@@ -181,7 +181,7 @@ function makeMountain(x, z, baseR, topR, h, color) {
 }
 
 if (CAN_USE_IMAGES) {
-  // 직접 그리신 성산일출봉 그림(far_island_v2.png)을 수평선에 세워 둡니다.
+  // 직접 그리신 성산일출봉 그림(far_island_v2.webp)을 수평선에 세워 둡니다.
   // 그림 원본이 1952x544 이고, 섬과 바다가 맞닿는 물가 선이 위에서 약 63% 지점에 있어서
   // 그 선이 실제 바다 높이(y=0)와 맞도록 판의 위치를 계산합니다.
   const IMG_W = 1952, IMG_H = 544, WATERLINE = 345 / IMG_H;
@@ -189,7 +189,7 @@ if (CAN_USE_IMAGES) {
   const backdrop = new THREE.Mesh(
     new THREE.PlaneGeometry(W, H),
     new THREE.MeshBasicMaterial({
-      map: loadTexture('../assets/stage1/far_island_v2.png'),
+      map: loadTexture('../assets/stage1/far_island_v2.webp'),
       transparent: true,
       depthWrite: false,
     })
@@ -1254,14 +1254,14 @@ function pingpong(i, n) {
 }
 
 if (CAN_USE_IMAGES) {
-  loadSheet('idle',      'idle_front.png', 8,  212);          // 서 있기 (정면)
-  loadSheet('walkSide',  'walk_side.png',  10, 208, 6, 8);    // 걷기 (옆모습, 원본은 왼쪽을 봄)
-  loadSheet('walkBack',  'walk_back.png',  10, 195, 3, 4);    // 걷기 (뒷모습)
-  loadSheet('walkFront', 'walk_front.png', 10, 198, 4, 5);    // 걷기 (카메라를 마주 보고 다가올 때)
-  loadSheet('cheer',     'cheer.png',      8,  192);          // 만세 (카메라를 보고 점프할 때)
-  loadSheet('sleep',     'sleep.png',      8,  299);          // 낮잠 (오래 가만히 있으면)
-  loadSheet('harvest',   'harvest.png',   10,  181);          // 감귤 따기 (F키로 딸 때, 한 번만 재생)
-  loadSheet('pullSide',  'pull_side.png', 10,  255);          // 끈 없이 상자를 몸으로 밀어 끌 때 (옆모습, 원본은 왼쪽을 봄)
+  loadSheet('idle',      'idle_front.webp', 8,  212);          // 서 있기 (정면)
+  loadSheet('walkSide',  'walk_side.webp',  10, 208, 6, 8);    // 걷기 (옆모습, 원본은 왼쪽을 봄)
+  loadSheet('walkBack',  'walk_back.webp',  10, 195, 3, 4);    // 걷기 (뒷모습)
+  loadSheet('walkFront', 'walk_front.webp', 10, 198, 4, 5);    // 걷기 (카메라를 마주 보고 다가올 때)
+  loadSheet('cheer',     'cheer.webp',      8,  192);          // 만세 (카메라를 보고 점프할 때)
+  loadSheet('sleep',     'sleep.webp',      8,  299);          // 낮잠 (오래 가만히 있으면)
+  loadSheet('harvest',   'harvest.webp',   10,  181);          // 감귤 따기 (F키로 딸 때, 한 번만 재생)
+  loadSheet('pullSide',  'pull_side.webp', 10,  255);          // 끈 없이 상자를 몸으로 밀어 끌 때 (옆모습, 원본은 왼쪽을 봄)
 
   // 판은 1x1 로 만들고, 어느 그림을 쓰느냐에 따라 매 프레임 크기를 바꿉니다.
   // 아래쪽 끝을 기준점으로 옮겨두면 세로로 늘였다 줄여도 발이 땅에서 안 떨어집니다.
