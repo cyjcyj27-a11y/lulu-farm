@@ -2,6 +2,10 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<!-- 이 한 줄이 없으면 폰이 "980픽셀짜리 데스크톱 화면"인 척 그린 다음 통째로 축소해 버립니다.
+     그러면 게임이 화면 왼쪽 위 구석에 손톱만하게 처박힙니다.
+     user-scalable=no 는 손가락으로 화면 자체가 확대되는 걸 막습니다 — 두 손가락은 게임 줌에 씁니다. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>루루냥의 제주농사</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
