@@ -1,0 +1,35 @@
+# 이 파일이 하는 일:
+# 깃허브에 코드가 올라가면, 깃허브가 알아서 게임을 웹에 띄워줍니다.
+# configure-pages 의 enablement: true 덕분에 설정 화면을 직접 만질 필요가 없습니다.
+name: 게임 웹에 올리기
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # 필요하면 손으로도 실행할 수 있게
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:                # 연달아 올려도 마지막 것만 배포되게
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true   # 깃허브 페이지 기능을 자동으로 켭니다
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .           # 저장소 전체가 곧 게임입니다
+      - id: deployment
+        uses: actions/deploy-pages@v4
