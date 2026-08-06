@@ -1381,6 +1381,30 @@ function buildRoom(R, floorColor, wallColor) {
   doorMark.position.set(R.cx, y0 + 1.25, R.cz + R.d / 2 - 0.03);
   doorMark.rotation.y = Math.PI;
   g.add(doorMark);
+  // 문틀 — 어두운 문이 벽에 묻히지 않게 밝은 테두리를 두릅니다
+  const frame = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.9, 2.9),
+    new THREE.MeshLambertMaterial({ color: 0xc9a86a })
+  );
+  frame.position.set(R.cx, y0 + 1.4, R.cz + R.d / 2 - 0.02);
+  frame.rotation.y = Math.PI;
+  g.add(frame);
+  // 문 위의 안내 팻말 — 여기로 걸어가면 밖으로 나갑니다
+  const signC = document.createElement('canvas');
+  signC.width = 256; signC.height = 64;
+  const sg = signC.getContext('2d');
+  sg.fillStyle = '#5e3f24'; sg.fillRect(0, 0, 256, 64);
+  sg.strokeStyle = '#c9a86a'; sg.lineWidth = 5; sg.strokeRect(2, 2, 252, 60);
+  sg.fillStyle = '#f6edd8'; sg.textAlign = 'center';
+  sg.font = 'bold 32px "맑은 고딕", Malgun Gothic, sans-serif';
+  sg.fillText('🚪 나가는 곳', 128, 43);
+  const signTex = new THREE.CanvasTexture(signC);
+  signTex.colorSpace = THREE.SRGBColorSpace;
+  const doorSign = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.42),
+    new THREE.MeshBasicMaterial({ map: signTex }));
+  doorSign.position.set(R.cx, y0 + 3.0, R.cz + R.d / 2 - 0.04);
+  doorSign.rotation.y = Math.PI;
+  g.add(doorSign);
   // 방을 밝히는 따뜻한 등불
   const lamp = new THREE.PointLight(0xffe0b0, 1.2, 22);
   lamp.position.set(R.cx, y0 + 2.6, R.cz);
@@ -3148,6 +3172,16 @@ function updateBasketPushed(dt) {
 
   if (Math.hypot(basketVel.x, basketVel.z) > 0.05) {
     turnBasketToward(Math.atan2(basketVel.x, basketVel.z), dt, 6);
+  }
+
+  // 그래도 깊이 겹치면 루루 쪽을 밀어냅니다 — 상자가 밀려나는 속도보다 루루 걸음이
+  // 빨라서(특히 달리기) 몸이 상자를 뚫고 지나가던 오류를 여기서 막습니다.
+  const px = basketPos.x - state.x, pz = basketPos.z - state.z;
+  const pd = Math.hypot(px, pz);
+  const minD = PUSH_MIN_DIST * 0.72;
+  if (pd < minD && pd > 0.0001) {
+    state.x = basketPos.x - (px / pd) * minD;
+    state.z = basketPos.z - (pz / pd) * minD;
   }
 }
 
