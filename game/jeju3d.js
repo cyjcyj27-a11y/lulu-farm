@@ -104,9 +104,16 @@ const DIVE = { x: 0, z: 118, r: 20 };    // 물질장 (포구 앞바다)
 const DIVE_DEPTH = 9;                    // 이만큼 더 파 내려갑니다
 const SEA_Y = -0.5;                      // 바다 표면 높이 (아래 4번에서 만드는 바다 판과 같은 값)
 
+let pierTopY = null;   // 포구 축대 윗면 높이 (처음 밟을 때 한 번 재서 기억합니다)
 function groundHeight(x, z) {
   // 집 내부·상점 내부는 섬에서 멀리 떨어진 곳에 지은 별도의 방들입니다 — 그 안은 평평한 방바닥
   if (x > 380 && x < 480 && z > 380 && z < 420) return 20;
+  // 포구 축대 위 — 바다 쪽으로 걸어나가도 축대 윗면 높이로 평평합니다
+  // (이게 없으면 축대 끝으로 갈수록 지형이 바다로 꺼져서 루루가 돌 밑에 파묻힙니다)
+  if (x > -2.6 && x < 2.6 && z > 92.5 && z < 102.4) {
+    if (pierTopY === null) pierTopY = groundHeight(0, 92);
+    return pierTopY;
+  }
   let h = 0;
   h += Math.sin(x * 0.032) * 1.3 + Math.cos(z * 0.027) * 1.5;   // 완만한 기복
   h += Math.sin((x + z) * 0.012) * 2.0;
@@ -2494,12 +2501,17 @@ function updateRopeBadge() {
   }
   // 포구 가까이 오면 물질하러 들어가는 법을 알려줍니다 (망사리가 없으면 그것부터)
   if (typeof PORT !== 'undefined' &&
-      Math.hypot(state.x - PORT.x, state.z - PORT.z) < BULTEOK_RANGE) {
-    ropeBadge.textContent = netCarried
-      ? `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다`
-      : (hasNet
-        ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
-        : `🧺 망사리가 있어야 물질합니다 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
+      Math.hypot(state.x - PORT.x, state.z - PORT.z) < BULTEOK_RANGE + 5) {
+    const nearEnd = Math.hypot(state.x - DIVE_ENTRY.x, state.z - DIVE_ENTRY.z) < DIVE_ENTRY_RANGE;
+    if (!nearEnd) {
+      ropeBadge.textContent = '🤿 축대 끝까지 걸어나가면 물질하러 들어갈 수 있어요';
+    } else {
+      ropeBadge.textContent = netCarried
+        ? `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다`
+        : (hasNet
+          ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
+          : `🧺 망사리가 있어야 물질합니다 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
+    }
     return;
   }
   // 헌집 가까이 오면 지금 할 수 있는 일(구입/수리)을 알려줍니다
@@ -3039,6 +3051,9 @@ function tryShipBox() {
 // ---------- 12-1e. 해녀 물질 ----------
 // 불턱에서 F를 누르면 바닷속으로 들어갑니다. 숨은 한정돼 있어서, 다 떨어지기 전에
 // 수면으로 올라와야 합니다. 딴 것은 망사리에 담기고, 뭍으로 나올 때 한꺼번에 팝니다.
+// 물질은 포구 축대 끝(바다 쪽 끝자락)에서 들어갑니다 — 축대를 끝까지 걸어나가야 합니다.
+const DIVE_ENTRY = { x: 0, z: 101 };
+const DIVE_ENTRY_RANGE = 2.6;
 // 포구는 축대가 넓어서 인식 범위도 넉넉해야 합니다.
 // ※ 예전에는 안내 문구가 5.2미터부터 뜨는데 실제 인식은 3.2미터라, 그 사이 2미터 구간에서
 //   "누르세요"라고 해놓고 눌러도 아무 일이 안 일어났습니다. 이제 둘을 같은 값으로 맞춥니다.
@@ -3739,12 +3754,13 @@ function handleActionKey() {
   if (houseDist < HOUSE_RANGE + 3) { tryFixHouse(); return; }
   const stableDist = Math.hypot(state.x - STABLE.x, state.z - STABLE.z);
   if (stableDist < STABLE_RANGE) { tryFeedPony(); return; }
-  const bulteokDist = Math.hypot(state.x - BULTEOK.x, state.z - BULTEOK.z);
-  if (bulteokDist < BULTEOK_RANGE) {
+  // 물질은 포구 축대 끝에서만 들어갈 수 있습니다
+  const entryDist = Math.hypot(state.x - DIVE_ENTRY.x, state.z - DIVE_ENTRY.z);
+  if (entryDist < DIVE_ENTRY_RANGE) {
     // 망사리를 메고 있어야만 바다에 들어갈 수 있습니다
     if (!netCarried) {
-      const py = groundHeight(BULTEOK.x, BULTEOK.z) + 2.2;
-      spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
+      const py = groundHeight(DIVE_ENTRY.x, DIVE_ENTRY.z) + 2.2;
+      spawnMoneyPopup(DIVE_ENTRY.x, py, DIVE_ENTRY.z,
         hasNet ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
                : `🧺 망사리가 있어야 물질할 수 있어요 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
       return;
@@ -3807,12 +3823,12 @@ bindTouchButton('btnJump',   (down) => { touchJump = down; });
 // 점프 높이는 JUMP²/(2×GRAVITY). 7.4이면 1.24미터라 돌담(1.3미터쯤)을 아슬아슬하게 못 넘었습니다.
 // 고양이답게 8.9로 올리면 1.8미터까지 떠서 담을 여유 있게 뛰어넘습니다.
 const WALK = 4.2, RUN = 8.0, GRAVITY = 22, JUMP = 8.9;
-// 물속 움직임 — 「인사이드」의 물속 구간처럼 묵직하게 가속하고 손을 놔도 한참 미끄러집니다.
-// 뭍에서는 키를 놓으면 즉시 멈추지만, 물속에서는 관성이 남아야 물에 잠긴 느낌이 납니다.
-const SWIM_ACCEL = 7.0;     // 물을 밀어내며 붙는 속도
-const SWIM_DRAG = 1.9;      // 손을 놨을 때 물이 잡아주는 정도 (작을수록 더 오래 미끄러짐)
-const SWIM_MAX = 3.4;       // 물속 최고 속도 (뭍 걷기 4.2보다 느림)
-const SWIM_UP = 9.0, WATER_SINK = 3.4;   // SEA_Y는 지형 함수보다 먼저 필요해서 위(2번)에 있습니다
+// 물속 움직임 — 예전에는 너무 미끄러지고(빙판 같고) 가라앉는 힘이 세서 부자연스러웠습니다.
+// 지금은: 밀면 금방 붙고, 놓으면 물이 잡아줘서 곧 멈추고, 가만히 있으면 아주 천천히 가라앉습니다.
+const SWIM_ACCEL = 14.0;    // 물을 밀어내며 붙는 속도 (금방 최고 속도에 닿습니다)
+const SWIM_DRAG = 3.2;      // 손을 놨을 때 물이 잡아주는 정도 (클수록 빨리 멈춤)
+const SWIM_MAX = 4.0;       // 물속 최고 속도
+const SWIM_UP = 12.0, WATER_SINK = 1.6;   // SEA_Y는 지형 함수보다 먼저 필요해서 위(2번)에 있습니다
 const swimVel = { x: 0, z: 0 };   // 물속에서만 쓰는 좌우 관성
 const moveDir = new THREE.Vector3();
 
@@ -3916,6 +3932,10 @@ function updateLulu(dt) {
     const R = state.inside ? ROOM : SHOP_ROOM;
     state.x = Math.min(R.cx + R.w / 2 - 0.6, Math.max(R.cx - R.w / 2 + 0.6, state.x));
     state.z = Math.min(R.cz + R.d / 2 - 0.4, Math.max(R.cz - R.d / 2 + 0.6, state.z));
+  } else if (state.z > 94 && state.z < PORT.z + 10.3 && Math.abs(state.x - PORT.x) < 2.4) {
+    // 포구 축대 위 — 섬 경계(원) 밖이지만 축대 폭 안에서는 끝까지 걸어나갈 수 있습니다
+    state.x = Math.min(PORT.x + 2.2, Math.max(PORT.x - 2.2, state.x));
+    state.z = Math.min(PORT.z + 10.1, state.z);
   } else {
     const rr = Math.hypot(state.x, state.z);
     if (rr > WALK_R) {
@@ -3930,7 +3950,8 @@ function updateLulu(dt) {
   if (state.diving) {
     if (wantUp) state.vy += SWIM_UP * dt;         // 누르고 있는 동안 계속 떠오름
     state.vy -= WATER_SINK * dt;                  // 놓으면 천천히 가라앉음
-    state.vy = Math.max(-2.6, Math.min(4.2, state.vy));
+    state.vy *= Math.max(0, 1 - 2.0 * dt);        // 물의 저항 — 위아래 움직임도 부드럽게 잦아듭니다
+    state.vy = Math.max(-2.2, Math.min(3.6, state.vy));
   } else {
     if (wantUp && state.onGround && state.harvestT < 0) {
       state.vy = JUMP;
