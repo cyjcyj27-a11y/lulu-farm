@@ -220,33 +220,54 @@ function makeMountain(x, z, baseR, topR, h, color) {
   return m;
 }
 
-if (CAN_USE_IMAGES) {
-  // 직접 그리신 성산일출봉 그림(far_island_v2.webp)을 수평선에 세워 둡니다.
-  // 그림 원본이 1952x544 이고, 섬과 바다가 맞닿는 물가 선이 위에서 약 63% 지점에 있어서
-  // 그 선이 실제 바다 높이(y=0)와 맞도록 판의 위치를 계산합니다.
-  const IMG_W = 1952, IMG_H = 544, WATERLINE = 345 / IMG_H;
-  const W = 936, H = W * IMG_H / IMG_W;   // 실제 성산일출봉을 들판에서 바라본 정도의 크기 (780에서 20% 키움)
-  const backdrop = new THREE.Mesh(
-    new THREE.PlaneGeometry(W, H),
-    new THREE.MeshBasicMaterial({
-      map: loadTexture('../assets/stage1/far_island_v2.webp'),
-      transparent: true,
-      depthWrite: false,
-    })
-  );
-  backdrop.position.set(0, H * (WATERLINE - 0.5), -480);   // 물가 선이 바다 높이(y=0)에 오도록
-  backdrop.renderOrder = -1;
-  scene.add(backdrop);
-  skyStuff.push(backdrop);
+// 성산일출봉 — 예전에는 그림판 한 장을 수평선에 세워 뒀는데, 각도에 따라 종이처럼 보였습니다.
+// 이제 실제 응회구 모양(가파른 절벽 위에 평평한 초록 분화구)을 통째로 빚어 세웁니다.
+{
+  const g = new THREE.Group();
+  g.position.set(40, -8, -470);
+  const cliffMat = new THREE.MeshLambertMaterial({ color: 0x62806f, flatShading: true });
+  const grassMat = new THREE.MeshLambertMaterial({ color: 0x6f9a56, flatShading: true });
+  const rimMat = new THREE.MeshLambertMaterial({ color: 0x55705f, flatShading: true });
 
-  makeMountain(-360, -300, 120, 14, 74, 0x6f9295);   // 멀리 보이는 한라산
-  // (오른쪽 바다에 있던 뾰족한 섬은 성산일출봉과 겹쳐 보여서 없앴습니다)
-} else {
-  makeMountain(-60, -430, 150, 16, 92, 0x64878a);
-  makeMountain(170, -360, 58, 8, 32, 0x6f9088);
-  makeMountain(-260, -300, 50, 6, 26, 0x789787);
-  makeMountain(260, -220, 38, 5, 20, 0x7d9b8a);
+  // 몸통 — 위가 넓적한 가파른 절벽. 각도마다 반지름을 살짝 다르게 해 세로 능선을 냅니다
+  const bodyGeo = new THREE.CylinderGeometry(86, 132, 96, 26, 5);
+  {
+    const pos = bodyGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const a = Math.atan2(z, x);
+      const k = 1 + Math.sin(a * 9) * 0.045 + Math.sin(a * 23 + 2) * 0.03;
+      pos.setX(i, x * k);
+      pos.setZ(i, z * k);
+    }
+    bodyGeo.computeVertexNormals();
+  }
+  const body = new THREE.Mesh(bodyGeo, cliffMat);
+  body.position.y = 48;
+  g.add(body);
+  // 분화구 테두리 — 꼭대기 가장자리를 나지막한 둔덕이 한 바퀴 두릅니다
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(80, 8, 8, 26), rimMat);
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 96;
+  g.add(rim);
+  // 분화구 안 풀밭 — 얕은 접시처럼 살짝 꺼진 초록
+  const bowl = new THREE.Mesh(new THREE.ConeGeometry(80, 10, 26), grassMat);
+  bowl.rotation.x = Math.PI;
+  bowl.position.y = 92;
+  g.add(bowl);
+  // 바다에 완만하게 잠기는 밑단 치마
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(150, 230, 26, 24), cliffMat);
+  skirt.position.y = 6;
+  g.add(skirt);
+  // 서쪽으로 이어지는 낮은 반도 — 성산은 섬이 아니라 뭍과 이어져 있으니까요
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(60, 90, 16, 18), grassMat);
+  neck.scale.set(2.6, 1, 0.7);
+  neck.position.set(-220, 2, 20);
+  g.add(neck);
+  scene.add(g);
+  skyStuff.push(g);
 }
+makeMountain(-360, -300, 120, 14, 74, 0x6f9295);   // 멀리 보이는 한라산
 
 // ---------- 6. 바람에 흔들리는 식물 재질 ----------
 // MeshLambertMaterial의 셰이더에 흔들림 코드를 살짝 끼워 넣습니다.
@@ -1050,34 +1071,145 @@ const house = (() => {
 function applyHouseLook() {
   if (house.plane) house.plane.material.map = houseTex[Math.max(0, houseStage)];
   house.junk.visible = houseStage < 3;    // 다 고치면 마당의 잡동사니가 치워집니다
-  house.sale.visible = houseStage < 0;    // 사고 나면 팻말이 사라집니다
+  house.sale.visible = houseStage < 0;    // 처음부터 루루의 집이라 팻말은 안 보입니다
 }
 applyHouseLook();
+
+// 헌집 입체 몸통 — 정면은 직접 그리신 그림 그대로, 뒤로는 돌벽과 초가지붕이 이어집니다.
+// (옆이나 뒤에서 봐도 종이처럼 얇아 보이지 않게)
+{
+  const body = new THREE.Mesh(new THREE.BoxGeometry(7.4, 2.6, 4.0), shopStoneMat);
+  body.position.set(0, 1.3, -2.2);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  house.group.add(body);
+  const roof = makeGableRoof(8.6, 5.2, 1.7, shopThatchMat);
+  roof.position.set(0, 2.55, -2.1);
+  house.group.add(roof);
+  // 뒤채에도 부딪히게
+  obstacles.push({ x: HOUSE.x, z: HOUSE.z - 2.4, r: 3.0, topY: NO_JUMP });
+}
 
 // ---------- 8-2e. 마구간과 조랑말 ----------
 // 서쪽 벌판에 초가 마구간이 있고, 안에 제주 조랑말이 서 있습니다 (직접 그리신 그림).
 // 이장님 상점에서 당근(1,000원)을 사다 먹이면 애정이 쌓입니다 — 나중에 경마의 밑천이 됩니다.
+// 맞배 초가지붕 한 채 — 길이 방향이 X축. 마구간과 헌집 몸통 양쪽에서 돌려 씁니다.
+function makeGableRoof(len, span, peak, mat) {
+  const g = new THREE.Group();
+  const s = span / 2;
+  const slope = Math.hypot(s, peak) + 0.25;
+  const tilt = Math.atan2(peak, s);
+  [1, -1].forEach((side) => {
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(len, 0.22, slope), mat);
+    panel.position.set(0, peak / 2, side * s / 2);
+    panel.rotation.x = side * tilt;
+    panel.castShadow = true;
+    g.add(panel);
+  });
+  const ridge = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, len, 6), mat);
+  ridge.rotation.z = Math.PI / 2;
+  ridge.position.y = peak;
+  g.add(ridge);
+  return g;
+}
+
 const STABLE = { x: -79, z: 8 };   // 서쪽 벌판 (바다에 걸치지 않게 물가에서 한 발 물림)
 const STABLE_RANGE = 6.0;
 const FEED_RANGE = 3.0;   // 당근은 조랑말 앞까지 가까이 가야 먹일 수 있습니다
 const STABLE_W = 9.0, STABLE_H = 9.0 * 684 / 1019;   // 그림 비율 그대로
+// 예전에는 그림 한 장을 세워 뒀는데, 옆에서 보면 종이처럼 얇았습니다.
+// 이제 돌벽·나무 기둥·초가지붕의 진짜 헛간을 짓고, 그 안에 조랑말도 통통하게 빚어 세웁니다.
 const stable = (() => {
   const g = new THREE.Group();
   const y = groundHeight(STABLE.x, STABLE.z);
   g.position.set(STABLE.x, y, STABLE.z);
-  if (CAN_USE_IMAGES) {
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(STABLE_W, STABLE_H),
-      new THREE.MeshLambertMaterial({ map: loadTexture('../assets/farmcat/stable.webp'), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })
-    );
-    plane.position.y = STABLE_H / 2;
-    plane.rotation.y = Math.PI / 2;   // 섬 안쪽(동쪽)을 바라보게
-    plane.castShadow = true;
-    g.add(plane);
-  }
+
+  // ----- 초가 헛간 (동쪽으로 열린 마구간) -----
+  const dirt = new THREE.Mesh(new THREE.CircleGeometry(3.6, 18),
+    new THREE.MeshLambertMaterial({ color: 0x8a6f4d }));
+  dirt.rotation.x = -Math.PI / 2;
+  dirt.position.y = 0.02;
+  g.add(dirt);
+  // 뒷벽(서쪽) — 현무암
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.7, 6.6), shopStoneMat);
+  back.position.set(-2.2, 1.35, 0);
+  back.castShadow = true;
+  g.add(back);
+  // 옆의 낮은 돌담 두 장
+  [-3.3, 3.3].forEach((z) => {
+    const w = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.9, 0.45), shopStoneMat);
+    w.position.set(-0.2, 0.95, z);
+    w.castShadow = true;
+    g.add(w);
+  });
+  // 앞 기둥 두 개 (나무)
+  [-3.1, 3.1].forEach((z) => {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 2.9, 7), shopWoodDarkMat);
+    p.position.set(2.0, 1.45, z);
+    p.castShadow = true;
+    g.add(p);
+  });
+  // 초가 지붕 — 용마루가 남북(z)으로 걸린 맞배지붕
+  const roof = makeGableRoof(7.8, 6.0, 1.6, shopThatchMat);
+  roof.rotation.y = Math.PI / 2;
+  roof.position.set(-0.1, 2.7, 0);
+  g.add(roof);
+  // 구석의 건초 더미
+  const hay = new THREE.Mesh(new THREE.SphereGeometry(0.55, 9, 7),
+    new THREE.MeshLambertMaterial({ color: 0xd8b45e, flatShading: true }));
+  hay.scale.y = 0.6;
+  hay.position.set(-1.4, 0.33, -2.2);
+  hay.castShadow = true;
+  g.add(hay);
+
+  // ----- 제주 조랑말 — 통통한 몸에 짙은 갈기, 동쪽(섬 안쪽)을 바라봅니다 -----
+  const pony = new THREE.Group();
+  const coatMat = new THREE.MeshLambertMaterial({ color: 0xa5713f, flatShading: true });
+  const maneMat = new THREE.MeshLambertMaterial({ color: 0x46331f, flatShading: true });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.52, 1.05, 5, 10), coatMat);
+  body.rotation.z = Math.PI / 2;
+  body.position.set(0, 1.15, 0);
+  body.castShadow = true;
+  pony.add(body);
+  const neckM = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.55, 4, 8), coatMat);
+  neckM.position.set(0.78, 1.62, 0);
+  neckM.rotation.z = -0.7;
+  pony.add(neckM);
+  const head = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.42, 4, 8), coatMat);
+  head.position.set(1.13, 1.86, 0);
+  head.rotation.z = Math.PI / 2 - 0.25;   // 코가 앞으로 살짝 숙인 자세
+  head.castShadow = true;
+  pony.add(head);
+  [-0.11, 0.11].forEach((dz) => {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 5), maneMat);
+    ear.position.set(0.98, 2.08, dz);
+    pony.add(ear);
+  });
+  const mane = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.12), maneMat);
+  mane.position.set(0.68, 1.82, 0);
+  mane.rotation.z = -0.7;
+  pony.add(mane);
+  [[0.55, -0.26], [0.55, 0.26], [-0.55, -0.26], [-0.55, 0.26]].forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.85, 6), coatMat);
+    leg.position.set(lx, 0.42, lz);
+    leg.castShadow = true;
+    pony.add(leg);
+    const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.1, 6), maneMat);
+    hoof.position.set(lx, 0.05, lz);
+    pony.add(hoof);
+  });
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.75, 6), maneMat);
+  tail.position.set(-0.95, 1.0, 0);
+  tail.rotation.z = 0.5;
+  pony.add(tail);
+  pony.position.set(0.1, 0, 0);
+  g.add(pony);
+
   scene.add(g);
   obstacles.push({ x: STABLE.x, z: STABLE.z, r: 2.0, topY: NO_JUMP });   // 조랑말 앞까지 바짝 갈 수 있게 좁힘
-  return { group: g };
+  obstacles.push({ x: STABLE.x - 0.2, z: STABLE.z - 3.3, r: 1.4, topY: NO_JUMP });   // 옆 돌담
+  obstacles.push({ x: STABLE.x - 0.2, z: STABLE.z + 3.3, r: 1.4, topY: NO_JUMP });
+  return { group: g, pony };
 })();
 
 // 공구 — 헌집을 고치는 데 필요한 망치·톱·페인트. 이장님 상점 앞 공구대에서 팝니다.
@@ -2569,12 +2701,13 @@ updateCoinBadge();
 // 화면에 잠깐 떴다 사라지는 "+1000원" 표시. 3D 좌표를 화면 좌표로 투영해서
 // 일반 HTML 글자로 띄우는 방식이라(WebGL 텍스트보다 간단), 매 프레임 위치만 갱신해주면 됩니다.
 const popups = [];
-function spawnMoneyPopup(worldX, worldY, worldZ, text) {
+// life를 주면 그 시간(초)만큼 떠 있습니다 — 중요한 문구는 길게 (기본 1.1초)
+function spawnMoneyPopup(worldX, worldY, worldZ, text, life) {
   const el = document.createElement('div');
   el.className = 'moneyPopup';
   el.textContent = text;
   document.getElementById('ui').appendChild(el);
-  popups.push({ el, x: worldX, y: worldY, z: worldZ, t: 0 });
+  popups.push({ el, x: worldX, y: worldY, z: worldZ, t: 0, life: life || 1.1 });
 }
 
 // ---------- 12-1a. 효과음 ----------
@@ -2677,11 +2810,13 @@ function updatePopups(dt) {
   for (let i = popups.length - 1; i >= 0; i--) {
     const p = popups[i];
     p.t += dt;
-    if (p.t > 1.1) { p.el.remove(); popups.splice(i, 1); continue; }
-    harvestVec.set(p.x, p.y + p.t * 0.9, p.z).project(camera);   // 위로 떠오르며
+    if (p.t > p.life) { p.el.remove(); popups.splice(i, 1); continue; }
+    // 위로 떠오르되, 오래 머무는 문구는 끝없이 올라가지 않게 1.2초어치까지만
+    harvestVec.set(p.x, p.y + Math.min(p.t, 1.2) * 0.9, p.z).project(camera);
     p.el.style.left = ((harvestVec.x * 0.5 + 0.5) * innerWidth) + 'px';
     p.el.style.top = ((-harvestVec.y * 0.5 + 0.5) * innerHeight) + 'px';
-    p.el.style.opacity = Math.max(0, 1 - p.t / 1.1);
+    // 수명의 마지막 30% 구간에서만 서서히 사라집니다
+    p.el.style.opacity = p.t < p.life * 0.7 ? 1 : Math.max(0, 1 - (p.t - p.life * 0.7) / (p.life * 0.3));
   }
 }
 
@@ -3191,10 +3326,10 @@ function leaveDive(reason) {
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
       lostCoins > 0
         ? '💸 의식을 잃은 사이 누군가 집에 들어와 돈을 다 훔쳐갔습니다'
-        : '😵 정신을 잃고 떠밀려 왔어요');
+        : '😵 정신을 잃고 떠밀려 왔어요', 5.5);
     if (lost > 0) {
-      setTimeout(() => spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
-        `🧺 망사리에 담았던 ${lost}개도 바다에 흘렸습니다`), 1700);
+      setTimeout(() => spawnMoneyPopup(BULTEOK.x, py + 0.9, BULTEOK.z,
+        `🧺 망사리에 담았던 ${lost}개도 바다에 흘렸습니다`, 5), 2600);
     }
   } else if (caught > 0) {
     coins += pay;
@@ -3691,13 +3826,13 @@ function updateCarrotFx(dt) {
     carrotFx.visible = false; carrotFxT = -1;
     // 다 먹은 순간 입가에서 반짝! (짧고 맑은 소리와 함께)
     const gy2 = groundHeight(STABLE.x, STABLE.z);
-    spawnMoneyPopup(STABLE.x + 1.2, gy2 + 2.35, STABLE.z, '✨');
+    spawnMoneyPopup(STABLE.x + 1.55, gy2 + 2.2, STABLE.z, '✨');
     blip(880, 1320, 0.14, 0.14, 'sine');
     return;
   }
   // 조랑말 입 앞에서 조금씩 작아지며(먹히며) 살짝 위아래로 흔들립니다
   const gy = groundHeight(STABLE.x, STABLE.z);
-  carrotFx.position.set(STABLE.x + 1.2, gy + 2.05 + Math.sin(carrotFxT * 18) * 0.05, STABLE.z);   // 조랑말 입가
+  carrotFx.position.set(STABLE.x + 1.55, gy + 1.9 + Math.sin(carrotFxT * 18) * 0.05, STABLE.z);   // 조랑말 입가 (3D 머리 앞)
   carrotFx.rotation.y = Math.atan2(camera.position.x - STABLE.x, camera.position.z - STABLE.z);
   carrotFx.scale.setScalar(1 - k * 0.85);
 }
