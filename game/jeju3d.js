@@ -1426,17 +1426,18 @@ function pickUpNet() {
   playPickSound();
   spawnMoneyPopup(state.x, groundHeight(state.x, state.z) + 1.4, state.z, '🧺 망사리를 챙겼어요');
 }
-// 메고 있는 동안 루루 등 뒤를 살랑살랑 따라다닙니다 (매 프레임 호출)
+// 메고 있는 동안 루루 등(허리께)에 딱 붙어 다닙니다 (매 프레임 호출)
 const netFollow = new THREE.Vector3();
 function updateNet(dt, t) {
   if (!netCarried) return;
   const back = state.facing + Math.PI;
+  // 몸에 살짝 겹칠 만큼 바짝(0.28), 허리 높이(0.35)에 붙입니다 — 허공에 떠 보이지 않게
   netFollow.set(
-    state.x + Math.sin(back) * 0.5,
-    lulu.position.y + 0.95 + Math.sin(t * 5) * 0.03,
-    state.z + Math.cos(back) * 0.5
+    state.x + Math.sin(back) * 0.28,
+    lulu.position.y + 0.35 + Math.sin(t * 5) * 0.015,
+    state.z + Math.cos(back) * 0.28
   );
-  netObj.position.lerp(netFollow, 1 - Math.pow(0.001, dt));
+  netObj.position.lerp(netFollow, 1 - Math.pow(0.000001, dt));   // 거의 즉시 따라붙습니다
   netObj.rotation.y = state.facing;
 }
 
@@ -2549,7 +2550,7 @@ function updateRopeBadge() {
       Math.hypot(state.x - STABLE.x, state.z - STABLE.z) < STABLE_RANGE) {
     ropeBadge.textContent = carrots > 0
       ? `🐴 ${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)`
-      : '🐴 조랑말이 배고파해요 — 이장님 상점에서 당근을 사오세요';
+      : '🐴 조랑말한테 당근을 주세요 — 당근은 이장님 상점에서';
     return;
   }
   if (state.grabbing) {
