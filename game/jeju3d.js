@@ -1078,7 +1078,56 @@ const stable = (() => {
 
 let carrots = 0;      // 들고 있는 당근
 let ponyLove = 0;     // 조랑말과 쌓은 애정 (당근 하나에 1씩)
+let hasTank = false;  // 해녀 산소통 — 사면 숨이 26초에서 60초로 늘어납니다
 const CARROT_PRICE = 1000;
+const TANK_PRICE = 30000;
+const TANK_BREATH = 60;   // 산소통을 멘 뒤의 숨 (원래 26초의 2배 이상)
+
+// 산소통 판매대 — 상점 정면 동쪽. 당근 바구니(서쪽)와 반대편에 나란히 놓입니다.
+const TANK_SPOT = { x: 9.4, z: 42.4 };
+const TANK_RANGE = 2.4;
+let tankMeshes = null;
+{
+  const y = groundHeight(TANK_SPOT.x, TANK_SPOT.z);
+  const g = new THREE.Group();
+  g.position.set(TANK_SPOT.x, y, TANK_SPOT.z);
+  const tankMat = new THREE.MeshLambertMaterial({ color: 0xd8862a, flatShading: true });
+  const valveMat = new THREE.MeshLambertMaterial({ color: 0x8b8f94, flatShading: true });
+  // 받침대와 산소통 두 개 (하나 팔려도 진열은 계속 남습니다)
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 0.6), shopWoodMat);
+  stand.position.y = 0.08;
+  stand.castShadow = true;
+  g.add(stand);
+  [-0.26, 0.26].forEach((px) => {
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.62, 4, 10), tankMat);
+    body.position.set(px, 0.66, 0);
+    body.castShadow = true;
+    g.add(body);
+    const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 6), valveMat);
+    valve.position.set(px, 1.12, 0);
+    g.add(valve);
+  });
+  scene.add(g);
+  tankMeshes = g;
+}
+
+function tryBuyTank() {
+  const y = groundHeight(TANK_SPOT.x, TANK_SPOT.z) + 1.6;
+  if (hasTank) {
+    spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, '이미 산소통이 있어요');
+    return;
+  }
+  if (coins < TANK_PRICE) {
+    spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, `${(TANK_PRICE - coins).toLocaleString()}원 부족`);
+    return;
+  }
+  coins -= TANK_PRICE;
+  hasTank = true;
+  BREATH_MAX = TANK_BREATH;   // 지금 물질 중이 아니어도, 다음 잠수부터 바로 적용됩니다
+  updateCoinBadge();
+  playShipSound();
+  spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, '🤿 산소통 구입! 숨이 60초로 늘었어요');
+}
 // 당근 바구니 — 상점 정면 서쪽에 놓인 판매대입니다. 상점(끈)과 자리를 나눠 씁니다.
 const CARROT_SPOT = { x: 3.2, z: 42.6 };
 const CARROT_RANGE = 2.4;
@@ -1939,10 +1988,17 @@ function updateRopeBadge() {
     ropeBadge.textContent = houseBadgeText();
     return;
   }
-  // 당근 바구니·마구간 안내
+  // 당근 바구니·산소통·마구간 안내
   if (typeof CARROT_SPOT !== 'undefined' &&
       Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z) < CARROT_RANGE) {
     ropeBadge.textContent = `🥕 ${KEY_ACTION}으로 당근 구입 (${CARROT_PRICE.toLocaleString()}원)`;
+    return;
+  }
+  if (typeof TANK_SPOT !== 'undefined' &&
+      Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z) < TANK_RANGE) {
+    ropeBadge.textContent = hasTank
+      ? '🤿 산소통 보유 중 — 숨 60초'
+      : `🤿 해녀 산소통 — ${KEY_ACTION}으로 구입 (${TANK_PRICE.toLocaleString()}원, 숨 26→60초)`;
     return;
   }
   if (typeof STABLE !== 'undefined' &&
@@ -2470,7 +2526,7 @@ function tryShipBox() {
 // ※ 예전에는 안내 문구가 5.2미터부터 뜨는데 실제 인식은 3.2미터라, 그 사이 2미터 구간에서
 //   "누르세요"라고 해놓고 눌러도 아무 일이 안 일어났습니다. 이제 둘을 같은 값으로 맞춥니다.
 const BULTEOK_RANGE = 6.0;
-const BREATH_MAX = 26;         // 한 번 잠수해서 버틸 수 있는 시간(초)
+let BREATH_MAX = 26;           // 한 번 잠수해서 버틸 수 있는 시간(초). 산소통을 사면 60초로 늘어납니다
 const NET_CAP = 24;            // 망사리에 담을 수 있는 개수
 const CATCH_RANGE = 1.7;       // 이 거리 안의 것만 딸 수 있음
 let breath = BREATH_MAX;
@@ -2861,9 +2917,11 @@ function handleActionKey() {
   if (state.harvestT >= 0 || state.fixT >= 0) return;
   if (state.diving) { tryCollect(); return; }
   if (nearestFruit() >= 0) { tryHarvest(); return; }
-  // 당근 바구니는 상점 코앞에 있으므로, 상점(끈)보다 먼저 좁은 범위로 확인합니다
+  // 당근 바구니·산소통 판매대는 상점 코앞에 있으므로, 상점(끈)보다 먼저 좁은 범위로 확인합니다
   const carrotDist = Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z);
   if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
+  const tankDist = Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z);
+  if (tankDist < TANK_RANGE) { tryBuyTank(); return; }
   const shopDist = Math.hypot(state.x - shop.group.position.x, state.z - shop.group.position.z);
   if (shopDist < SHOP_RANGE) { tryBuyRope(); return; }
   const depotDist = Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z);
