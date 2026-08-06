@@ -1263,7 +1263,7 @@ let carrots = 0;      // 들고 있는 당근
 let ponyLove = 0;     // 조랑말과 쌓은 애정 (당근 하나에 1씩)
 let hasTank = false;  // 해녀 산소통 — 사면 숨이 60초에서 3분으로 늘어납니다
 const CARROT_PRICE = 1000;
-const TANK_PRICE = 30000;
+const TANK_PRICE = 100000;
 const TANK_BREATH = 180;   // 산소통을 멘 뒤의 숨 — 3분
 
 // 산소통 판매대 — 상점 정면 동쪽. 당근 바구니(서쪽)와 반대편에 나란히 놓입니다.
@@ -1382,19 +1382,20 @@ function buildRoom(R, floorColor, wallColor) {
   lamp.position.set(R.cx, y0 + 2.6, R.cz);
   g.add(lamp);
   scene.add(g);
-  return g;
+  // 바닥·벽 재질을 돌려줘서, 나중에 바닥재·벽지를 사서 갈 수 있게 합니다
+  return { group: g, floorMat: floor.material, wallMat };
 }
-buildRoom(ROOM, 0x7a6a52, 0x8d8b85);        // 집 안 — 다져진 흙바닥에 돌벽 (폐가답게)
-buildRoom(SHOP_ROOM, 0x9a7748, 0xd3b97e);   // 상점 안 — 나무 바닥에 초가빛 벽
+const houseRoomLook = buildRoom(ROOM, 0x7a6a52, 0x8d8b85);   // 집 안 — 다져진 흙바닥에 돌벽 (폐가답게)
+buildRoom(SHOP_ROOM, 0x9a7748, 0xd3b97e);                    // 상점 안 — 나무 바닥에 초가빛 벽
 
 // ---------- 8-2h-2. 가구 (상점에서 사서 집을 꾸밉니다) ----------
 // 처음엔 집이 텅 비어서 맨땅에서 잡니다. 상점 안에서 가구를 사면 집 안에 놓입니다.
 const FURN_ORDER = ['bed', 'chair', 'table', 'closet'];
 const FURNITURE = {
-  bed:    { name: '침대', price: 20000 },
-  chair:  { name: '의자', price: 6000 },
-  table:  { name: '식탁', price: 12000 },
-  closet: { name: '옷장', price: 15000 },
+  bed:    { name: '침대', price: 100000 },
+  chair:  { name: '의자', price: 60000 },
+  table:  { name: '식탁', price: 120000 },
+  closet: { name: '옷장', price: 200000 },
 };
 let furnitureOwned = { bed: false, chair: false, table: false, closet: false };
 
@@ -1633,6 +1634,71 @@ const SHOP_GOODS = [
     sign.position.set(good.x, y0 + 2.0, good.z + 0.1);
     scene.add(sign);
   }
+}
+
+// ---------- 8-2h-4b. 상점 왼쪽 인테리어 코너 — 집 바닥재·벽지 (색을 골라 삽니다) ----------
+// 서쪽 벽을 따라 색 견본이 줄지어 있고, 마음에 드는 색 앞에서 F를 누르면
+// 그 색으로 집 안 바닥/벽이 바로 바뀝니다. (바꿀 때마다 시공비를 냅니다)
+const RENO_GOODS = [
+  { type: 'floor', name: '바닥', price: 50000,  colorName: '원목',     color: 0x9a7748, dz: -2.7 },
+  { type: 'floor', name: '바닥', price: 50000,  colorName: '밝은나무', color: 0xc9a86a, dz: -1.8 },
+  { type: 'floor', name: '바닥', price: 50000,  colorName: '현무암',   color: 0x8d8b85, dz: -0.9 },
+  { type: 'floor', name: '바닥', price: 50000,  colorName: '붉은흙',   color: 0x9a6a4d, dz: 0.0 },
+  { type: 'wall',  name: '벽지', price: 100000, colorName: '크림',     color: 0xf0e4c8, dz: 1.2 },
+  { type: 'wall',  name: '벽지', price: 100000, colorName: '하늘',     color: 0xa8c8e0, dz: 2.1 },
+  { type: 'wall',  name: '벽지', price: 100000, colorName: '연분홍',   color: 0xe8b8c0, dz: 3.0 },
+];
+let houseFloorColor = 0;   // 0 = 아직 기본 (폐가 흙바닥·돌벽)
+let houseWallColor = 0;
+{
+  const y0 = SHOP_ROOM.y, x = SHOP_ROOM.cx - 5.3;
+  for (const rg of RENO_GOODS) {
+    rg.x = x;
+    rg.z = SHOP_ROOM.cz + rg.dz;
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.7), shopWoodMat);
+    stand.position.set(rg.x, y0 + 0.25, rg.z);
+    scene.add(stand);
+    const chip = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.12, 0.55),
+      new THREE.MeshLambertMaterial({ color: rg.color }));
+    chip.position.set(rg.x, y0 + 0.56, rg.z);
+    scene.add(chip);
+  }
+  const s1 = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.58),
+    new THREE.MeshBasicMaterial({ map: makePriceSign('바닥', 50000) }));
+  s1.position.set(x + 0.1, y0 + 2.0, SHOP_ROOM.cz - 1.35);
+  s1.rotation.y = Math.PI / 2;
+  scene.add(s1);
+  const s2 = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.58),
+    new THREE.MeshBasicMaterial({ map: makePriceSign('벽지', 100000) }));
+  s2.position.set(x + 0.1, y0 + 2.0, SHOP_ROOM.cz + 2.1);
+  s2.rotation.y = Math.PI / 2;
+  scene.add(s2);
+}
+function applyRoomLook() {
+  if (houseFloorColor) houseRoomLook.floorMat.color.setHex(houseFloorColor);
+  if (houseWallColor) houseRoomLook.wallMat.color.setHex(houseWallColor);
+}
+function nearestReno() {
+  let best = null, bestD = 0.9;
+  for (const rg of RENO_GOODS) {
+    const d = Math.hypot(state.x - rg.x, state.z - rg.z);
+    if (d < bestD) { bestD = d; best = rg; }
+  }
+  return best;
+}
+function buyReno(rg) {
+  const py = SHOP_ROOM.y + 1.6;
+  if (coins < rg.price) {
+    spawnMoneyPopup(state.x, py, state.z, `${(rg.price - coins).toLocaleString()}원 부족`);
+    return;
+  }
+  coins -= rg.price;
+  updateCoinBadge();
+  if (rg.type === 'floor') houseFloorColor = rg.color;
+  else houseWallColor = rg.color;
+  applyRoomLook();
+  playShipSound();
+  spawnMoneyPopup(state.x, py, state.z, `🎨 ${rg.colorName} ${rg.name} 시공 완료! 집이 바뀌었어요`);
 }
 
 // 물건 하나 사기 — 물건 앞에서 F를 눌렀을 때
@@ -2028,9 +2094,9 @@ const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: t
 // 채집물 한 종류의 설명. 값이 비쌀수록 드물게 놓습니다.
 // 미역 70% / 소라 20% / 전복 10% — 흔한 건 헐값, 귀한 전복은 만 원짜리 한탕입니다.
 const CATCH_KINDS = {
-  abalone: { name: '전복', price: 10000, count: 12 },
-  conch:   { name: '소라', price: 1000,  count: 24 },
-  kelp:    { name: '미역', price: 100,   count: 86 },
+  abalone: { name: '전복', price: 20000, count: 12 },
+  conch:   { name: '소라', price: 10000, count: 24 },
+  kelp:    { name: '미역', price: 1000,  count: 86 },
 };
 const catchSpots = [];        // { x, y, z, kind, picked }
 const catchMeshes = {};       // 종류별 InstancedMesh
@@ -2270,6 +2336,8 @@ let spriteCard = null;                     // 그림이 붙은 판
 let spriteBlob = null;                     // 발밑 그림자
 const SPRITE_H = 1.5;                      // 화면에 보이는 루루 키(월드 단위)
 let mayorGroup = null, mayorCard = null;   // 이장님 (상점·택배사를 오가는 NPC)
+let ponyCard = null;                       // 조랑말 (웃는 평소 / 우는 배고픔 — 경마 영상에서 오려낸 그림)
+const PONY_H = 2.05;                       // 조랑말 키 (미터)
 const MAYOR_H = 1.9;                       // 이장님 키 — 어른이라 루루보다 큼직합니다
 
 // assets/farmcat/ 스프라이트 시트. 한 장에 여러 칸이 가로로 이어붙어 있습니다.
@@ -2363,6 +2431,19 @@ if (CAN_USE_IMAGES) {
   mayorGroup = new THREE.Group();
   mayorGroup.add(mayorCard);
   scene.add(mayorGroup);
+
+  // ----- 조랑말 그림판 — 마구간 안에 서 있습니다 (그림띠가 있을 때만) -----
+  if (SHEETS.ponyHappy) {
+    const pGeo = new THREE.PlaneGeometry(1, 1);
+    pGeo.translate(0, 0.5, 0);
+    ponyCard = new THREE.Mesh(
+      pGeo,
+      new THREE.MeshBasicMaterial({ map: SHEETS.ponyHappy.tex, transparent: true, alphaTest: 0.08 })
+    );
+    ponyCard.userData.planeH = PONY_H * CELL_H / (CELL_H - CELL_PAD * 2);
+    scene.add(ponyCard);
+    if (stable.pony) stable.pony.visible = false;   // 그림이 있으면 3D 조랑말은 숨깁니다
+  }
   const mBlob = new THREE.Mesh(
     new THREE.CircleGeometry(0.55, 22),
     new THREE.MeshBasicMaterial({ color: 0x1d2b17, transparent: true, opacity: 0.4, depthWrite: false })
@@ -2596,6 +2677,11 @@ function updateRopeBadge() {
   }
   // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
   if (state.inShop) {
+    const rg = nearestReno();
+    if (rg) {
+      ropeBadge.textContent = `🎨 ${rg.name} · ${rg.colorName} — ${rg.price.toLocaleString()}원 (${KEY_ACTION}으로 시공)`;
+      return;
+    }
     const good = nearestShopGood();
     if (good) {
       const owned =
@@ -2662,9 +2748,14 @@ function updateRopeBadge() {
   }
   if (typeof STABLE !== 'undefined' &&
       Math.hypot(state.x - STABLE.x, state.z - STABLE.z) < STABLE_RANGE) {
-    ropeBadge.textContent = carrots > 0
-      ? `🐴 ${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)`
-      : '🐴 조랑말한테 당근을 주세요 — 당근은 이장님 상점에서';
+    if (!ponyAlive) {
+      ropeBadge.textContent = '💔 조랑말이 굶어 죽었습니다… 마구간이 비었어요';
+    } else if (carrots > 0) {
+      ropeBadge.textContent = `🐴 ${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)` +
+        (ponyFedToday() ? '' : ' · 오늘 아직 안 먹였어요');
+    } else {
+      ropeBadge.textContent = '🐴 조랑말한테 당근을 주세요 — 당근은 이장님 상점에서';
+    }
     return;
   }
   if (state.grabbing) {
@@ -3578,6 +3669,91 @@ function updateMayor(dt, t) {
   mayorCard.scale.set(mirrorM ? -Wp : Wp, Hp, 1);
 }
 
+// ---------- 12-1f-2a. 게임 시간 — 해가 뜨고 지는 하루, 그리고 말의 끼니 ----------
+// 하루는 10분. 해뜰녘에 하루가 바뀌면서 "말에게 당근을 주세요" 알림이 옵니다.
+// 당근은 얼마든지 줘도 되지만, 하루에 한 번은 꼭 줘야 합니다:
+// 하루라도 거르면 말이 울고, 3일째·6일째엔 경고가 오고, 7일을 굶기면 죽습니다.
+const DAY_LEN = 600;                 // 하루 길이 (초)
+let gameT = DAY_LEN * 0.06;          // 아침 직후에서 시작
+let dayCount = 1;
+let lastFedDay = 0;                  // 마지막으로 당근을 준 날 (0 = 아직 한 번도 안 줌)
+let ponyAlive = true;
+function ponyFedToday() { return lastFedDay >= dayCount; }
+function hungerDays() { return Math.max(0, dayCount - lastFedDay); }
+
+function applyPonyAlive() {
+  // 그림 조랑말(ponyCard)이 있으면 3D 조랑말은 숨기고, 죽었으면 마구간을 비웁니다
+  if (stable.pony) stable.pony.visible = ponyAlive && !ponyCard;
+  if (ponyCard) ponyCard.visible = ponyAlive;
+}
+
+function morningNotice() {
+  if (!ponyAlive) return;
+  const px = state.x, py = lulu.position.y + 2.4, pz = state.z;
+  const h = hungerDays();
+  if (h >= 7) {
+    // 7일을 굶겼습니다 — 마구간이 빕니다
+    ponyAlive = false;
+    applyPonyAlive();
+    saveGame(true);
+    spawnMoneyPopup(px, py, pz, '💔 조랑말이 굶어 죽었습니다…', 8);
+    return;
+  }
+  if (h >= 6) spawnMoneyPopup(px, py, pz, '🚨 오늘도 말먹이를 주지 않으면 말이 죽어요', 7);
+  else if (h >= 3) spawnMoneyPopup(px, py, pz, '⚠️ 말이 배고파서 죽을지도 몰라요', 7);
+  else spawnMoneyPopup(px, py, pz, '🌅 아침이에요 — 매일 아침 말에게 당근을 주세요', 6);
+}
+
+// 하늘·해·안개를 시간에 맞춰 물들입니다
+const SKY_DAY_TOP = new THREE.Color(0x2f7fd0), SKY_DAY_BOT = new THREE.Color(0xe2eff8);
+const SKY_NGT_TOP = new THREE.Color(0x0a1230), SKY_NGT_BOT = new THREE.Color(0x1c2a4a);
+const SKY_DUSK = new THREE.Color(0xf2a35e);
+const FOG_DAY = new THREE.Color(0xd2e6ee), FOG_NGT = new THREE.Color(0x101a2c);
+const DAY_PORTION = 0.62;            // 하루 중 낮의 비율 (나머지는 밤)
+let sunAngCur = Math.PI / 2;         // 해의 각도 (동쪽 0 → 정오 π/2 → 서쪽 π, 밤이면 -1)
+function updateDayNight(dt) {
+  gameT += dt;
+  if (gameT >= DAY_LEN) {
+    gameT -= DAY_LEN;
+    dayCount++;
+    morningNotice();
+  }
+  const t01 = gameT / DAY_LEN;
+  let daylight;
+  if (t01 < DAY_PORTION) {
+    sunAngCur = (t01 / DAY_PORTION) * Math.PI;
+    daylight = Math.max(0, Math.sin(sunAngCur));
+  } else {
+    sunAngCur = -1;
+    daylight = 0;
+  }
+  // 해뜰녘·해질녘의 주황기 — 해가 낮게 걸렸을 때만
+  const dusk = Math.max(0, 1 - Math.abs(daylight - 0.18) / 0.18) * 0.6;
+  sun.intensity = 0.12 + 1.95 * daylight;
+  hemi.intensity = 0.22 + 0.95 * daylight;
+  const top = sky.material.uniforms.topColor.value;
+  const bot = sky.material.uniforms.bottomColor.value;
+  top.copy(SKY_NGT_TOP).lerp(SKY_DAY_TOP, daylight);
+  bot.copy(SKY_NGT_BOT).lerp(SKY_DAY_BOT, daylight).lerp(SKY_DUSK, dusk);
+  if (!state.diving) scene.fog.color.copy(FOG_NGT).lerp(FOG_DAY, daylight).lerp(SKY_DUSK, dusk * 0.5);
+}
+
+// 조랑말 그림 갱신 — 오늘 당근을 먹었으면 웃는 모습, 아니면 우는 모습 (매 프레임)
+function updatePony(t) {
+  if (!ponyCard || !ponyAlive) return;
+  const sheet = ponyFedToday() ? SHEETS.ponyHappy : SHEETS.ponySad;
+  if (!sheet) return;
+  if (ponyCard.material.map !== sheet.tex) ponyCard.material.map = sheet.tex;
+  setCell(sheet, Math.floor(t * 8));
+  const gy = groundHeight(STABLE.x, STABLE.z);
+  ponyCard.position.set(STABLE.x + 0.2, gy, STABLE.z);
+  // 루루 그림과 같은 종이 인형 방식 — 항상 카메라를 바라봅니다
+  ponyCard.rotation.y = Math.atan2(camera.position.x - STABLE.x, camera.position.z - STABLE.z);
+  const Hp = ponyCard.userData.planeH;
+  const Wp = Hp * sheet.frameW / CELL_H;
+  ponyCard.scale.set(Wp, Hp, 1);
+}
+
 // ---------- 12-1f-2b. 저장 · 처음부터 · 종료 ----------
 // 진행 상황을 브라우저 안(localStorage)에 남깁니다. 게임을 켜면 자동으로 이어집니다.
 // (딴 귤·채집물 위치까지는 저장하지 않습니다 — 자원은 켤 때마다 새로 차 있습니다)
@@ -3592,6 +3768,8 @@ function saveGame(quiet) {
       tools, basketCount, cap: BASKET_CAP, x: outX, z: outZ,
       hasNet, netCarried, netX: netObj.position.x, netZ: netObj.position.z,
       furn: furnitureOwned,
+      gameT, dayCount, lastFedDay, ponyAlive,
+      floorC: houseFloorColor, wallC: houseWallColor,
     }));
     if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '💾 저장했어요');
   } catch (e) { /* 시크릿 창 등에서는 저장이 막힐 수 있습니다 */ }
@@ -3623,6 +3801,16 @@ function loadGame() {
   // 가구 — 산 것들을 집 안에 다시 놓습니다
   furnitureOwned = Object.assign({ bed: false, chair: false, table: false, closet: false }, d.furn || {});
   applyFurniture();
+  // 게임 시간과 말의 끼니
+  if (typeof d.gameT === 'number') gameT = d.gameT;
+  dayCount = d.dayCount || 1;
+  lastFedDay = d.lastFedDay || 0;
+  ponyAlive = d.ponyAlive !== false;
+  applyPonyAlive();
+  // 집 인테리어 (바닥재·벽지)
+  houseFloorColor = d.floorC || 0;
+  houseWallColor = d.wallC || 0;
+  applyRoomLook();
   // 예전 저장이 실내 좌표를 담고 있으면 무시하고 섬의 시작 자리에서 깨어납니다
   if (typeof d.x === 'number' && d.x < 380) {
     state.x = d.x; state.z = d.z;
@@ -3818,6 +4006,10 @@ function updateCarrotFx(dt) {
 
 function tryFeedPony() {
   const y = groundHeight(STABLE.x, STABLE.z) + STABLE_H * 0.75;
+  if (!ponyAlive) {
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, '💔 마구간이 비어 있습니다…');
+    return;
+  }
   // 멀리서 던져 주는 게 아니라, 조랑말 앞까지 가서 손으로 먹입니다
   const d = Math.hypot(state.x - STABLE.x, state.z - STABLE.z);
   if (d > FEED_RANGE) {
@@ -3830,6 +4022,7 @@ function tryFeedPony() {
   }
   carrots--;
   ponyLove++;
+  lastFedDay = dayCount;   // 오늘 끼니를 챙겼습니다 — 말이 웃는 얼굴로 돌아옵니다
   updateCarrotBadge();
   playDropSound();
   state.facing = Math.atan2(STABLE.x - state.x, STABLE.z - state.z);   // 조랑말을 바라보고 먹입니다
@@ -3856,8 +4049,10 @@ function handleActionKey() {
     tryCollect();
     return;
   }
-  // 상점 안: 물건 앞이면 그 물건을 삽니다
+  // 상점 안: 물건(또는 왼쪽 인테리어 견본) 앞이면 그것을 삽니다
   if (state.inShop) {
+    const rg = nearestReno();
+    if (rg) { buyReno(rg); return; }
     const good = nearestShopGood();
     if (good) buyShopGood(good);
     return;
@@ -4319,6 +4514,8 @@ function animate() {
   updateDiving(dt);   // 물질 중이면 숨을 깎고, 다 떨어지면 뭍으로 올려보냅니다
   updateNet(dt, t);   // 망사리를 멨으면 등 뒤를 따라다닙니다
   updateDoors();      // 문 앞에 서면 집·상점 안팎을 드나듭니다
+  updateDayNight(dt); // 해가 뜨고 지고, 아침마다 하루가 바뀝니다
+  updatePony(t);      // 조랑말 — 오늘 먹였으면 웃고, 굶었으면 웁니다
   updateHouse(dt);    // 집 고치는 동작이 끝나면 수리 단계를 올립니다
   updateMayor(dt, t); // 이장님이 상점과 택배사 사이를 오갑니다
   updateCarrotFx(dt); // 먹인 당근이 조랑말 입가에서 냠냠 사라집니다
@@ -4342,8 +4539,13 @@ function animate() {
   camera.position.lerp(camWanted, 1 - Math.pow(0.0015, dt));
   camera.lookAt(camTarget);
 
-  // 그림자용 태양은 루루를 따라다닙니다 (넓은 들판을 한 번에 못 비추기 때문)
-  sun.position.set(lulu.position.x + 26, lulu.position.y + 40, lulu.position.z + 18);
+  // 그림자용 태양은 루루를 따라다니며, 게임 시간에 맞춰 동쪽에서 서쪽으로 갑니다
+  const sunA = sunAngCur >= 0 ? sunAngCur : Math.PI / 2;
+  sun.position.set(
+    lulu.position.x + Math.cos(sunA) * 42,
+    lulu.position.y + 10 + Math.sin(sunA) * 38,
+    lulu.position.z + 18
+  );
   sun.target.position.copy(lulu.position);
   sun.target.updateMatrixWorld();
 
