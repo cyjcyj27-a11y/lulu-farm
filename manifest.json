@@ -1,0 +1,17 @@
+{
+  "name": "루루냥의 제주살이",
+  "short_name": "루루냥",
+  "description": "고양이 루루가 제주에서 귤 따고, 물질하고, 말 키우고, 집 꾸미는 힐링 게임",
+  "lang": "ko",
+  "start_url": "./game/jeju3d.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#a9d3ea",
+  "theme_color": "#2f7fd0",
+  "icons": [
+    { "src": "./assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
