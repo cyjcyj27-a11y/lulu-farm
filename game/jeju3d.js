@@ -2201,6 +2201,7 @@ if (CAN_USE_IMAGES) {
   loadSheet('diveFloat', 'dive_float.webp', 8,  173);          // 수면에 떠서 숨 고르기 (정면)
   loadSheet('divePick',  'dive_pick.webp',  6,  190);          // 전복·소라를 딸 때 (한 번만 재생)
   loadSheet('diveUp',    'dive_up.webp',    5,  140);          // 수면으로 떠오를 때
+  loadSheet('diveDown',  'dive_down.webp',  8,  175);          // 아래로 잠수할 때 (직접 뽑으신 영상에서 변환)
   // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
   loadSheet('fixHouse',  'fix_house.webp',  3,  167);
   // 이장님 (상점과 택배사를 오가는 NPC). 걷기 원본은 루루와 반대로 "오른쪽"을 봅니다
@@ -4078,10 +4079,14 @@ function updateSpriteLulu(groundY) {
       // 수면에 떠서 숨 고르는 중
       sheet = SHEETS.diveFloat;
       cell = Math.floor(t * 6) % sheet.frames;
-    } else if (state.vy > 0.6 || surfacing > 0) {
-      // 물 위로 떠오르는 중
+    } else if (state.vy > 0.5 || surfacing > 0) {
+      // 위로 헤엄쳐 떠오르는 중 (⤴·Space)
       sheet = SHEETS.diveUp;
       cell = pingpong(Math.floor(t * 7), sheet.frames);
+    } else if (state.vy < -0.4) {
+      // 아래로 잠수하는 중 (💨·Shift) — 전용 잠수 그림이 있으면 그걸, 없으면 활공 그림을 기울여 씁니다
+      sheet = SHEETS.diveDown || SHEETS.diveSwim;
+      cell = Math.floor(t * 8) % sheet.frames;
     } else if (sp > 0.4) {
       // 헤엄치기 — 빨리 갈수록 팔다리가 빨리 움직입니다
       sheet = SHEETS.diveSwim;
@@ -4142,6 +4147,10 @@ function updateSpriteLulu(groundY) {
   const sitDrop = sheet === SHEETS.sleep ? 0 : 0.16 * state.sit;
   spriteBoard.position.y = hop - sitDrop;
   spriteBoard.rotation.z = Math.sin(state.walkPhase) * 0.045 * state.speed;
+  // 물속에서 오르내리는 방향으로 몸이 기웁니다 — 잠수하면 머리가 아래로, 수평이면 원래대로
+  if (state.diving && sheet === SHEETS.diveSwim) {
+    spriteBoard.rotation.z = Math.max(-1, Math.min(1, -state.vy)) * 0.5;
+  }
 
   // 판 크기: 칸마다 가로 폭이 달라서 그림에 맞춰 그때그때 정합니다.
   // 원본 그림이 왼쪽을 보고 있으므로, 오른쪽으로 갈 때 좌우를 뒤집습니다.
