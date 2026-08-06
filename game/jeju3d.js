@@ -723,12 +723,6 @@ function buildShop(x, z, rotY) {
   }
   g.add(cart);
 
-  // 사기 전까지 손수레 위에 놓인 끈 뭉치 — 사고 나면 이 메쉬만 숨깁니다(visible = false)
-  const ropeCoil = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.07, 8, 20), shopRopeMat);
-  ropeCoil.rotation.x = Math.PI / 2;
-  ropeCoil.position.set(0.4, 0.86, 0);
-  ropeCoil.castShadow = true;
-  cart.add(ropeCoil);
 
   // 문 앞 디딤돌
   for (let i = 0; i < 3; i++) {
@@ -739,7 +733,7 @@ function buildShop(x, z, rotY) {
 
   scene.add(g);
   obstacles.push({ x, z, r: 2.6, topY: NO_JUMP });   // 가게 건물은 뛰어넘을 수 없습니다
-  return { group: g, ropeCoil };
+  return { group: g };
 }
 // 루루가 시작하는 트인 마당(HOME 칸) 안, 시작 지점 바로 북쪽에 두어 처음부터 눈에 띄게 합니다.
 // 시작 지점이 z=34라 가게는 -z(남쪽)를 바라봐야 정면이 보입니다.
@@ -1419,10 +1413,11 @@ const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: t
 // (해저 바닥은 따로 만들지 않습니다. 지형 함수가 이 자리를 이미 우묵하게 파냈습니다)
 
 // 채집물 한 종류의 설명. 값이 비쌀수록 드물게 놓습니다.
+// 미역 70% / 소라 20% / 전복 10% — 흔한 건 헐값, 귀한 전복은 만 원짜리 한탕입니다.
 const CATCH_KINDS = {
-  abalone: { name: '전복', price: 3000, count: 26 },
-  conch:   { name: '소라', price: 1200, count: 42 },
-  kelp:    { name: '미역', price: 500,  count: 54 },
+  abalone: { name: '전복', price: 10000, count: 12 },
+  conch:   { name: '소라', price: 1000,  count: 24 },
+  kelp:    { name: '미역', price: 100,   count: 86 },
 };
 const catchSpots = [];        // { x, y, z, kind, picked }
 const catchMeshes = {};       // 종류별 InstancedMesh
@@ -1943,8 +1938,8 @@ camera.position.set(state.x, 8, state.z + 12);
 const HARVEST_RANGE = 2.0;     // 이 거리 안의 귤만 딸 수 있음
 const HARVEST_DURATION = 0.6;  // 애니메이션 길이(초). 이 동안은 못 움직임
 let coins = 0;
-let hasRope = false;              // 상점에서 끈을 샀는지 — 사면 컨테이너가 자동으로 따라오게 바뀝니다
-const ROPE_PRICE = 100000;
+const hasRope = false;            // 끈 아이템은 게임에서 뺐습니다. 상자는 E로 손잡고 끕니다
+                                  // (상자 물리 코드 곳곳이 이 이름을 참조해서 변수만 남겨둡니다)
 const coinBadge = document.getElementById('coinBadge');
 const ropeBadge = document.getElementById('ropeBadge');
 const boxBadge = document.getElementById('boxBadge');
@@ -2016,7 +2011,7 @@ function updateRopeBadge() {
     const dist = Math.hypot(basketPos.x - state.x, basketPos.z - state.z);
     ropeBadge.textContent = dist < GRAB_RANGE
       ? `📦 ${KEY_GRAB}을 누르면 상자를 잡을 수 있어요`
-      : `📦 밀거나, 가까이 가서 ${KEY_GRAB}로 잡아 끌 수 있어요 (끈: ${ROPE_PRICE.toLocaleString()}원)`;
+      : `📦 밀거나, 가까이 가서 ${KEY_GRAB}로 잡아 끌 수 있어요`;
   }
 }
 updateCoinBadge();
@@ -2479,25 +2474,9 @@ function tryHarvest() {
   state.sit = 0;
 }
 
-// ---------- 12-1c. 상점 — 끈 사기 (F키, 상점 근처에서) ----------
-function tryBuyRope() {
-  const popupY = shop.group.position.y + 1.7;
-  if (hasRope) {
-    spawnMoneyPopup(shop.group.position.x, popupY, shop.group.position.z, '이미 끈이 있어요');
-    return;
-  }
-  if (coins < ROPE_PRICE) {
-    spawnMoneyPopup(shop.group.position.x, popupY, shop.group.position.z, `${(ROPE_PRICE - coins).toLocaleString()}원 부족`);
-    return;
-  }
-  coins -= ROPE_PRICE;
-  hasRope = true;
-  state.grabbing = false;          // 이제부터 항상 자동으로 따라오니 손으로 붙잡고 있을 필요가 없음
-  shop.ropeCoil.visible = false;   // 판매대 위 끈 뭉치가 사라짐 (팔렸으니까)
-  updateCoinBadge();
-  updateRopeBadge();
-  spawnMoneyPopup(shop.group.position.x, popupY, shop.group.position.z, '🪢 끈 구매!');
-}
+// (예전에는 상점에서 10만원짜리 끈을 팔았고, 사면 상자가 자동으로 따라왔습니다.
+//  상자는 E로 손잡고 끄는 것으로 충분해서 끈 아이템은 뺐습니다. 이제 상점 앞에서는
+//  당근(왼쪽 바구니)과 해녀 산소통(오른쪽 판매대)을 팝니다.)
 
 // ---------- 12-1d. 택배사 — 육지로 부치기 (F키, 택배사 근처에서) ----------
 // 상자에 담긴 귤을 트럭에 실어 보냅니다. 상자는 비워지고, 담겨 있던 만큼 택배 정산을 받습니다.
@@ -2532,7 +2511,8 @@ const CATCH_RANGE = 1.7;       // 이 거리 안의 것만 딸 수 있음
 let breath = BREATH_MAX;
 let net = [];                  // 이번 물질에서 딴 것들의 종류 목록
 let breathLow = false;         // 숨이 얼마 안 남아 몸이 무거워진 상태
-let surfacing = 0;             // 0보다 크면 숨이 다해 저절로 떠오르는 중 (남은 시간)
+let surfacing = 0;             // (예전 "저절로 떠오르기"의 잔재 — 이제 안 쓰지만 다른 코드가 참조합니다)
+let drowning = 0;              // 0보다 크면 숨이 다해 정신을 잃는 중 (남은 시간)
 const vignette = document.getElementById('vignette');
 
 const breathBar = document.getElementById('breathFill');
@@ -2595,6 +2575,7 @@ function enterDive() {
   breath = BREATH_MAX;
   breathLow = false;
   surfacing = 0;
+  drowning = 0;
   swimVel.x = 0; swimVel.z = 0;
   net = [];
   state.x = DIVE.x;
@@ -2608,7 +2589,8 @@ function enterDive() {
   spawnMoneyPopup(state.x, SEA_Y + 1.5, state.z, '🤿 물질 시작! 숨 조심하세요');
 }
 
-// 뭍으로 나오면서 딴 것을 전부 팝니다
+// 뭍으로 나오면서 딴 것을 전부 팝니다.
+// 단, 숨이 다해 정신을 잃고 나온 것(reason === 'drown')이면 망사리를 통째로 잃습니다.
 function leaveDive(reason) {
   let pay = 0;
   const tally = {};
@@ -2616,12 +2598,14 @@ function leaveDive(reason) {
     pay += CATCH_KINDS[kind].price;
     tally[kind] = (tally[kind] || 0) + 1;
   }
-  const caught = net.length;
+  const caught = reason === 'drown' ? 0 : net.length;
+  const lost = net.length;
   state.diving = false;
   net = [];
   breath = BREATH_MAX;
   breathLow = false;
   surfacing = 0;
+  drowning = 0;
   state.pickT = -1;
   swimVel.x = 0; swimVel.z = 0;
   if (vignette) vignette.style.opacity = 0;
@@ -2634,15 +2618,24 @@ function leaveDive(reason) {
   updateDiveUI();
 
   const py = groundHeight(BULTEOK.x, BULTEOK.z) + 2.2;
-  if (caught > 0) {
+  if (reason === 'drown') {
+    // 정신을 잃고 뭍에 떠밀려 왔습니다 — 망사리에 담았던 것은 전부 바다에 흘렸습니다
+    spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
+      lost > 0 ? `😵 정신을 잃었어요… 망사리 ${lost}개를 바다에 흘렸습니다` : '😵 정신을 잃고 떠밀려 왔어요');
+  } else if (caught > 0) {
     coins += pay;
     updateCoinBadge();
     playShipSound();
     const list = Object.entries(tally).map(([k, n]) => `${CATCH_KINDS[k].name} ${n}`).join(' · ');
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, `${list} → +${pay.toLocaleString()}원`);
   } else {
-    spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, reason === 'breath' ? '숨이 차서 올라왔어요' : '뭍으로 나왔어요');
+    spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, '뭍으로 나왔어요');
   }
+}
+
+// 물속에서 정신을 잃을 때 — 낮게 잦아드는 소리
+function playDrownSound() {
+  blip(220, 55, 0.9, 0.18, 'sine');
 }
 
 // 손 닿는 곳에 있는, 아직 안 딴 채집물 찾기
@@ -2671,6 +2664,7 @@ function hideCatch(i) {
 }
 
 function tryCollect() {
+  if (drowning > 0) return;   // 정신을 잃는 중
   if (net.length >= NET_CAP) {
     spawnMoneyPopup(state.x, lulu.position.y + 1.2, state.z, '망사리가 가득 찼어요 · 뭍으로!');
     return;
@@ -2704,13 +2698,15 @@ function updateDiving(dt) {
   if (!state.diving) { if (vignette) vignette.style.opacity = 0; return; }
   const atSurface = lulu.position.y > SEA_Y - 1.2;
 
-  if (surfacing > 0) {
-    // 숨이 다해 저절로 떠오르는 중 — 조작을 놓아도 몸이 알아서 물 위로 향합니다
-    surfacing -= dt;
-    state.vy = Math.max(state.vy, 2.6);
+  if (drowning > 0) {
+    // 숨이 다해 정신을 잃는 중 — 몸이 축 처져 가라앉고, 화면이 조여들다가 뭍에서 깨어납니다.
+    // 이 동안 딴 것(망사리)은 전부 바다에 흘려보냅니다. 그게 숨을 아껴야 하는 이유입니다.
+    drowning -= dt;
+    state.vy = Math.min(state.vy, -0.6);
     swimVel.x *= 0.9; swimVel.z *= 0.9;
-    if (atSurface || surfacing <= 0) { leaveDive('breath'); return; }   // 나온 뒤엔 아래를 건드리면 안 됩니다
-    if (vignette) vignette.style.opacity = 0.85;
+    if (vignette) vignette.style.opacity = Math.min(1, 1.4 - drowning * 0.6);
+    if (drowning <= 0) { leaveDive('drown'); return; }
+    updateDiveUI();
     return;
   }
 
@@ -2720,8 +2716,9 @@ function updateDiving(dt) {
     breath -= dt;
     if (breath <= 0) {
       breath = 0;
-      surfacing = 6;                                    // 6초 안에 못 올라오면 강제로 마무리
-      spawnMoneyPopup(state.x, lulu.position.y + 1.2, state.z, '숨이 차요! 올라갑니다');
+      drowning = 2.2;                                   // 정신을 잃습니다 — 이제 되돌릴 수 없습니다
+      playDrownSound();
+      spawnMoneyPopup(state.x, lulu.position.y + 1.2, state.z, '😵 숨이 다했어요…');
     }
   }
 
@@ -2922,8 +2919,6 @@ function handleActionKey() {
   if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
   const tankDist = Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z);
   if (tankDist < TANK_RANGE) { tryBuyTank(); return; }
-  const shopDist = Math.hypot(state.x - shop.group.position.x, state.z - shop.group.position.z);
-  if (shopDist < SHOP_RANGE) { tryBuyRope(); return; }
   const depotDist = Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z);
   if (depotDist < DEPOT_RANGE) { tryShipBox(); return; }
   const houseDist = Math.hypot(state.x - HOUSE.x, state.z - HOUSE.z);
@@ -2936,7 +2931,11 @@ function handleActionKey() {
 
 // 물속에서 E를 누르면 물질을 끝내고 뭍으로 나옵니다 (상자 잡기와 같은 키)
 function handleGrabKey() {
-  if (state.diving) { leaveDive('exit'); return; }
+  if (state.diving) {
+    if (drowning > 0) return;   // 정신을 잃는 중엔 아무것도 못 합니다 (죽음 회피 방지)
+    leaveDive('exit');
+    return;
+  }
   tryToggleGrab();
 }
 addEventListener('keydown', (e) => { if (e.code === 'KeyF') handleActionKey(); });
