@@ -2452,6 +2452,7 @@ if (CAN_USE_IMAGES) {
   loadSheet('ponyHappy', 'pony_happy.webp', 8,  128);          // 조랑말 — 웃는 평소 모습 (경마 1등 영상에서)
   loadSheet('ponySad',   'pony_sad.webp',   8,  227);          // 조랑말 — 굶어서 우는 모습 (경마 꼴등 영상에서)
   loadSheet('halmang',   'halmang.webp',    8,  185);          // 해녀 할망 — 포구 옆에 앉아 같은 말만 되뇌입니다
+  loadSheet('wetsuitLand', 'wetsuit_land.webp', 5, 204);       // 잠수복 차림 뭍 자세 (해녀 시트에서: 뒤0·뒤1·옆2·옆3·정면4)
   // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
   loadSheet('fixHouse',  'fix_house.webp',  3,  167);
   // 이장님 (상점과 택배사를 오가는 NPC). 걷기 원본은 루루와 반대로 "오른쪽"을 봅니다
@@ -4931,8 +4932,14 @@ function updateSpriteLulu(groundY) {
       sheet = SHEETS.diveSwim;
       cell = 0;
     }
+  } else if (SHEETS.wetsuitLand && inWetsuitZone()) {
+    // 포구 구역 — 해녀 시트에서 오린 잠수복 차림. 걸을 땐 옆모습 두 컷을 번갈아 딛습니다
+    sheet = SHEETS.wetsuitLand;
+    cell = view === 'back' ? 0
+         : view === 'front' ? 4
+         : (walking ? 2 + (Math.floor(state.walkPhase) % 2) : 3);
   } else if (SHEETS.diveIdle && inWetsuitZone()) {
-    // 포구 구역 — 잠수복 차림으로 서성입니다 (물질 나갈 채비)
+    // (시트가 없을 때의 예비 — 물속 대기 자세)
     sheet = SHEETS.diveIdle;
     cell = Math.floor(t * 6) % sheet.frames;
   } else if (state.fixT >= 0 && SHEETS.fixHouse) {
@@ -4997,8 +5004,8 @@ function updateSpriteLulu(groundY) {
   // (정면으로 오면 좌우 성분이 0이라 뒤집기 값이 직전 것으로 남아 방향이 튀었습니다)
   // 옆모습 그림들은 원본이 왼쪽을 보므로, 오른쪽으로 갈 때 좌우를 뒤집습니다.
   // (물속의 둥둥·수면 그림은 정면이라 뒤집지 않습니다)
-  // 잠수 그림(diveDown)도 옆모습이라, 왼쪽으로 갈 땐 원본 그대로·오른쪽으로 갈 땐 좌우를 뒤집습니다
-  const sideSheets = [SHEETS.walkSide, SHEETS.pullSide, SHEETS.diveSwim, SHEETS.divePick, SHEETS.diveDown];
+  // 잠수 그림(diveDown)·잠수복 뭍 자세도 옆모습이라, 오른쪽으로 갈 땐 좌우를 뒤집습니다
+  const sideSheets = [SHEETS.walkSide, SHEETS.pullSide, SHEETS.diveSwim, SHEETS.divePick, SHEETS.diveDown, SHEETS.wetsuitLand];
   const mirror = sideSheets.includes(sheet) && spriteCard.userData.headingRight;
   spriteCard.scale.set(mirror ? -Wp : Wp, Hp * breath, 1);
 
