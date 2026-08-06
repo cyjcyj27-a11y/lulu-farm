@@ -76,6 +76,31 @@
   }
   #fileWarn b { color: #ffe08a; }
 
+  /* 숨이 차면 화면 가장자리가 조여옵니다 (인사이드의 물속 구간처럼) */
+  #vignette {
+    position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(4,20,28,0) 32%, rgba(3,14,20,.96) 92%);
+    transition: opacity .35s ease;
+  }
+
+  /* ---- 물질할 때만 나오는 숨 게이지 ---- */
+  #breathBar {
+    display: none;
+    position: absolute; left: 50%; top: 22px; transform: translateX(-50%);
+    width: min(260px, 60vw); height: 16px;
+    background: rgba(0,0,0,.45); border-radius: 999px; padding: 3px;
+  }
+  #breathFill {
+    height: 100%; width: 100%; border-radius: 999px;
+    background: #5fc6e8; transition: width .12s linear, background .3s;
+  }
+  #breathBar::after {
+    content: '숨'; position: absolute; left: -26px; top: 1px;
+    font-size: 12px; font-weight: 700;
+  }
+  #netBadge { display: none; bottom: 140px; }
+  #netBadge.full { background: rgba(196, 96, 16, .85); color: #fff3d6; font-weight: 700; }
+
   /* ---- 시작 화면 ----
      브라우저는 사용자가 한 번 누르기 전에는 소리를 못 내게 막습니다.
      그 "한 번 누르기"를 자연스럽게 받아내면서, 조작법도 같이 알려주는 화면입니다. */
@@ -104,6 +129,23 @@
     font-size: clamp(12px, 2.8vw, 14px); line-height: 1.5;
   }
   #startKeys b { color: #ffd88a; font-weight: 700; }
+  /* 시작 화면에서 "이 게임에서 뭘 하는가"를 두 가지 일거리로 보여줍니다 */
+  #startJobs {
+    display: flex; flex-direction: column; gap: 10px;
+    width: min(420px, 88vw);
+  }
+  .job {
+    display: grid; grid-template-columns: auto 1fr; gap: 2px 12px;
+    align-items: baseline; text-align: left;
+    background: rgba(0,0,0,.4); border-radius: 12px; padding: 13px 16px;
+  }
+  .job .ji { grid-row: span 2; font-size: 26px; align-self: center; }
+  .job b { color: #ffd88a; font-size: clamp(14px, 3.2vw, 16px); }
+  .job span:last-child {
+    font-size: clamp(11.5px, 2.7vw, 13px); line-height: 1.5; color: #ddd6bf;
+  }
+  .job em { color: #ffd88a; font-style: normal; }
+
   #startGo {
     background: #e2861f; color: #2a1806; font-weight: 800;
     border-radius: 999px; padding: 15px 38px; font-size: 17px;
@@ -172,11 +214,17 @@
     <b>상점 이용</b> F (상점 근처에서)<br>
     <b>택배 부치기</b> F (택배사 근처에서)<br>
     <b>상자 잡기/놓기</b> E (가까이 가서)<br>
+    <b>물질하기</b> F (북쪽 해안 불턱에서)<br>
+    <b>물속에서</b> F 채집 · Space 떠오르기 · E 나가기<br>
     <b>배경음악</b> M (또는 배지 클릭)
   </div>
 
   <div id="coinBadge">🍊 0원</div>
+  <div id="vignette"></div>
+  <div id="breathBar"><div id="breathFill"></div></div>
+
   <div class="badge" id="musicBadge">🎵 배경음악 켜짐</div>
+  <div class="badge" id="netBadge">🧺 망사리 0/24</div>
   <div class="badge" id="boxBadge">📦 상자 0/36</div>
   <div class="badge" id="ropeBadge">📦 상자에 가까이 가면 E로 잡을 수 있어요</div>
   <div id="hint">감귤나무 가까이서 F로 귤을 따면 상자에 쌓입니다 · 상자 가까이서 E로 잡아 끌고 가세요 · 상자가 차면 마당 왼쪽 <b>택배사</b>에서 F로 육지에 부치면 큰돈! · 10만원 모으면 상점에서 끈을 살 수 있어요</div>
@@ -199,6 +247,19 @@
       <b class="mob">🍊 버튼</b><span class="mob">귤 따기 · 상점 · 택배</span>
       <b class="mob">📦 버튼</b><span class="mob">상자 잡기 / 놓기</span>
       <b class="mob">🎵 배지</b><span class="mob">누르면 배경음악 꺼짐</span>
+    </div>
+    <div id="startJobs">
+      <div class="job">
+        <span class="ji">🍊</span>
+        <b>감귤 농사</b>
+        <span>귤을 따서 상자에 담고, 가득 차면 택배사에서 육지로 부칩니다</span>
+      </div>
+      <div class="job">
+        <span class="ji">🤿</span>
+        <b>해녀 물질</b>
+        <span>북쪽 바닷가 <em>불턱</em>에서 바다로. 숨이 붙어 있는 동안
+              전복·소라·미역을 따서 망사리에 담고, 숨이 차기 전에 올라오세요</span>
+      </div>
     </div>
     <div id="startGo">눌러서 시작</div>
   </div>
