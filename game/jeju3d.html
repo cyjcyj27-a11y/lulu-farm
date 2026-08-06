@@ -118,6 +118,33 @@
   }
   #sceneFade.show { opacity: 1; }
 
+  /* ---- 도감(업적) 화면 — 📖 버튼 ---- */
+  #bookWrap {
+    display: none;
+    position: absolute; inset: 0; pointer-events: auto;
+    background: rgba(8, 18, 16, .82);
+    align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  #bookList {
+    width: min(480px, 92vw); max-height: 82vh; overflow-y: auto;
+    background: #f6edd8; border-radius: 16px; padding: 18px 20px;
+    box-shadow: 0 4px 0 rgba(150,128,90,.55), 0 14px 40px rgba(0,0,0,.5);
+  }
+  #bookList .bookHead {
+    font-size: 17px; font-weight: 800; color: #3a2817; text-shadow: none;
+    margin-bottom: 10px; text-align: center;
+  }
+  #bookList .ach {
+    padding: 8px 10px; border-radius: 10px; margin-bottom: 6px;
+    background: rgba(150,128,90,.12);
+  }
+  #bookList .ach b { display: block; color: #8a7355; font-size: 14px; text-shadow: none; }
+  #bookList .ach span { display: block; color: #a09378; font-size: 12px; text-shadow: none; margin-top: 2px; }
+  #bookList .ach.on { background: rgba(217,121,60,.14); }
+  #bookList .ach.on b { color: #b3541e; }
+  #bookList .ach.on span { color: #6b5537; }
+
   /* ---- 대화 카드 — 이장님·돌하르방과 이야기 ---- */
   #talkBox {
     display: none;
@@ -384,6 +411,7 @@
   </div>
   <div id="sceneFade"></div>
   <div id="talkBox"><b id="talkName"></b><p id="talkText"></p><div class="next">🐾 누르면 다음</div></div>
+  <div id="bookWrap"><div id="bookList"></div></div>
   <div id="raceWrap">
     <video id="raceVideo" playsinline></video>
     <div class="cap">화면을 누르면 건너뜁니다</div>
@@ -392,6 +420,7 @@
 
   <div id="iconRow">
     <button class="ibtn" id="btnSave" title="저장하기">💾</button>
+    <button class="ibtn" id="bookBadge" title="도감 (업적)">📖</button>
     <button class="ibtn" id="mapBadge" title="지도 (M)">
       <!-- 제주도를 단순화한 모양: 동서로 길쭉한 섬 가운데에 한라산이 볼록 -->
       <svg width="24" height="15" viewBox="0 0 48 30" aria-hidden="true">
@@ -479,6 +508,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=48"></script>
+<script src="jeju3d.js?v=51"></script>
 </body>
 </html>

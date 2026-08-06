@@ -1732,11 +1732,12 @@ function nearestReno() {
 }
 function buyReno(rg) {
   const py = SHOP_ROOM.y + 1.6;
-  if (coins < rg.price) {
-    spawnMoneyPopup(state.x, py, state.z, `${(rg.price - coins).toLocaleString()}원 부족`);
+  const price = shopPrice(rg.price);   // 장날이면 반값!
+  if (coins < price) {
+    spawnMoneyPopup(state.x, py, state.z, `${(price - coins).toLocaleString()}원 부족`);
     return;
   }
-  coins -= rg.price;
+  coins -= price;
   updateCoinBadge();
   if (rg.type === 'floor') houseFloorColor = rg.color;
   else houseWallColor = rg.color;
@@ -1757,11 +1758,12 @@ function buyShopGood(good) {
     spawnMoneyPopup(px, py, pz, `이미 ${good.name}${good.key === 'tank' ? '이' : '가'} 있어요`);
     return;
   }
-  if (coins < good.price) {
-    spawnMoneyPopup(px, py, pz, `${(good.price - coins).toLocaleString()}원 부족`);
+  const price = shopPrice(good.price);   // 장날이면 반값!
+  if (coins < price) {
+    spawnMoneyPopup(px, py, pz, `${(price - coins).toLocaleString()}원 부족`);
     return;
   }
-  coins -= good.price;
+  coins -= price;
   updateCoinBadge();
   if (good.key === 'carrot') {
     carrots++;
@@ -2754,7 +2756,7 @@ function updateRopeBadge() {
   if (state.inShop) {
     const rg = nearestReno();
     if (rg) {
-      ropeBadge.textContent = `🎨 ${rg.name} · ${rg.colorName} — ${rg.price.toLocaleString()}원 (${KEY_ACTION}으로 시공)`;
+      ropeBadge.textContent = `🎨 ${rg.name} · ${rg.colorName} — ${shopPrice(rg.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION}으로 시공)`;
       return;
     }
     const good = nearestShopGood();
@@ -2765,7 +2767,7 @@ function updateRopeBadge() {
         (FURNITURE[good.key] && furnitureOwned[good.key]);
       ropeBadge.textContent = owned
         ? `${good.emoji} ${good.name} — 보유 중`
-        : `${good.emoji} ${good.name} ${good.price.toLocaleString()}원 — ${KEY_ACTION}으로 구입`;
+        : `${good.emoji} ${good.name} ${shopPrice(good.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''} — ${KEY_ACTION}으로 구입`;
     } else {
       ropeBadge.textContent = '🏪 상점 안 — 물건 앞에 서면 살 수 있어요 (문 쪽으로 가면 밖으로)';
     }
@@ -2789,7 +2791,9 @@ function updateRopeBadge() {
   if (typeof PORT !== 'undefined' &&
       Math.hypot(state.x - PORT.x, state.z - PORT.z) < BULTEOK_RANGE + 5) {
     const nearEnd = Math.hypot(state.x - DIVE_ENTRY.x, state.z - DIVE_ENTRY.z) < DIVE_ENTRY_RANGE;
-    if (!nearEnd) {
+    if (dayEvent === 'storm') {
+      ropeBadge.textContent = '🌀 태풍이 몰아쳐요 — 오늘은 물질을 쉽니다 (귤은 웃돈!)';
+    } else if (!nearEnd) {
       ropeBadge.textContent = '🤿 축대 끝까지 걸어나가면 물질하러 들어갈 수 있어요';
     } else {
       ropeBadge.textContent = netCarried
@@ -3308,7 +3312,16 @@ function updateFlyingFruits(dt) {
       // 날아온 귤이 여기서 비로소 "상자 안에 쌓인 귤" 한 알로 바뀝니다
       if (addFruitToBasket()) {
         playDropSound();                            // 나무통에 툭 떨어지는 소리
-        spawnMoneyPopup(p.x, p.y + 0.9, p.z, '🍊 +1');   // 한 알 담겼습니다 (돈은 박스로 팔 때 한꺼번에)
+        // 황금귤이 열리는 날엔 가끔 반짝이는 놈이 섞여 있습니다 — 그 자리에서 5,000원!
+        if (dayEvent === 'gold' && Math.random() < 0.07) {
+          coins += 5000;
+          stat.gold++;
+          updateCoinBadge();
+          playShipSound();
+          spawnMoneyPopup(p.x, p.y + 1.1, p.z, '✨ 황금귤! +5,000원', 3);
+        } else {
+          spawnMoneyPopup(p.x, p.y + 0.9, p.z, '🍊 +1');   // 한 알 담겼습니다 (돈은 박스로 팔 때 한꺼번에)
+        }
       }
       if (basketCount >= BASKET_CAP) {
         spawnMoneyPopup(p.x, p.y + 1.1, p.z, '📦 상자가 가득 찼어요!');
@@ -3367,11 +3380,18 @@ function tryShipBox() {
     spawnMoneyPopup(dp.x, popupY, dp.z, '이장님이 오고 계세요 — 잠깐만요');
     return;
   }
-  coins += BOX_PRICE;
+  // 태풍이 오는 날은 뭍의 귤이 귀해져 웃돈(2배)을 받습니다
+  const boxPay = dayEvent === 'storm' ? BOX_PRICE * 2 : BOX_PRICE;
+  coins += boxPay;
+  stat.boxes++;
   emptyBasket();                 // 트럭에 실었으니 상자는 다시 비워집니다
   updateCoinBadge();
   playShipSound();
-  spawnMoneyPopup(dp.x, popupY, dp.z, `🚚 이장님이 귤 한 박스를 사셨어요! +${BOX_PRICE.toLocaleString()}원`);
+  spawnMoneyPopup(dp.x, popupY, dp.z,
+    dayEvent === 'storm'
+      ? `🚚 태풍 웃돈! 귤 한 박스 +${boxPay.toLocaleString()}원`
+      : `🚚 이장님이 귤 한 박스를 사셨어요! +${boxPay.toLocaleString()}원`);
+  checkAchievements();
 }
 
 // ---------- 12-1e. 해녀 물질 ----------
@@ -3450,6 +3470,8 @@ function applyDiveLook() {
 }
 
 function enterDive() {
+  stat.dives++;
+  checkAchievements();
   state.diving = true;
   breath = BREATH_MAX;
   breathLow = false;
@@ -3502,8 +3524,10 @@ function leaveDive(reason) {
     // 그게 숨을 아껴야 하는 진짜 이유입니다. (죽는 순간 바로 저장해 새로고침 꼼수도 안 통합니다)
     const lostCoins = coins;
     coins = 0;
+    stat.drowns++;
     updateCoinBadge();
     saveGame(true);
+    checkAchievements();
     // DIE 화면은 뭍에서 깨어난 뒤에도 한동안 머물다가 천천히 걷힙니다
     if (deathOverlay) setTimeout(() => deathOverlay.classList.remove('show'), 2800);
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
@@ -3515,11 +3539,15 @@ function leaveDive(reason) {
         `🧺 망사리에 담았던 ${lost}개도 바다에 흘렸습니다`, 5), 2600);
     }
   } else if (caught > 0) {
+    if (dayEvent === 'haul') pay = Math.round(pay * 1.5);   // 물반 고기반 — 오늘은 1.5배!
     coins += pay;
+    for (const [k, n] of Object.entries(tally)) stat[k] = (stat[k] || 0) + n;
     updateCoinBadge();
     playShipSound();
     const list = Object.entries(tally).map(([k, n]) => `${CATCH_KINDS[k].name} ${n}`).join(' · ');
-    spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, `${list} → +${pay.toLocaleString()}원`);
+    spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
+      `${list} → +${pay.toLocaleString()}원${dayEvent === 'haul' ? ' (물반 고기반!)' : ''}`);
+    checkAchievements();
   } else {
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, '뭍으로 나왔어요');
   }
@@ -3817,6 +3845,26 @@ function morningNotice() {
   else spawnMoneyPopup(px, py, pz, '🌅 아침이에요 — 매일 아침 말에게 당근을 주세요', 6);
 }
 
+// ----- 오늘의 사건 — 아침마다 그날만의 일이 벌어집니다 (접속할 이유!) -----
+// null(평온) 40% · 태풍 15% · 황금귤 15% · 물반고기반 15% · 장날 15%
+let dayEvent = null;
+function rollDayEvent() {
+  const r = Math.random();
+  dayEvent = r < 0.4 ? null : r < 0.55 ? 'storm' : r < 0.7 ? 'gold' : r < 0.85 ? 'haul' : 'market';
+}
+function dayEventNotice() {
+  if (!dayEvent) return;
+  const msg = {
+    storm:  '🌀 태풍이 와요! 오늘은 물질 금지 · 대신 귤 박스는 웃돈(2배)',
+    gold:   '✨ 황금귤이 열리는 날! 따다 보면 반짝이는 놈이 섞여 있대요',
+    haul:   '🌊 물반 고기반! 오늘 물질 채집물은 1.5배 값',
+    market: '🎪 오늘은 장날! 상점 물건이 전부 반값',
+  }[dayEvent];
+  spawnMoneyPopup(state.x, lulu.position.y + 3.0, state.z, msg, 7);
+}
+// 장날이면 상점 물건값이 반값이 됩니다 (사는 곳마다 이 함수를 거칩니다)
+function shopPrice(p) { return dayEvent === 'market' ? Math.round(p / 2) : p; }
+
 // 하늘·해·안개를 시간에 맞춰 물들입니다
 const SKY_DAY_TOP = new THREE.Color(0x2f7fd0), SKY_DAY_BOT = new THREE.Color(0xe2eff8);
 const SKY_NGT_TOP = new THREE.Color(0x0a1230), SKY_NGT_BOT = new THREE.Color(0x1c2a4a);
@@ -3830,6 +3878,8 @@ function updateDayNight(dt) {
     gameT -= DAY_LEN;
     dayCount++;
     morningNotice();
+    rollDayEvent();
+    setTimeout(dayEventNotice, 2200);   // 아침 인사 다음에 오늘의 소식
   }
   const t01 = gameT / DAY_LEN;
   let daylight;
@@ -3849,7 +3899,16 @@ function updateDayNight(dt) {
   top.copy(SKY_NGT_TOP).lerp(SKY_DAY_TOP, daylight);
   bot.copy(SKY_NGT_BOT).lerp(SKY_DAY_BOT, daylight).lerp(SKY_DUSK, dusk);
   if (!state.diving) scene.fog.color.copy(FOG_NGT).lerp(FOG_DAY, daylight).lerp(SKY_DUSK, dusk * 0.5);
+  // 태풍이 오는 날은 종일 잿빛으로 어둑합니다
+  if (dayEvent === 'storm') {
+    sun.intensity *= 0.5;
+    hemi.intensity *= 0.65;
+    top.lerp(STORM_GRAY, 0.55);
+    bot.lerp(STORM_GRAY, 0.4);
+    if (!state.diving) scene.fog.color.lerp(STORM_GRAY, 0.5);
+  }
 }
+const STORM_GRAY = new THREE.Color(0x6a7078);
 
 // 조랑말 그림 갱신 — 오늘 당근을 먹었으면 웃는 모습, 아니면 우는 모습 (매 프레임)
 function updatePony(t) {
@@ -3957,23 +4016,96 @@ function updateHalmang() {
   halmangCard.scale.set(Hp * sheet.frameW / CELL_H, Hp, 1);
 }
 
+// 루루의 사연 — 처음 시작할 때 딱 한 번, 루루가 왜 제주에 왔는지 들려줍니다.
+// 이 세 줄이 있어야 이 섬의 하루하루가 "할 일 목록"이 아니라 "루루의 삶"이 됩니다.
+let introSeen = false;
+const INTRO_LINES = [
+  '…도시는 너무 시끄러웠어. 그래서 루루는 짐을 싸서, 바다 건너 제주로 왔다.',
+  '가진 것은 밀짚모자 하나, 그리고 할머니가 남기고 간 남쪽 언덕의 낡은 돌집 하나.',
+  '"여기서라면… 다시 시작할 수 있을 거야." 🍊 루루냥의 제주살이는 이렇게 시작된다.',
+];
+
 // 돌하르방 — 상점 앞을 지키는 안내석. 처음 온 사람에게 섬 사는 법을 알려줍니다
 const TUTOR_SPOT = { x: 2.2, z: 45.4 };
 const TUTOR_RANGE = 2.6;
 let tutorialSeen = false;
 const TUTOR_LINES = [
-  '혼저 옵서예! 나는 이 섬을 지키는 돌하르방이우다.',
-  '🍊 귤나무 앞에서 🐾(F)를 누르면 귤을 딴다네. 상자에 담아 택배사의 이장님께 팔면 돈이 되지.',
-  '🏪 상점 문 앞에 서면 안으로 들어가네. 당근을 사서 말에게 매일 하나씩 먹이게 — 굶기면 큰일 나!',
-  '🤿 물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가면 되네. 숨은 반만 쓰고 올라오게!',
-  '🏠 남쪽 언덕 돌집이 자네 집이야. 문 앞에 서면 들어가지고, 가구를 사다 꾸밀 수도 있다네.',
-  '🏇 말과 정이 들면 마구간 옆 팻말에서 경마에도 나가보게. 그럼, 좋은 하루 되시게!',
+  '안녕하세요! 저는 이 섬을 지키는 돌하르방입니다. 섬에서 사는 법을 알려드릴게요.',
+  '🍊 귤나무 앞에서 🐾(F)를 누르면 귤을 딸 수 있어요. 상자를 가득 채워 택배사에 가져가면 한 박스 10,000원에 팔립니다.',
+  '🏪 상점 문 앞에 서면 안으로 들어갑니다. 당근을 사서 말에게 매일 한 개씩 먹여주세요 — 굶기면 위험해요!',
+  '🤿 물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가세요. 숨이 다하면 죽을 위험이 있어요!',
+  '🏠 남쪽 언덕의 돌집이 루루의 집입니다. 문 앞에 서면 들어가지고, 가구를 사서 꾸밀 수도 있어요.',
+  '🏇 말과 애정이 쌓이면 마구간 옆 팻말에서 경마에 나갈 수 있습니다. 좋은 하루 되세요!',
 ];
 function tutorTalk() {
   startTalk('돌하르방', TUTOR_LINES, () => {
     if (!tutorialSeen) { tutorialSeen = true; saveGame(true); }
   });
 }
+
+// ---------- 12-1f-2a4. 도감(업적) — 섬 살이의 발자취 ----------
+// 게임 곳곳에서 한 일을 세어두고(stat), 조건을 채우면 업적이 달성됩니다.
+// 왼쪽 아래 📖 버튼으로 언제든 펼쳐볼 수 있습니다.
+const stat = { boxes: 0, dives: 0, drowns: 0, races: 0, raceWins: 0, abalone: 0, conch: 0, kelp: 0, gold: 0 };
+const ACHIEVEMENTS = [
+  { id: 'box1',    name: '첫 출하',     desc: '귤 한 박스를 처음 팔았다' },
+  { id: 'box10',   name: '귤 부자',     desc: '귤 박스 10개 판매' },
+  { id: 'box50',   name: '감귤 명인',   desc: '귤 박스 50개 판매' },
+  { id: 'dive1',   name: '초보 해녀',   desc: '처음으로 물질을 나갔다' },
+  { id: 'dive20',  name: '상군 해녀',   desc: '물질 20회' },
+  { id: 'abal10',  name: '전복 사냥꾼', desc: '전복 10개 채집' },
+  { id: 'drown1',  name: '바당의 경고', desc: '욕심내다 바다에 잡혀갔다…' },
+  { id: 'race1',   name: '첫 우승',     desc: '경마에서 처음 이겼다' },
+  { id: 'race5',   name: '경마왕',      desc: '경마 5승' },
+  { id: 'love100', name: '단짝',        desc: '조랑말 애정 100 달성' },
+  { id: 'house',   name: '내 집 마련',  desc: '돌집 수리를 끝냈다' },
+  { id: 'furn',    name: '아늑한 집',   desc: '가구 네 가지를 모두 들여놓았다' },
+  { id: 'gold1',   name: '황금귤!',     desc: '황금귤을 처음 발견했다' },
+  { id: 'rich',    name: '백만장자',    desc: '돈 1,000,000원 모으기' },
+];
+const ACH_TESTS = {
+  box1: () => stat.boxes >= 1,
+  box10: () => stat.boxes >= 10,
+  box50: () => stat.boxes >= 50,
+  dive1: () => stat.dives >= 1,
+  dive20: () => stat.dives >= 20,
+  abal10: () => stat.abalone >= 10,
+  drown1: () => stat.drowns >= 1,
+  race1: () => stat.raceWins >= 1,
+  race5: () => stat.raceWins >= 5,
+  love100: () => ponyLove >= 100,
+  house: () => houseStage >= 3,
+  furn: () => FURN_ORDER.every((k) => furnitureOwned[k]),
+  gold1: () => stat.gold >= 1,
+  rich: () => coins >= 1000000,
+};
+let achieved = {};
+function checkAchievements() {
+  for (const a of ACHIEVEMENTS) {
+    if (!achieved[a.id] && ACH_TESTS[a.id]()) {
+      achieved[a.id] = true;
+      spawnMoneyPopup(state.x, lulu.position.y + 2.6, state.z, `🏅 업적 달성 — ${a.name}!`, 5);
+      playShipSound();
+      saveGame(true);
+    }
+  }
+}
+// 도감 화면 (📖 버튼)
+const bookWrap = document.getElementById('bookWrap');
+const bookList = document.getElementById('bookList');
+const bookBadge = document.getElementById('bookBadge');
+function openBook() {
+  if (!bookWrap || !bookList) return;
+  const done = ACHIEVEMENTS.filter((a) => achieved[a.id]).length;
+  bookList.innerHTML =
+    `<div class="bookHead">🏅 업적 ${done} / ${ACHIEVEMENTS.length}</div>` +
+    ACHIEVEMENTS.map((a) =>
+      `<div class="ach${achieved[a.id] ? ' on' : ''}"><b>${achieved[a.id] ? '🏅' : '🔒'} ${a.name}</b><span>${a.desc}</span></div>`
+    ).join('');
+  bookWrap.style.display = 'flex';
+}
+if (bookBadge) bookBadge.addEventListener('pointerdown', (e) => { e.preventDefault(); openBook(); });
+if (bookWrap) bookWrap.addEventListener('pointerdown', () => { bookWrap.style.display = 'none'; });
 
 // ---------- 12-1f-2b. 저장 · 처음부터 · 종료 ----------
 // 진행 상황을 브라우저 안(localStorage)에 남깁니다. 게임을 켜면 자동으로 이어집니다.
@@ -3989,8 +4121,9 @@ function saveGame(quiet) {
       tools, basketCount, cap: BASKET_CAP, x: outX, z: outZ,
       hasNet, netCarried, netX: netObj.position.x, netZ: netObj.position.z,
       furn: furnitureOwned,
-      gameT, dayCount, lastFedDay, ponyAlive, tutorialSeen,
+      gameT, dayCount, lastFedDay, ponyAlive, tutorialSeen, introSeen, dayEvent,
       floorC: houseFloorColor, wallC: houseWallColor,
+      stat, achieved,
     }));
     if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '💾 저장했어요');
   } catch (e) { /* 시크릿 창 등에서는 저장이 막힐 수 있습니다 */ }
@@ -4028,6 +4161,10 @@ function loadGame() {
   lastFedDay = d.lastFedDay || 0;
   ponyAlive = d.ponyAlive !== false;
   tutorialSeen = !!d.tutorialSeen;
+  introSeen = !!d.introSeen;
+  dayEvent = d.dayEvent || null;
+  if (d.stat) Object.assign(stat, d.stat);
+  achieved = d.achieved || {};
   applyPonyAlive();
   // 집 인테리어 (바닥재·벽지)
   houseFloorColor = d.floorC || 0;
@@ -4048,7 +4185,8 @@ if (btnSave) btnSave.addEventListener('pointerdown', (e) => { e.preventDefault()
 // (다시하기·종료 버튼은 뺐습니다. 저장은 아래 자동 저장이 알아서 해줍니다)
 
 // 자동 저장 — 몇 초에 한 번씩, 그리고 창을 닫거나 다른 앱으로 넘어가는 순간에도 조용히 저장합니다
-setInterval(() => saveGame(true), 5000);
+// (이때 돈·애정·집 같은 "지켜보기만 하면 되는" 업적들도 함께 확인합니다)
+setInterval(() => { checkAchievements(); saveGame(true); }, 5000);
 addEventListener('pagehide', () => saveGame(true));
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
 
@@ -4238,6 +4376,7 @@ function tryRace() {
     return;
   }
   coins -= RACE_FEE;
+  stat.races++;
   updateCoinBadge();
   const win = Math.random() < raceWinChance();
   startRaceVideo(win);
@@ -4262,9 +4401,11 @@ function startRaceVideo(win) {
     const py = groundHeight(state.x, state.z) + 2;
     if (win) {
       coins += RACE_PRIZE;
+      stat.raceWins++;
       updateCoinBadge();
       playShipSound();
       spawnMoneyPopup(state.x, py, state.z, `🏆 1등! 상금 ${RACE_PRIZE.toLocaleString()}원을 받았어요`, 5);
+      checkAchievements();
     } else {
       spawnMoneyPopup(state.x, py, state.z, '😢 꼴등… 당근을 더 먹이면 더 잘 뜁니다', 5);
     }
@@ -4306,6 +4447,13 @@ function updateCarrotFx(dt) {
   carrotFx.scale.setScalar(1 - k * 0.85);
 }
 
+// 조랑말 울음소리 (직접 준비하신 소리) — F로 말을 상대할 때 웁니다
+const ponySfx = new Audio('../assets/farmcat/pony_sound.mp3');
+ponySfx.volume = 0.75;
+function playPonySfx() {
+  try { ponySfx.currentTime = 0; ponySfx.play().catch(() => {}); } catch (e) {}
+}
+
 function tryFeedPony() {
   const y = groundHeight(STABLE.x, STABLE.z) + STABLE_H * 0.75;
   if (!ponyAlive) {
@@ -4332,6 +4480,7 @@ function tryFeedPony() {
     spawnMoneyPopup(state.x, groundHeight(state.x, state.z) + 1.6, state.z, '🐴 조랑말 앞까지 더 가까이 가세요');
     return;
   }
+  playPonySfx();   // 말 곁에서 F — 히힝!
   if (carrots <= 0) {
     spawnMoneyPopup(STABLE.x, y, STABLE.z, '당근이 없어요 · 이장님 상점에서 1,000원');
     return;
@@ -4422,6 +4571,12 @@ function handleActionKey() {
   // 물질은 포구 축대 끝에서만 들어갈 수 있습니다
   const entryDist = Math.hypot(state.x - DIVE_ENTRY.x, state.z - DIVE_ENTRY.z);
   if (entryDist < DIVE_ENTRY_RANGE) {
+    // 태풍이 오는 날은 바다가 위험해 물질을 쉽니다
+    if (dayEvent === 'storm') {
+      spawnMoneyPopup(DIVE_ENTRY.x, groundHeight(DIVE_ENTRY.x, DIVE_ENTRY.z) + 2.2, DIVE_ENTRY.z,
+        '🌀 태풍이 몰아쳐요 — 오늘은 물질을 쉽니다');
+      return;
+    }
     // 망사리를 메고 있어야만 바다에 들어갈 수 있습니다
     if (!netCarried) {
       const py = groundHeight(DIVE_ENTRY.x, DIVE_ENTRY.z) + 2.2;
@@ -4465,10 +4620,21 @@ for (const img of document.querySelectorAll('#startJobs img[data-src]')) {
       setTimeout(() => startEl.remove(), 500);   // 사라지고 나면 화면에서 완전히 치웁니다
       wakeAudio();
       startBgm();
-      // 처음 온 사람에게는 돌하르방이 손짓합니다
-      if (!tutorialSeen) {
-        setTimeout(() => spawnMoneyPopup(TUTOR_SPOT.x, groundHeight(TUTOR_SPOT.x, TUTOR_SPOT.z) + 3.4, TUTOR_SPOT.z,
-          '🗿 돌하르방이 할 말이 있대요 — 가까이 가서 🐾', 8), 900);
+      const tutorHint = () => {
+        if (!tutorialSeen) {
+          setTimeout(() => spawnMoneyPopup(TUTOR_SPOT.x, groundHeight(TUTOR_SPOT.x, TUTOR_SPOT.z) + 3.4, TUTOR_SPOT.z,
+            '🗿 돌하르방이 할 말이 있대요 — 가까이 가서 🐾', 8), 900);
+        }
+      };
+      // 처음 온 사람에게는 루루의 사연부터, 그다음 돌하르방이 손짓합니다
+      if (!introSeen) {
+        setTimeout(() => startTalk('루루', INTRO_LINES, () => {
+          introSeen = true;
+          saveGame(true);
+          tutorHint();
+        }), 600);
+      } else {
+        tutorHint();
       }
     };
     startEl.addEventListener('pointerdown', begin, { once: true });
