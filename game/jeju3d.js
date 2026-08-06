@@ -2672,10 +2672,9 @@ function updateCoinBadge() {
 function updateBasketBadge() {
   if (!boxBadge) return;
   const full = basketCount >= BASKET_CAP;
-  const worth = (basketCount * 100).toLocaleString();
   boxBadge.textContent = full
-    ? `📦 상자 가득! ${basketCount}/${BASKET_CAP} · ${worth}원 — 택배사의 이장님께`
-    : `📦 상자 ${basketCount}/${BASKET_CAP} · ${worth}원`;
+    ? `📦 상자 가득! ${basketCount}/${BASKET_CAP} — 택배사의 이장님께 (한 박스 10,000원)`
+    : `📦 상자 ${basketCount}/${BASKET_CAP} — 가득 채우면 10,000원`;
   boxBadge.classList.toggle('full', full);
 }
 // 상자(basketPos)와 잡기 범위(GRAB_RANGE)는 아래 12-1b에서 정의되므로,
@@ -3244,7 +3243,7 @@ function updateFlyingFruits(dt) {
       // 날아온 귤이 여기서 비로소 "상자 안에 쌓인 귤" 한 알로 바뀝니다
       if (addFruitToBasket()) {
         playDropSound();                            // 나무통에 툭 떨어지는 소리
-        spawnMoneyPopup(p.x, p.y + 0.9, p.z, '+100원');   // 상자에 가치가 쌓입니다
+        spawnMoneyPopup(p.x, p.y + 0.9, p.z, '🍊 +1');   // 한 알 담겼습니다 (돈은 박스로 팔 때 한꺼번에)
       }
       if (basketCount >= BASKET_CAP) {
         spawnMoneyPopup(p.x, p.y + 1.1, p.z, '📦 상자가 가득 찼어요!');
@@ -3269,7 +3268,7 @@ function tryHarvest() {
   playPickSound();                   // 가지에서 톡 떼어내는 소리
   spawnFlyingFruit(s.x, s.y, s.z);   // 나무에 매달려 있던 바로 그 자리에서 손으로 따서 날려보냄
   hideFruit(i);
-  // 딸 때는 돈을 바로 받지 않습니다. 상자에 떨어지는 순간 "+100원"이 상자 가치로 쌓이고,
+  // 딸 때는 돈을 바로 받지 않습니다. 상자에 한 알씩 쌓이고, 가득 채워 배송해야 박스값을 받습니다.
   // 택배사에서 이장님과 정산해야 비로소 현금이 됩니다.
   state.harvestT = 0;
   state.idleTime = 0;
@@ -3281,14 +3280,20 @@ function tryHarvest() {
 //  당근(왼쪽 바구니)과 해녀 산소통(오른쪽 판매대)을 팝니다.)
 
 // ---------- 12-1d. 택배사 — 이장님과 정산하고 육지로 부치기 ----------
-// 상자에 담긴 귤을 이장님이 알당 100원에 사서 트럭에 실어 보냅니다 (가득 찬 36알 = 3,600원).
+// 귤은 낱개로 값을 세지 않습니다. 상자를 가득 채워 가면 이장님이 한 박스 10,000원에 사 줍니다.
+// (덜 찬 상자는 안 사 줍니다 — "가득 채워서 오게!")
 // 이장님이 택배사에 계셔야 정산이 됩니다 — 루루가 문앞에 서면 이장님이 걸어오니 잠깐 기다리세요.
-const FRUIT_PRICE = 100;
+const BOX_PRICE = 10000;
 function tryShipBox() {
   const dp = depot.group.position;
   const popupY = dp.y + 3.2;
   if (basketCount === 0) {
     spawnMoneyPopup(dp.x, popupY, dp.z, '상자가 비었어요 · 귤을 담아 오세요');
+    return;
+  }
+  if (basketCount < BASKET_CAP) {
+    spawnMoneyPopup(dp.x, popupY, dp.z,
+      `상자를 가득 채워서 오게 (${basketCount}/${BASKET_CAP}) — 한 박스 ${BOX_PRICE.toLocaleString()}원`);
     return;
   }
   // 이장님이 아직 오는 중이면 정산할 사람이 없습니다
@@ -3297,13 +3302,11 @@ function tryShipBox() {
     spawnMoneyPopup(dp.x, popupY, dp.z, '이장님이 오고 계세요 — 잠깐만요');
     return;
   }
-  const pay = basketCount * FRUIT_PRICE;
-  const sent = basketCount;
-  coins += pay;
+  coins += BOX_PRICE;
   emptyBasket();                 // 트럭에 실었으니 상자는 다시 비워집니다
   updateCoinBadge();
   playShipSound();
-  spawnMoneyPopup(dp.x, popupY, dp.z, `🚚 이장님이 귤 ${sent}알을 사셨어요! +${pay.toLocaleString()}원`);
+  spawnMoneyPopup(dp.x, popupY, dp.z, `🚚 이장님이 귤 한 박스를 사셨어요! +${BOX_PRICE.toLocaleString()}원`);
 }
 
 // ---------- 12-1e. 해녀 물질 ----------
@@ -3844,7 +3847,7 @@ function mayorTalkLines() {
   ];
   if (basketCount >= BASKET_CAP) return [
     '오, 귤이 실하네! 상자가 가득이야.',
-    '택배사 앞으로 가져오게 — 알당 100원, 후하게 쳐줌세.',
+    '택배사 앞으로 가져오게 — 한 박스 만 원, 후하게 쳐줌세.',
   ];
   if (!ponyFedToday()) return [
     '오늘 말한테 당근은 줬는가?',
