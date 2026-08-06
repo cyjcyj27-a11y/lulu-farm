@@ -2400,6 +2400,15 @@ function handleGrabKey() {
 }
 addEventListener('keydown', (e) => { if (e.code === 'KeyF') handleActionKey(); });
 
+// 시작 화면의 일거리 그림 — 아직 안 그린 것은 파일이 없으므로, 있을 때만 붙입니다.
+// (없는 그림을 그냥 붙이면 깨진 그림 아이콘이 나와서 오히려 보기 싫습니다)
+for (const img of document.querySelectorAll('#startJobs img[data-src]')) {
+  const src = img.getAttribute('data-src');
+  const probe = new Image();
+  probe.onload = () => { img.src = src; };   // 파일이 있으면 그때 붙입니다
+  probe.src = src;
+}
+
 // 시작 화면: 누르면 사라지면서 소리와 배경음악이 깨어납니다.
 // (브라우저가 "사용자가 한 번 누르기 전엔 소리 금지"로 막아두기 때문에 이 한 번이 필요합니다)
 {
