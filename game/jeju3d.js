@@ -1912,6 +1912,19 @@ function buildTangerineTree(x, y, z) {
   obstacles.push({ x, z, r: 0.55, topY: NO_JUMP });
 }
 
+// 건물 곁에는 나무를 심지 않습니다 — 걸어다니는 충돌 반경(일부러 좁게 둠)보다
+// 건물 지붕이 훨씬 커서, 그 반경만 피하면 나무가 지붕을 뚫고 자라기 때문입니다.
+const NO_PLANT = [
+  { x: STABLE.x, z: STABLE.z, r: 7.5 },   // 마구간 (지붕 폭 6m + 잎 반경)
+  { x: HOUSE.x, z: HOUSE.z, r: 8 },       // 헌집 (그림 폭 8.5m + 뒤채)
+];
+function plantBlocked(x, z) {
+  for (const n of NO_PLANT) {
+    if (Math.hypot(n.x - x, n.z - z) < n.r) return true;
+  }
+  return false;
+}
+
 for (const f of ORCHARDS) {
   const c = Math.cos(f.rot), s = Math.sin(f.rot);
   for (let i = 0; i < f.cols; i++) {
@@ -1922,6 +1935,7 @@ for (const f of ORCHARDS) {
       const z = f.z + lx * s + lz * c;
       const y = groundHeight(x, z);
       if (y < 1.5) continue;                  // 바닷가 모래밭에는 안 심습니다
+      if (plantBlocked(x, z)) continue;       // 마구간·헌집 곁은 비워둡니다
       // 밭담·돌하르방처럼 이미 자리를 차지한 것 위에는 겹쳐 심지 않습니다
       let blocked = false;
       for (const o of obstacles) {
@@ -2013,6 +2027,7 @@ scatter(16, ISLAND_R - 26, 2.5, (x, y, z) => {
   for (const o of obstacles) {
     if (Math.hypot(o.x - x, o.z - z) < o.r + 4.5) return;
   }
+  if (plantBlocked(x, z)) return;   // 마구간·헌집 곁은 비워둡니다
   buildTree(x, y, z);
 });
 
