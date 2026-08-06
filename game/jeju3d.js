@@ -4007,8 +4007,9 @@ let racing = false;
   board.rotation.y = Math.PI / 2;
   scene.add(board);
 }
+// 승률 = 기본 10% + 당근 1개당 1% 가산 (예: 당근 30개면 40%, 90개부터는 100%)
 function raceWinChance() {
-  return Math.min(0.7, 0.1 + (ponyLove / RACE_LOVE) * 0.6);
+  return Math.min(1, 0.1 + ponyLove / 100);
 }
 function tryRace() {
   const y = groundHeight(RACE_SPOT.x, RACE_SPOT.z) + 1.8;
