@@ -220,54 +220,33 @@ function makeMountain(x, z, baseR, topR, h, color) {
   return m;
 }
 
-// 성산일출봉 — 예전에는 그림판 한 장을 수평선에 세워 뒀는데, 각도에 따라 종이처럼 보였습니다.
-// 이제 실제 응회구 모양(가파른 절벽 위에 평평한 초록 분화구)을 통째로 빚어 세웁니다.
-{
-  const g = new THREE.Group();
-  g.position.set(40, -8, -470);
-  const cliffMat = new THREE.MeshLambertMaterial({ color: 0x62806f, flatShading: true });
-  const grassMat = new THREE.MeshLambertMaterial({ color: 0x6f9a56, flatShading: true });
-  const rimMat = new THREE.MeshLambertMaterial({ color: 0x55705f, flatShading: true });
+if (CAN_USE_IMAGES) {
+  // 직접 그리신 성산일출봉 그림(far_island_v2.webp)을 수평선에 세워 둡니다.
+  // 그림 원본이 1952x544 이고, 섬과 바다가 맞닿는 물가 선이 위에서 약 63% 지점에 있어서
+  // 그 선이 실제 바다 높이(y=0)와 맞도록 판의 위치를 계산합니다.
+  const IMG_W = 1952, IMG_H = 544, WATERLINE = 345 / IMG_H;
+  const W = 936, H = W * IMG_H / IMG_W;   // 실제 성산일출봉을 들판에서 바라본 정도의 크기 (780에서 20% 키움)
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(W, H),
+    new THREE.MeshBasicMaterial({
+      map: loadTexture('../assets/stage1/far_island_v2.webp'),
+      transparent: true,
+      depthWrite: false,
+    })
+  );
+  backdrop.position.set(0, H * (WATERLINE - 0.5), -480);   // 물가 선이 바다 높이(y=0)에 오도록
+  backdrop.renderOrder = -1;
+  scene.add(backdrop);
+  skyStuff.push(backdrop);
 
-  // 몸통 — 위가 넓적한 가파른 절벽. 각도마다 반지름을 살짝 다르게 해 세로 능선을 냅니다
-  const bodyGeo = new THREE.CylinderGeometry(86, 132, 96, 26, 5);
-  {
-    const pos = bodyGeo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i);
-      const a = Math.atan2(z, x);
-      const k = 1 + Math.sin(a * 9) * 0.045 + Math.sin(a * 23 + 2) * 0.03;
-      pos.setX(i, x * k);
-      pos.setZ(i, z * k);
-    }
-    bodyGeo.computeVertexNormals();
-  }
-  const body = new THREE.Mesh(bodyGeo, cliffMat);
-  body.position.y = 48;
-  g.add(body);
-  // 분화구 테두리 — 꼭대기 가장자리를 나지막한 둔덕이 한 바퀴 두릅니다
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(80, 8, 8, 26), rimMat);
-  rim.rotation.x = Math.PI / 2;
-  rim.position.y = 96;
-  g.add(rim);
-  // 분화구 안 풀밭 — 얕은 접시처럼 살짝 꺼진 초록
-  const bowl = new THREE.Mesh(new THREE.ConeGeometry(80, 10, 26), grassMat);
-  bowl.rotation.x = Math.PI;
-  bowl.position.y = 92;
-  g.add(bowl);
-  // 바다에 완만하게 잠기는 밑단 치마
-  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(150, 230, 26, 24), cliffMat);
-  skirt.position.y = 6;
-  g.add(skirt);
-  // 서쪽으로 이어지는 낮은 반도 — 성산은 섬이 아니라 뭍과 이어져 있으니까요
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(60, 90, 16, 18), grassMat);
-  neck.scale.set(2.6, 1, 0.7);
-  neck.position.set(-220, 2, 20);
-  g.add(neck);
-  scene.add(g);
-  skyStuff.push(g);
+  makeMountain(-360, -300, 120, 14, 74, 0x6f9295);   // 멀리 보이는 한라산
+  // (오른쪽 바다에 있던 뾰족한 섬은 성산일출봉과 겹쳐 보여서 없앴습니다)
+} else {
+  makeMountain(-60, -430, 150, 16, 92, 0x64878a);
+  makeMountain(170, -360, 58, 8, 32, 0x6f9088);
+  makeMountain(-260, -300, 50, 6, 26, 0x789787);
+  makeMountain(260, -220, 38, 5, 20, 0x7d9b8a);
 }
-makeMountain(-360, -300, 120, 14, 74, 0x6f9295);   // 멀리 보이는 한라산
 
 // ---------- 6. 바람에 흔들리는 식물 재질 ----------
 // MeshLambertMaterial의 셰이더에 흔들림 코드를 살짝 끼워 넣습니다.
