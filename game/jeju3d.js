@@ -2584,6 +2584,13 @@ function updateCamera(dt) {
 // 물속에서는 위를 올려다볼 수 있어야 "보는 방향으로 헤엄"이 됩니다. 뭍에서는 예전 그대로.
 function pitchMin() { return state.diving ? -0.85 : 0.05; }
 
+// 포구에 들어서면 루루가 잠수복으로 갈아입습니다 — 물질 나갈 채비!
+function inWetsuitZone() {
+  if (state.diving || state.inside || state.inShop) return false;
+  return Math.hypot(state.x - PORT.x, state.z - PORT.z) < 9 ||
+         (state.z > 92 && Math.abs(state.x - PORT.x) < 4);   // 축대 위 전체
+}
+
 let dragging = false, lastX = 0, lastY = 0;
 renderer.domElement.addEventListener('mousedown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
 addEventListener('mouseup', () => { dragging = false; });
@@ -4924,6 +4931,10 @@ function updateSpriteLulu(groundY) {
       sheet = SHEETS.diveSwim;
       cell = 0;
     }
+  } else if (SHEETS.diveIdle && inWetsuitZone()) {
+    // 포구 구역 — 잠수복 차림으로 서성입니다 (물질 나갈 채비)
+    sheet = SHEETS.diveIdle;
+    cell = Math.floor(t * 6) % sheet.frames;
   } else if (state.fixT >= 0 && SHEETS.fixHouse) {
     // 집 고치는 중 — 수리 단계에 맞는 연장을 든 그림 (0 망치, 1 톱, 2 붓).
     // 살짝살짝 두드리는 느낌이 나게 그림판을 아주 조금 흔들어줍니다.
