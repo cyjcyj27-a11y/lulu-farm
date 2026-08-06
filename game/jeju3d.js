@@ -2307,9 +2307,12 @@ function updateCamera(dt) {
   if (keys['KeyS']) camPitch += CAM_PITCH * dt;     // S = 위에서 내려다보기
   if (keys['KeyZ']) camDist += CAM_ZOOM * dt;       // 멀리
   if (keys['KeyX']) camDist -= CAM_ZOOM * dt;       // 가까이
-  camPitch = Math.max(0.05, Math.min(1.0, camPitch));
+  camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch));
   camDist = Math.max(4, Math.min(22, camDist));
 }
+
+// 물속에서는 위를 올려다볼 수 있어야 "보는 방향으로 헤엄"이 됩니다. 뭍에서는 예전 그대로.
+function pitchMin() { return state.diving ? -0.85 : 0.05; }
 
 let dragging = false, lastX = 0, lastY = 0;
 renderer.domElement.addEventListener('mousedown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
@@ -2317,7 +2320,7 @@ addEventListener('mouseup', () => { dragging = false; });
 addEventListener('mousemove', (e) => {
   if (!dragging) return;
   camYaw -= (e.clientX - lastX) * 0.005;
-  camPitch = Math.max(0.05, Math.min(1.0, camPitch + (e.clientY - lastY) * 0.003));
+  camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch + (e.clientY - lastY) * 0.003));
   lastX = e.clientX; lastY = e.clientY;
 });
 addEventListener('wheel', (e) => {
@@ -2376,7 +2379,7 @@ function handleTouchMove(e) {
       showStick(true, stickX, stickY, stickX + dx, stickY + dy);
     } else if (t.identifier === lookId) {
       camYaw -= (t.clientX - lookX) * 0.006;
-      camPitch = Math.max(0.05, Math.min(1.0, camPitch + (t.clientY - lookY) * 0.004));
+      camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch + (t.clientY - lookY) * 0.004));
       lookX = t.clientX; lookY = t.clientY;
     }
   }
@@ -2476,8 +2479,8 @@ function updateRopeBadge() {
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
     ropeBadge.textContent = IS_TOUCH
-      ? '🤿 🐾 채집 · 조이스틱 위로 떠오르기 · 아래로 잠수 · 수면에서 🐾 나가기'
-      : '🤿 F 채집 · ↑ 떠오르기 · ↓ 잠수 · ← → 헤엄 · 수면에서 F 나가기';
+      ? '🤿 🐾 채집 · 오른쪽 화면으로 시선을 돌리고, 조이스틱 ↑로 그쪽으로 헤엄 · 수면에서 🐾 나가기'
+      : '🤿 F 채집 · ↑ 보는 방향으로 헤엄 (W S로 위아래 보기) · 수면에서 F 나가기';
     return;
   }
   // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
@@ -3887,14 +3890,20 @@ function updateLulu(dt) {
   const spd = (running ? RUN : WALK) * tilt;
 
   if (state.diving) {
-    // 물속에서는 방향키만 씁니다: ← →(조이스틱 좌우)는 좌우 헤엄,
-    // ↑ ↓(조이스틱 위아래)는 아래쪽 점프·중력 계산에서 뜨고 가라앉기에 씁니다.
-    moveDir.set(rgtX * r, 0, rgtZ * r);
-    const sideTilt = Math.min(1, Math.abs(r));
+    // 시선 방향 수영: ↑는 카메라가 보는 쪽으로 헤엄칩니다 — 아래를 내려다보며 ↑면 잠수,
+    // 위를 올려다보며 ↑면 상승. ↓는 그 반대(뒤로), ← →는 옆으로.
+    const cosP = Math.cos(camPitch);
+    moveDir.set(
+      fwdX * cosP * f + rgtX * r,
+      -Math.sin(camPitch) * f,
+      fwdZ * cosP * f + rgtZ * r
+    );
+    const swimTilt = Math.min(1, Math.hypot(f, r));
     if (moveDir.lengthSq() > 0.0001) {
       moveDir.normalize();
-      swimVel.x += moveDir.x * SWIM_ACCEL * sideTilt * dt;
-      swimVel.z += moveDir.z * SWIM_ACCEL * sideTilt * dt;
+      swimVel.x += moveDir.x * SWIM_ACCEL * swimTilt * dt;
+      swimVel.z += moveDir.z * SWIM_ACCEL * swimTilt * dt;
+      state.vy += moveDir.y * SWIM_UP * swimTilt * dt;   // 상하 성분은 여기서 바로 밉니다
       state.idleTime = 0;
     } else {
       state.idleTime += dt;
@@ -3974,12 +3983,10 @@ function updateLulu(dt) {
   const gy = state.diving ? seabedHeight(state.x, state.z) : groundHeight(state.x, state.z);
   const wantUp = keys['Space'] || touchJump;
   if (state.diving) {
-    // ↑(조이스틱 위)로 떠오르고, ↓(아래)로 잠수합니다 — f는 위에서 계산한 앞뒤 입력값
-    if (f > 0.1) state.vy += SWIM_UP * Math.min(1, f) * dt;         // 위로 헤엄치기
-    else if (f < -0.1) state.vy -= SWIM_DOWN * Math.min(1, -f) * dt; // 아래로 잠수하기
-    else state.vy += BUOYANCY * dt;                 // 부력 — 가만히 있으면 살며시 떠오릅니다
+    // 상하 추진력은 위 이동 계산(시선 방향)에서 이미 vy에 더했습니다.
+    if (Math.abs(f) <= 0.1) state.vy += BUOYANCY * dt;   // 부력 — 가만히 있으면 살며시 떠오릅니다
     state.vy *= Math.max(0, 1 - 2.6 * dt);          // 물의 저항 — 움직임이 부드럽게 잦아듭니다
-    state.vy = Math.max(-2.0, Math.min(2.2, state.vy));
+    state.vy = Math.max(-2.4, Math.min(2.4, state.vy));
   } else {
     if (wantUp && state.onGround && state.harvestT < 0) {
       state.vy = JUMP;
@@ -4165,7 +4172,8 @@ function updateSpriteLulu(groundY) {
   // (정면으로 오면 좌우 성분이 0이라 뒤집기 값이 직전 것으로 남아 방향이 튀었습니다)
   // 옆모습 그림들은 원본이 왼쪽을 보므로, 오른쪽으로 갈 때 좌우를 뒤집습니다.
   // (물속의 둥둥·수면 그림은 정면이라 뒤집지 않습니다)
-  const sideSheets = [SHEETS.walkSide, SHEETS.pullSide, SHEETS.diveSwim, SHEETS.divePick];
+  // 잠수 그림(diveDown)도 옆모습이라, 왼쪽으로 갈 땐 원본 그대로·오른쪽으로 갈 땐 좌우를 뒤집습니다
+  const sideSheets = [SHEETS.walkSide, SHEETS.pullSide, SHEETS.diveSwim, SHEETS.divePick, SHEETS.diveDown];
   const mirror = sideSheets.includes(sheet) && spriteCard.userData.headingRight;
   spriteCard.scale.set(mirror ? -Wp : Wp, Hp * breath, 1);
 
