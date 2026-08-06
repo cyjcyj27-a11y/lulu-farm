@@ -442,6 +442,9 @@ function buildStoneWall(x1, z1, x2, z2) {
 buildStoneWall(-92, 22, -66, 44);
 buildStoneWall(66, 60, 92, 44);
 buildStoneWall(-58, -74, -22, -84);
+// 헌집으로 안내하는 남쪽 돌담길 — 밭 사이에서 시작해 언덕 끝 집 앞까지 죽 내려갑니다
+buildStoneWall(46, -18, 52, -44);
+buildStoneWall(52, -44, 53, -66);
 
 // 감귤밭을 두르는 밭담. 네 변 중 한 곳은 터놓아야 루루가 들어갈 수 있습니다
 // (돌담은 낮아 보여도 통과가 막혀 있어서, 막아두면 밭 안으로 못 들어갑니다)
@@ -966,17 +969,20 @@ const DEPOT_RANGE = 6.5;   // 이 거리 안에서 F를 누르면 배송할 수 
 const citrusTrunkMat = new THREE.MeshLambertMaterial({ color: 0x6f5540, flatShading: true });
 
 // ---------- 8-2d. 헌집 (사서 고치는 제주 돌집) ----------
-// 마당 동쪽에 버려진 돌집이 서 있습니다. 사서 세 번 고치면(벽→지붕→페인트) 내 집이 됩니다.
+// 남쪽 돌담길을 죽 내려가면, 바다가 내려다보이는 언덕 끝에 버려진 돌집이 서 있습니다.
+// 사서 세 번 고치면(벽→지붕→페인트) 내 집이 됩니다.
 // 집은 직접 그리신 그림을 판에 세워 쓰고, 수리 단계마다 그림만 바꿔 끼웁니다.
 //   old_house_0: 폐가 / 1: 벽 고침 / 2: 지붕 고침 / 3: 완성 (원본 그대로)
-const HOUSE = { x: 13, z: 46 };
+const HOUSE = { x: 58, z: -72 };
 const HOUSE_RANGE = 5.5;
 const HOUSE_W = 8.5, HOUSE_H = 8.5 * 520 / 1110;   // 그림 비율 그대로
 let houseStage = -1;    // -1 = 아직 안 삼, 0~2 = 수리 중, 3 = 완성
 const houseTex = [];
 const house = (() => {
   const g = new THREE.Group();
-  const y = groundHeight(HOUSE.x, HOUSE.z);
+  // 언덕 비탈에 서 있으므로, 집 높이는 마당(북쪽 접근로) 쪽 땅에 맞춥니다.
+  // 집 한가운데 땅높이에 맞추면 앞쪽 비탈이 집 아랫도리를 절반쯤 가려버립니다.
+  const y = groundHeight(HOUSE.x, HOUSE.z + 3);
   g.position.set(HOUSE.x, y, HOUSE.z);
 
   let plane = null;
@@ -984,10 +990,11 @@ const house = (() => {
     for (let i = 0; i < 4; i++) houseTex.push(loadTexture(`../assets/farmcat/old_house_${i}.webp`));
     plane = new THREE.Mesh(
       new THREE.PlaneGeometry(HOUSE_W, HOUSE_H),
-      new THREE.MeshLambertMaterial({ map: houseTex[0], transparent: true, alphaTest: 0.5 })
+      // 양면으로 그려야 뒤로 돌아가도 집이 사라지지 않습니다 (뒤에서는 좌우가 뒤집혀 보일 뿐)
+      new THREE.MeshLambertMaterial({ map: houseTex[0], transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })
     );
     plane.position.y = HOUSE_H / 2;
-    plane.rotation.y = Math.PI;      // 마당(남쪽)을 바라보게
+    // 집은 남쪽 언덕 끝에서 뭍(북쪽)을 바라봅니다 — 돌담길을 내려온 사람을 맞는 방향
     plane.castShadow = true;
     g.add(plane);
   }
@@ -1043,6 +1050,54 @@ function applyHouseLook() {
   house.sale.visible = houseStage < 0;    // 사고 나면 팻말이 사라집니다
 }
 applyHouseLook();
+
+// ---------- 8-2e. 마구간과 조랑말 ----------
+// 서쪽 벌판에 초가 마구간이 있고, 안에 제주 조랑말이 서 있습니다 (직접 그리신 그림).
+// 이장님 상점에서 당근(1,000원)을 사다 먹이면 애정이 쌓입니다 — 나중에 경마의 밑천이 됩니다.
+const STABLE = { x: -79, z: 8 };   // 서쪽 벌판 (바다에 걸치지 않게 물가에서 한 발 물림)
+const STABLE_RANGE = 6.0;
+const STABLE_W = 9.0, STABLE_H = 9.0 * 684 / 1019;   // 그림 비율 그대로
+const stable = (() => {
+  const g = new THREE.Group();
+  const y = groundHeight(STABLE.x, STABLE.z);
+  g.position.set(STABLE.x, y, STABLE.z);
+  if (CAN_USE_IMAGES) {
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(STABLE_W, STABLE_H),
+      new THREE.MeshLambertMaterial({ map: loadTexture('../assets/farmcat/stable.webp'), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })
+    );
+    plane.position.y = STABLE_H / 2;
+    plane.rotation.y = Math.PI / 2;   // 섬 안쪽(동쪽)을 바라보게
+    plane.castShadow = true;
+    g.add(plane);
+  }
+  scene.add(g);
+  obstacles.push({ x: STABLE.x, z: STABLE.z, r: 3.2, topY: NO_JUMP });
+  return { group: g };
+})();
+
+let carrots = 0;      // 들고 있는 당근
+let ponyLove = 0;     // 조랑말과 쌓은 애정 (당근 하나에 1씩)
+const CARROT_PRICE = 1000;
+// 당근 바구니 — 상점 정면 서쪽에 놓인 판매대입니다. 상점(끈)과 자리를 나눠 씁니다.
+const CARROT_SPOT = { x: 3.2, z: 42.6 };
+const CARROT_RANGE = 2.4;
+{
+  const y = groundHeight(CARROT_SPOT.x, CARROT_SPOT.z);
+  const tub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.38, 0.34, 10), shopWoodMat);
+  tub.position.set(CARROT_SPOT.x, y + 0.17, CARROT_SPOT.z);
+  tub.castShadow = true;
+  scene.add(tub);
+  const carrotMat = new THREE.MeshLambertMaterial({ color: 0xe06a1d, flatShading: true });
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const c = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 6), carrotMat);
+    c.position.set(CARROT_SPOT.x + Math.cos(a) * 0.24, y + 0.42, CARROT_SPOT.z + Math.sin(a) * 0.24);
+    c.rotation.set((Math.random() - 0.5) * 0.9, 0, (Math.random() - 0.5) * 0.9);
+    c.castShadow = true;
+    scene.add(c);
+  }
+}
 
 // 8-3. 감귤나무 (밭담 안에 줄지어 심는 귤밭)
 // 귤은 나무마다 따로 만들면 수백 개가 되어 느려지므로, 위치만 모아뒀다가
@@ -1377,24 +1432,46 @@ const catchMeshes = {};       // 종류별 InstancedMesh
       catchSpots.push({ x, y, z, kind, picked: false });
     }
   }
-  // 종류별로 한 번에 그리기. 인스턴스 번호와 catchSpots 번호를 맞춰두어야 딸 때 숨길 수 있습니다
-  const GEO = {
-    abalone: new THREE.SphereGeometry(0.26, 8, 6),
-    conch:   new THREE.ConeGeometry(0.2, 0.42, 7),
-    kelp:    new THREE.SphereGeometry(0.3, 6, 5),
-  };
-  const MAT = { abalone: abaloneMat, conch: conchMat, kelp: kelpMat };
+  // 종류별로 한 번에 그리기. 인스턴스 번호와 catchSpots 번호를 맞춰두어야 딸 때 숨길 수 있습니다.
+  // 그림을 쓸 수 있으면 직접 그리신 해산물 그림을 작은 판에 세워 씁니다 (진짜 전복·소라·미역 모양).
+  // 그림을 못 읽는 경우(더블클릭으로 열었을 때)에는 예전처럼 공·원뿔로 대신합니다.
+  const CATCH_SIZE = { abalone: 0.55, conch: 0.5, kelp: 1.0 };   // 판 한 변의 크기(미터)
   for (const kind of Object.keys(CATCH_KINDS)) {
     const mine = catchSpots.map((s, i) => ({ s, i })).filter((o) => o.s.kind === kind);
-    const m = new THREE.InstancedMesh(GEO[kind], MAT[kind], mine.length);
-    mine.forEach((o, j) => {
-      o.s.slot = j;                                  // 이 채집물이 몇 번째 인스턴스인지 기억
-      dummy.position.set(o.s.x, o.s.y, o.s.z);
-      dummy.rotation.set(kind === 'abalone' ? Math.PI / 2 : 0, Math.random() * 3, 0);
-      dummy.scale.set(1, kind === 'abalone' ? 0.45 : 1, 1);
-      dummy.updateMatrix();
-      m.setMatrixAt(j, dummy.matrix);
-    });
+    let m;
+    if (CAN_USE_IMAGES) {
+      const sz = CATCH_SIZE[kind];
+      const geo = new THREE.PlaneGeometry(sz, sz);
+      geo.translate(0, sz * 0.42, 0);   // 아래끝을 바닥에 맞춰 세웁니다
+      m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({
+        map: loadTexture(`../assets/farmcat/catch_${kind}.webp`),
+        transparent: true, alphaTest: 0.5, side: THREE.DoubleSide,
+      }), mine.length);
+      mine.forEach((o, j) => {
+        o.s.slot = j;
+        dummy.position.set(o.s.x, o.s.y, o.s.z);
+        dummy.rotation.set(0, Math.random() * Math.PI, 0);   // 아무 방향이나 보고 서 있게
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        m.setMatrixAt(j, dummy.matrix);
+      });
+    } else {
+      const GEO = {
+        abalone: new THREE.SphereGeometry(0.26, 8, 6),
+        conch:   new THREE.ConeGeometry(0.2, 0.42, 7),
+        kelp:    new THREE.SphereGeometry(0.3, 6, 5),
+      };
+      const MAT = { abalone: abaloneMat, conch: conchMat, kelp: kelpMat };
+      m = new THREE.InstancedMesh(GEO[kind], MAT[kind], mine.length);
+      mine.forEach((o, j) => {
+        o.s.slot = j;
+        dummy.position.set(o.s.x, o.s.y, o.s.z);
+        dummy.rotation.set(kind === 'abalone' ? Math.PI / 2 : 0, Math.random() * 3, 0);
+        dummy.scale.set(1, kind === 'abalone' ? 0.45 : 1, 1);
+        dummy.updateMatrix();
+        m.setMatrixAt(j, dummy.matrix);
+      });
+    }
     m.instanceMatrix.needsUpdate = true;
     m.frustumCulled = false;
     m.castShadow = true;
@@ -1572,8 +1649,10 @@ if (CAN_USE_IMAGES) {
   loadSheet('sleep',     'sleep.webp',      8,  299);          // 낮잠 (오래 가만히 있으면)
   loadSheet('harvest',   'harvest.webp',   10,  181);          // 감귤 따기 (F키로 딸 때, 한 번만 재생)
   loadSheet('pullSide',  'pull_side.webp', 10,  255);          // 끈 없이 상자를 몸으로 밀어 끌 때 (옆모습, 원본은 왼쪽을 봄)
-  // 해녀 물질 (캐릭터 시트에서 잘라낸 것 — 전부 옆모습, 원본은 왼쪽을 봄)
-  loadSheet('diveSwim',  'dive_swim.webp',  5,  224);          // 물속을 헤엄칠 때
+  // 해녀 물질 — 헤엄·둥둥·수면은 영상에서 뽑아 8칸씩이라 훨씬 부드럽게 움직입니다
+  loadSheet('diveSwim',  'dive_swim.webp',  8,  164);          // 물속 활공 (옆모습, 원본은 왼쪽을 봄)
+  loadSheet('diveIdle',  'dive_idle.webp',  8,  139);          // 물속에 가만히 떠 있기 (정면)
+  loadSheet('diveFloat', 'dive_float.webp', 8,  173);          // 수면에 떠서 숨 고르기 (정면)
   loadSheet('divePick',  'dive_pick.webp',  6,  190);          // 전복·소라를 딸 때 (한 번만 재생)
   loadSheet('diveUp',    'dive_up.webp',    5,  140);          // 수면으로 떠오를 때
   // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
@@ -1833,6 +1912,19 @@ function updateRopeBadge() {
   if (typeof HOUSE !== 'undefined' &&
       Math.hypot(state.x - HOUSE.x, state.z - HOUSE.z) < HOUSE_RANGE + 3) {
     ropeBadge.textContent = houseBadgeText();
+    return;
+  }
+  // 당근 바구니·마구간 안내
+  if (typeof CARROT_SPOT !== 'undefined' &&
+      Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z) < CARROT_RANGE) {
+    ropeBadge.textContent = `🥕 ${KEY_ACTION}으로 당근 구입 (${CARROT_PRICE.toLocaleString()}원)`;
+    return;
+  }
+  if (typeof STABLE !== 'undefined' &&
+      Math.hypot(state.x - STABLE.x, state.z - STABLE.z) < STABLE_RANGE) {
+    ropeBadge.textContent = carrots > 0
+      ? `🐴 ${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)`
+      : '🐴 조랑말이 배고파해요 — 이장님 상점에서 당근을 사오세요';
     return;
   }
   if (hasRope) {
@@ -2630,18 +2722,65 @@ function playHammerSound() {
   }
 }
 
+// ---------- 12-1g. 당근 사서 조랑말 먹이기 ----------
+const carrotBadge = document.getElementById('carrotBadge');
+function updateCarrotBadge() {
+  if (!carrotBadge) return;
+  carrotBadge.style.display = carrots > 0 ? 'block' : 'none';
+  carrotBadge.textContent = `🥕 당근 ${carrots}개`;
+}
+
+function tryBuyCarrot() {
+  const y = groundHeight(CARROT_SPOT.x, CARROT_SPOT.z) + 1.3;
+  if (coins < CARROT_PRICE) {
+    spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `${(CARROT_PRICE - coins).toLocaleString()}원 부족`);
+    return;
+  }
+  coins -= CARROT_PRICE;
+  carrots++;
+  updateCoinBadge();
+  updateCarrotBadge();
+  playPickSound();
+  spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `🥕 당근 구입! (${carrots}개)`);
+}
+
+// 당근을 이만큼 먹이면 경마장에 나갈 수 있습니다 (경마는 준비 중 — 영상이 오면 붙입니다)
+const RACE_LOVE = 100;
+function tryFeedPony() {
+  const y = groundHeight(STABLE.x, STABLE.z) + STABLE_H * 0.75;
+  if (carrots <= 0) {
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, '당근이 없어요 · 이장님 상점에서 1,000원');
+    return;
+  }
+  carrots--;
+  ponyLove++;
+  updateCarrotBadge();
+  playDropSound();
+  if (ponyLove >= RACE_LOVE) {
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, `🏇 애정 ${ponyLove}! 경마장에 나갈 수 있어요 (준비 중)`);
+  } else {
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, `🥕 냠냠! ❤️ ${ponyLove}/${RACE_LOVE}`);
+  }
+  state.idleTime = 0;
+}
+
 // F키 하나로 상황에 맞는 행동을 합니다:
 // 물속이면 채집, 뭍이면 귤 따기 → 상점 → 택배사 → 헌집 → 포구 순으로 가까운 것을 씁니다.
 function handleActionKey() {
   if (state.harvestT >= 0 || state.fixT >= 0) return;
   if (state.diving) { tryCollect(); return; }
   if (nearestFruit() >= 0) { tryHarvest(); return; }
+  // 당근 바구니는 상점 코앞에 있으므로, 상점(끈)보다 먼저 좁은 범위로 확인합니다
+  const carrotDist = Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z);
+  if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
   const shopDist = Math.hypot(state.x - shop.group.position.x, state.z - shop.group.position.z);
   if (shopDist < SHOP_RANGE) { tryBuyRope(); return; }
   const depotDist = Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z);
   if (depotDist < DEPOT_RANGE) { tryShipBox(); return; }
   const houseDist = Math.hypot(state.x - HOUSE.x, state.z - HOUSE.z);
   if (houseDist < HOUSE_RANGE + 3) { tryFixHouse(); return; }
+  const stableDist = Math.hypot(state.x - STABLE.x, state.z - STABLE.z);
+  if (stableDist < STABLE_RANGE) { tryFeedPony(); return; }
   const bulteokDist = Math.hypot(state.x - BULTEOK.x, state.z - BULTEOK.z);
   if (bulteokDist < BULTEOK_RANGE) enterDive();
 }
@@ -2898,20 +3037,31 @@ function updateSpriteLulu(groundY) {
   const t = performance.now() * 0.001;
 
   if (state.diving && SHEETS.diveSwim) {
-    // 물속에서는 해녀 차림 그림만 씁니다 (전부 옆모습이라 앞뒤 구분이 없습니다).
+    // 물속에서는 해녀 차림 그림만 씁니다.
+    const sp = Math.hypot(swimVel.x, swimVel.z);
     if (state.pickT >= 0) {
       // 전복을 따는 중 — 손을 뻗어 떼어내는 동작이 한 방향으로 재생됩니다
       sheet = SHEETS.divePick;
       cell = Math.min(sheet.frames - 1, Math.floor((state.pickT / PICK_DURATION) * sheet.frames));
+    } else if (lulu.position.y > SEA_Y - 1.2 && SHEETS.diveFloat) {
+      // 수면에 떠서 숨 고르는 중
+      sheet = SHEETS.diveFloat;
+      cell = Math.floor(t * 6) % sheet.frames;
     } else if (state.vy > 0.6 || surfacing > 0) {
       // 물 위로 떠오르는 중
       sheet = SHEETS.diveUp;
       cell = pingpong(Math.floor(t * 7), sheet.frames);
-    } else {
+    } else if (sp > 0.4) {
       // 헤엄치기 — 빨리 갈수록 팔다리가 빨리 움직입니다
       sheet = SHEETS.diveSwim;
-      const sp = Math.hypot(swimVel.x, swimVel.z);
-      cell = Math.floor(t * (3 + sp * 2.4)) % sheet.frames;
+      cell = Math.floor(t * (4 + sp * 2.4)) % sheet.frames;
+    } else if (SHEETS.diveIdle) {
+      // 가만히 물에 떠 있기
+      sheet = SHEETS.diveIdle;
+      cell = Math.floor(t * 6) % sheet.frames;
+    } else {
+      sheet = SHEETS.diveSwim;
+      cell = 0;
     }
   } else if (state.fixT >= 0 && SHEETS.fixHouse) {
     // 집 고치는 중 — 수리 단계에 맞는 연장을 든 그림 (0 망치, 1 톱, 2 붓).
@@ -2970,8 +3120,8 @@ function updateSpriteLulu(groundY) {
   // 옆모습일 때만 진행 방향에 맞춰 뒤집습니다. 정면·뒷모습은 어느 쪽으로 가든 그대로 둡니다
   // (정면으로 오면 좌우 성분이 0이라 뒤집기 값이 직전 것으로 남아 방향이 튀었습니다)
   // 옆모습 그림들은 원본이 왼쪽을 보므로, 오른쪽으로 갈 때 좌우를 뒤집습니다.
-  // 해녀 그림 세 장도 전부 옆모습이라 같이 넣어줍니다.
-  const sideSheets = [SHEETS.walkSide, SHEETS.pullSide, SHEETS.diveSwim, SHEETS.divePick, SHEETS.diveUp];
+  // (물속의 둥둥·수면 그림은 정면이라 뒤집지 않습니다)
+  const sideSheets = [SHEETS.walkSide, SHEETS.pullSide, SHEETS.diveSwim, SHEETS.divePick];
   const mirror = sideSheets.includes(sheet) && spriteCard.userData.headingRight;
   spriteCard.scale.set(mirror ? -Wp : Wp, Hp * breath, 1);
 
