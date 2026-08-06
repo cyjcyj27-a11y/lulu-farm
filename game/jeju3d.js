@@ -290,6 +290,9 @@ function scatter(count, maxR, minHeight, callback) {
     const a = Math.random() * Math.PI * 2;
     const r = Math.sqrt(Math.random()) * maxR;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    // 포구 축대 위는 걸어다니는 길이라 바위·풀을 심지 않습니다
+    // (축대 바닥을 평평하게 만든 뒤로 여기가 "땅"으로 인식되어 바위가 길을 막는 일이 있었습니다)
+    if (x > -3.4 && x < 3.4 && z > 90.5 && z < 103.5) continue;
     const y = groundHeight(x, z);
     if (y < minHeight) continue;
     callback(x, y, z, r);
@@ -4545,7 +4548,8 @@ function updateLulu(dt) {
     state.z = Math.min(R.cz + R.d / 2 - 0.4, Math.max(R.cz - R.d / 2 + 0.6, state.z));
   } else if (state.z > 94 && state.z < PORT.z + 10.3 && Math.abs(state.x - PORT.x) < 2.4) {
     // 포구 축대 위 — 섬 경계(원) 밖이지만 축대 폭 안에서는 끝까지 걸어나갈 수 있습니다
-    state.x = Math.min(PORT.x + 2.2, Math.max(PORT.x - 2.2, state.x));
+    // (양옆 현무암 장식과 겹치지 않게 폭을 살짝 좁힙니다)
+    state.x = Math.min(PORT.x + 1.85, Math.max(PORT.x - 1.85, state.x));
     state.z = Math.min(PORT.z + 10.1, state.z);
   } else {
     const rr = Math.hypot(state.x, state.z);
