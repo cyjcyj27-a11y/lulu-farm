@@ -1059,6 +1059,7 @@ applyHouseLook();
 // 이장님 상점에서 당근(1,000원)을 사다 먹이면 애정이 쌓입니다 — 나중에 경마의 밑천이 됩니다.
 const STABLE = { x: -79, z: 8 };   // 서쪽 벌판 (바다에 걸치지 않게 물가에서 한 발 물림)
 const STABLE_RANGE = 6.0;
+const FEED_RANGE = 3.0;   // 당근은 조랑말 앞까지 가까이 가야 먹일 수 있습니다
 const STABLE_W = 9.0, STABLE_H = 9.0 * 684 / 1019;   // 그림 비율 그대로
 const stable = (() => {
   const g = new THREE.Group();
@@ -1075,7 +1076,7 @@ const stable = (() => {
     g.add(plane);
   }
   scene.add(g);
-  obstacles.push({ x: STABLE.x, z: STABLE.z, r: 3.2, topY: NO_JUMP });
+  obstacles.push({ x: STABLE.x, z: STABLE.z, r: 2.0, topY: NO_JUMP });   // 조랑말 앞까지 바짝 갈 수 있게 좁힘
   return { group: g };
 })();
 
@@ -3682,7 +3683,14 @@ function updateCarrotFx(dt) {
   if (carrotFxT < 0 || !carrotFx) return;
   carrotFxT += dt;
   const k = carrotFxT / CARROT_FX_TIME;
-  if (k >= 1) { carrotFx.visible = false; carrotFxT = -1; return; }
+  if (k >= 1) {
+    carrotFx.visible = false; carrotFxT = -1;
+    // 다 먹은 순간 입가에서 반짝! (짧고 맑은 소리와 함께)
+    const gy2 = groundHeight(STABLE.x, STABLE.z);
+    spawnMoneyPopup(STABLE.x + 1.2, gy2 + 2.35, STABLE.z, '✨');
+    blip(880, 1320, 0.14, 0.14, 'sine');
+    return;
+  }
   // 조랑말 입 앞에서 조금씩 작아지며(먹히며) 살짝 위아래로 흔들립니다
   const gy = groundHeight(STABLE.x, STABLE.z);
   carrotFx.position.set(STABLE.x + 1.2, gy + 2.05 + Math.sin(carrotFxT * 18) * 0.05, STABLE.z);   // 조랑말 입가
@@ -3692,6 +3700,12 @@ function updateCarrotFx(dt) {
 
 function tryFeedPony() {
   const y = groundHeight(STABLE.x, STABLE.z) + STABLE_H * 0.75;
+  // 멀리서 던져 주는 게 아니라, 조랑말 앞까지 가서 손으로 먹입니다
+  const d = Math.hypot(state.x - STABLE.x, state.z - STABLE.z);
+  if (d > FEED_RANGE) {
+    spawnMoneyPopup(state.x, groundHeight(state.x, state.z) + 1.6, state.z, '🐴 조랑말 앞까지 더 가까이 가세요');
+    return;
+  }
   if (carrots <= 0) {
     spawnMoneyPopup(STABLE.x, y, STABLE.z, '당근이 없어요 · 이장님 상점에서 1,000원');
     return;
@@ -3700,6 +3714,8 @@ function tryFeedPony() {
   ponyLove++;
   updateCarrotBadge();
   playDropSound();
+  state.facing = Math.atan2(STABLE.x - state.x, STABLE.z - state.z);   // 조랑말을 바라보고 먹입니다
+  state.idleTime = 0; state.sit = 0;
   if (carrotFx) { carrotFx.visible = true; carrotFxT = 0; }   // 당근 그림이 냠냠 사라집니다
   if (ponyLove >= RACE_LOVE) {
     spawnMoneyPopup(STABLE.x, y, STABLE.z, `🏇 애정 ${ponyLove}! 경마장에 나갈 수 있어요 (준비 중)`);
