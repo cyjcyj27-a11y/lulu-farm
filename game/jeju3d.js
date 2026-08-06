@@ -3183,8 +3183,8 @@ function leaveDive(reason) {
     coins = 0;
     updateCoinBadge();
     saveGame(true);
-    // DIE 화면은 뭍에서 깨어나고 잠시 뒤에 걷힙니다
-    if (deathOverlay) setTimeout(() => deathOverlay.classList.remove('show'), 1100);
+    // DIE 화면은 뭍에서 깨어난 뒤에도 한동안 머물다가 천천히 걷힙니다
+    if (deathOverlay) setTimeout(() => deathOverlay.classList.remove('show'), 2800);
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
       lostCoins > 0
         ? '💸 의식을 잃은 사이 누군가 집에 들어와 돈을 다 훔쳐갔습니다'
@@ -3289,7 +3289,7 @@ function updateDiving(dt) {
     breath -= dt;
     if (breath <= 0) {
       breath = 0;
-      drowning = 3.4;                                   // 정신을 잃습니다 — 이제 되돌릴 수 없습니다
+      drowning = 4.2;                                   // 정신을 잃습니다 — 문구를 읽을 만큼 천천히 가라앉습니다
       if (deathOverlay) deathOverlay.classList.add('show');   // '욕심내민 바당이 데려간다' + DIE
       playDrownSound();
     }
