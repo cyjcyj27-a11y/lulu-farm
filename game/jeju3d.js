@@ -1951,24 +1951,25 @@ function updateCoinBadge() {
 function updateBasketBadge() {
   if (!boxBadge) return;
   const full = basketCount >= BASKET_CAP;
+  const worth = (basketCount * 100).toLocaleString();
   boxBadge.textContent = full
-    ? `📦 상자 가득! ${basketCount}/${BASKET_CAP} — 택배사로 가져가세요`
-    : `📦 상자 ${basketCount}/${BASKET_CAP}`;
+    ? `📦 상자 가득! ${basketCount}/${BASKET_CAP} · ${worth}원 — 택배사의 이장님께`
+    : `📦 상자 ${basketCount}/${BASKET_CAP} · ${worth}원`;
   boxBadge.classList.toggle('full', full);
 }
 // 상자(basketPos)와 잡기 범위(GRAB_RANGE)는 아래 12-1b에서 정의되므로,
 // 이 배지 내용은 그쪽 값들이 다 준비된 뒤(매 프레임 updateBasket 안에서) 갱신합니다.
 // 안내 문구에 쓸 조작 이름. 폰에는 키보드가 없으므로 화면 버튼 이름으로 바꿔 말해줍니다.
 // (예전에는 폰에서도 "F를 누르세요"라고만 해서, 누를 F가 없어 물질하러 못 들어갔습니다)
-const KEY_ACTION = IS_TOUCH ? '🍊 버튼' : 'F';
-const KEY_GRAB = IS_TOUCH ? '📦 버튼' : 'E';
+const KEY_ACTION = IS_TOUCH ? '🐾 버튼' : 'F';
+const KEY_GRAB = KEY_ACTION;   // 상호작용 키를 하나로 통일했습니다
 const KEY_UP = IS_TOUCH ? '⤴ 버튼' : 'Space';
 
 function updateRopeBadge() {
   if (!ropeBadge) return;
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
-    ropeBadge.textContent = `🤿 ${KEY_ACTION} 채집 · ${KEY_UP} 떠오르기 · ${KEY_GRAB} 뭍에 나가기`;
+    ropeBadge.textContent = `🤿 ${KEY_ACTION} 채집 · ${KEY_UP} 떠오르기 · 수면에서 ${KEY_ACTION} 뭍에 나가기`;
     return;
   }
   // 포구 가까이 오면 물질하러 들어가는 법을 알려줍니다
@@ -2108,14 +2109,14 @@ addEventListener('pagehide', () => { bgm.pause(); });
 //  이 배지만 auto로 되돌려 놔야 눌러도 반응합니다 — CSS의 .tappable 이 그 일을 합니다)
 const musicBadge = document.getElementById('musicBadge');
 function updateMusicBadge() {
-  if (musicBadge) musicBadge.textContent = bgm.muted ? '🔇 배경음악 꺼짐' : '🎵 배경음악 켜짐';
+  if (musicBadge) musicBadge.textContent = bgm.muted ? '🔇 음악 꺼짐 (누르면 켬)' : '🎵 음악 켜짐 (누르면 끔)';
 }
 function toggleMusic() {
   bgm.muted = !bgm.muted;
   if (!bgm.muted) startBgm();   // 아직 한 번도 안 틀었으면 이참에 틀어줍니다
   updateMusicBadge();
 }
-addEventListener('keydown', (e) => { if (e.code === 'KeyM') toggleMusic(); });
+// M키는 지도가 가져갔습니다. 음악은 왼쪽 아래 🎵 배지를 눌러 켜고 끕니다.
 if (musicBadge) {
   musicBadge.classList.add('tappable');
   musicBadge.addEventListener('pointerdown', (e) => { e.preventDefault(); toggleMusic(); });
@@ -2401,8 +2402,8 @@ function tryToggleGrab() {
   state.idleTime = 0;
 }
 // E키는 상황에 따라 다르게 씁니다: 뭍에서는 상자 잡기, 물속에서는 물질 끝내고 나오기.
-// handleGrabKey는 물질 코드(12-1e)에서 정의되지만, 키를 누르는 건 그 뒤이므로 괜찮습니다.
-addEventListener('keydown', (e) => { if (e.code === 'KeyE') handleGrabKey(); });
+// 상호작용 키는 F 하나로 통일했습니다. E는 손에 익은 분들을 위한 같은 기능의 별칭입니다.
+addEventListener('keydown', (e) => { if (e.code === 'KeyE') handleActionKey(); });
 
 // 딴 귤 하나를 나무 위치에서 바구니까지 실제 중력으로 포물선을 그리며 날려보냅니다
 // (도착 시점의 위치를 미리 정해두고, 그 지점에 정확히 떨어지도록 초기 속도를 역산합니다)
@@ -2442,7 +2443,10 @@ function updateFlyingFruits(dt) {
       flyingFruits.splice(i, 1);
       basketPunch = 1;                      // 바구니가 귤 받는 순간 살짝 눌리는 반응
       // 날아온 귤이 여기서 비로소 "상자 안에 쌓인 귤" 한 알로 바뀝니다
-      if (addFruitToBasket()) playDropSound();   // 나무통에 툭 떨어지는 소리
+      if (addFruitToBasket()) {
+        playDropSound();                            // 나무통에 툭 떨어지는 소리
+        spawnMoneyPopup(p.x, p.y + 0.9, p.z, '+100원');   // 상자에 가치가 쌓입니다
+      }
       if (basketCount >= BASKET_CAP) {
         spawnMoneyPopup(p.x, p.y + 1.1, p.z, '📦 상자가 가득 찼어요!');
       }
@@ -2466,9 +2470,8 @@ function tryHarvest() {
   playPickSound();                   // 가지에서 톡 떼어내는 소리
   spawnFlyingFruit(s.x, s.y, s.z);   // 나무에 매달려 있던 바로 그 자리에서 손으로 따서 날려보냄
   hideFruit(i);
-  coins += 100;
-  updateCoinBadge();
-  spawnMoneyPopup(s.x, s.y, s.z, '+100원');
+  // 딸 때는 돈을 바로 받지 않습니다. 상자에 떨어지는 순간 "+100원"이 상자 가치로 쌓이고,
+  // 택배사에서 이장님과 정산해야 비로소 현금이 됩니다.
   state.harvestT = 0;
   state.idleTime = 0;
   state.sit = 0;
@@ -2478,10 +2481,10 @@ function tryHarvest() {
 //  상자는 E로 손잡고 끄는 것으로 충분해서 끈 아이템은 뺐습니다. 이제 상점 앞에서는
 //  당근(왼쪽 바구니)과 해녀 산소통(오른쪽 판매대)을 팝니다.)
 
-// ---------- 12-1d. 택배사 — 육지로 부치기 (F키, 택배사 근처에서) ----------
-// 상자에 담긴 귤을 트럭에 실어 보냅니다. 상자는 비워지고, 담겨 있던 만큼 택배 정산을 받습니다.
-// 귤을 딸 때 이미 100원씩 받았으므로, 이건 "육지로 부쳐야 제값을 받는다"는 웃돈입니다.
-const SHIP_PRICE = 400;     // 귤 한 알을 육지로 부쳤을 때 더 받는 돈 (가득 채운 한 상자 = 14,400원)
+// ---------- 12-1d. 택배사 — 이장님과 정산하고 육지로 부치기 ----------
+// 상자에 담긴 귤을 이장님이 알당 100원에 사서 트럭에 실어 보냅니다 (가득 찬 36알 = 3,600원).
+// 이장님이 택배사에 계셔야 정산이 됩니다 — 루루가 문앞에 서면 이장님이 걸어오니 잠깐 기다리세요.
+const FRUIT_PRICE = 100;
 function tryShipBox() {
   const dp = depot.group.position;
   const popupY = dp.y + 3.2;
@@ -2489,13 +2492,19 @@ function tryShipBox() {
     spawnMoneyPopup(dp.x, popupY, dp.z, '상자가 비었어요 · 귤을 담아 오세요');
     return;
   }
-  const pay = basketCount * SHIP_PRICE;
+  // 이장님이 아직 오는 중이면 정산할 사람이 없습니다
+  const mayorHere = Math.hypot(mayor.x - MAYOR_POSTS.depot.x, mayor.z - MAYOR_POSTS.depot.z) < 2.5;
+  if (!mayorHere) {
+    spawnMoneyPopup(dp.x, popupY, dp.z, '이장님이 오고 계세요 — 잠깐만요');
+    return;
+  }
+  const pay = basketCount * FRUIT_PRICE;
   const sent = basketCount;
   coins += pay;
   emptyBasket();                 // 트럭에 실었으니 상자는 다시 비워집니다
   updateCoinBadge();
   playShipSound();
-  spawnMoneyPopup(dp.x, popupY, dp.z, `🚚 귤 ${sent}알 육지로 출발! +${pay.toLocaleString()}원`);
+  spawnMoneyPopup(dp.x, popupY, dp.z, `🚚 이장님이 귤 ${sent}알을 사셨어요! +${pay.toLocaleString()}원`);
 }
 
 // ---------- 12-1e. 해녀 물질 ----------
@@ -2866,6 +2875,125 @@ function updateMayor(dt, t) {
   mayorCard.scale.set(mirrorM ? -Wp : Wp, Hp, 1);
 }
 
+// ---------- 12-1f-3. 전체 지도 (M키 / 🗺 배지) ----------
+// 지도는 따로 그림을 만들지 않고, 게임이 쓰는 지형 높이 함수(groundHeight)를 그대로
+// 캔버스에 칠해서 만듭니다. 그래서 지형을 고치면 지도도 저절로 맞습니다.
+const MAP_WORLD = 112;   // 지도에 담는 범위 (-112 ~ +112)
+let mapBase = null;      // 한 번 그려두는 바탕 (지형·나무·돌담·건물)
+
+function buildMapBase() {
+  const S = 560;
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const g = c.getContext('2d');
+  // 게임에서는 +z가 북쪽(위)인데 캔버스 y는 아래로 갈수록 커지므로, 세로를 뒤집어야 방향이 맞습니다
+  const w2m = (wx, wz) => [(wx + MAP_WORLD) / (MAP_WORLD * 2) * S, (1 - (wz + MAP_WORLD) / (MAP_WORLD * 2)) * S];
+
+  // 지형 — 픽셀마다 땅 높이를 재서 바다/모래/풀밭/오름 색을 칠합니다
+  const img = g.createImageData(S, S);
+  for (let py = 0; py < S; py++) {
+    for (let px = 0; px < S; px++) {
+      const wx = px / S * MAP_WORLD * 2 - MAP_WORLD;
+      const wz = (1 - py / S) * MAP_WORLD * 2 - MAP_WORLD;
+      const h = groundHeight(wx, wz);
+      let r, gg, b;
+      if (h < -0.4) { r = 31; gg = 107; b = 125; }         // 바다
+      else if (h < 0.6) { r = 216; gg = 199; b = 155; }    // 물가 모래
+      else {
+        const t = Math.min(1, (h - 0.6) / 14);             // 높을수록 밝은 풀빛
+        r = 106 + t * 40; gg = 152 + t * 26; b = 72 + t * 20;
+      }
+      const i = (py * S + px) * 4;
+      img.data[i] = r; img.data[i + 1] = gg; img.data[i + 2] = b; img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+
+  // 물질장 — 물속 사냥터를 점선 동그라미로
+  {
+    const [cx, cy] = w2m(DIVE.x, DIVE.z);
+    g.strokeStyle = 'rgba(255,255,255,.75)';
+    g.setLineDash([6, 5]);
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(cx, cy, DIVE.r / (MAP_WORLD * 2) * S, 0, Math.PI * 2);
+    g.stroke();
+    g.setLineDash([]);
+  }
+
+  // 귤나무 — 점 하나가 나무 한 그루입니다
+  g.fillStyle = '#2e5c2a';
+  for (const t of trunkSpots) {
+    const [px, py] = w2m(t.x, t.z);
+    g.fillRect(px - 1, py - 1, 2.4, 2.4);
+  }
+  // 돌담 — 뛰어넘을 수 있는 낮은 장애물(topY가 낮은 것)이 담입니다
+  g.fillStyle = 'rgba(70,70,72,.8)';
+  for (const o of obstacles) {
+    if (o.topY >= NO_JUMP) continue;
+    const [px, py] = w2m(o.x, o.z);
+    g.fillRect(px - 1, py - 1, 2, 2);
+  }
+
+  // 건물·장소 이름표
+  g.textAlign = 'center';
+  const label = (wx, wz, emoji, name) => {
+    const [px, py] = w2m(wx, wz);
+    g.font = '20px sans-serif';
+    g.fillText(emoji, px, py + 6);
+    g.font = 'bold 12.5px "맑은 고딕", Malgun Gothic, sans-serif';
+    g.lineWidth = 3;
+    g.strokeStyle = 'rgba(0,0,0,.65)';
+    g.strokeText(name, px, py + 21);
+    g.fillStyle = '#fff';
+    g.fillText(name, px, py + 21);
+  };
+  label(shop.group.position.x, shop.group.position.z, '🏪', '이장님 상점');
+  label(depot.group.position.x - 8, depot.group.position.z, '🚚', '택배사');
+  label(STABLE.x, STABLE.z, '🐴', '마구간');
+  label(HOUSE.x, HOUSE.z, '🏠', houseStage >= 3 ? '내 집' : '헌집');
+  label(PORT.x, PORT.z, '⚓', '포구');
+  return c;
+}
+
+const mapWrap = document.getElementById('mapWrap');
+const mapCanvas = document.getElementById('mapCanvas');
+let mapOpen = false;
+function toggleMap() {
+  mapOpen = !mapOpen;
+  if (!mapWrap) return;
+  mapWrap.style.display = mapOpen ? 'flex' : 'none';
+  if (mapOpen) drawMap();
+}
+function drawMap() {
+  if (!mapCanvas) return;
+  if (!mapBase) mapBase = buildMapBase();          // 처음 열 때 한 번만 그립니다
+  const g = mapCanvas.getContext('2d');
+  mapCanvas.width = mapBase.width; mapCanvas.height = mapBase.height;
+  g.drawImage(mapBase, 0, 0);
+  // 루루의 현재 위치 — 주황 점과 이름
+  const S = mapBase.width;
+  const px = (state.x + MAP_WORLD) / (MAP_WORLD * 2) * S;
+  const py = (1 - (state.z + MAP_WORLD) / (MAP_WORLD * 2)) * S;
+  g.fillStyle = '#ff8c1a';
+  g.strokeStyle = '#fff';
+  g.lineWidth = 2.5;
+  g.beginPath(); g.arc(px, py, 7, 0, Math.PI * 2); g.fill(); g.stroke();
+  g.textAlign = 'center';
+  g.font = 'bold 13px "맑은 고딕", Malgun Gothic, sans-serif';
+  g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.65)';
+  g.strokeText('루루', px, py - 12);
+  g.fillStyle = '#ffd88a';
+  g.fillText('루루', px, py - 12);
+}
+addEventListener('keydown', (e) => { if (e.code === 'KeyM') toggleMap(); });
+if (mapWrap) mapWrap.addEventListener('pointerdown', (e) => { e.preventDefault(); toggleMap(); });
+const mapBadge = document.getElementById('mapBadge');
+if (mapBadge) {
+  mapBadge.classList.add('tappable');
+  mapBadge.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); toggleMap(); });
+}
+
 // ---------- 12-1g. 당근 사서 조랑말 먹이기 ----------
 const carrotBadge = document.getElementById('carrotBadge');
 function updateCarrotBadge() {
@@ -2908,13 +3036,20 @@ function tryFeedPony() {
   state.idleTime = 0;
 }
 
-// F키 하나로 상황에 맞는 행동을 합니다:
-// 물속이면 채집, 뭍이면 귤 따기 → 상점 → 택배사 → 헌집 → 포구 순으로 가까운 것을 씁니다.
+// F키 하나로 "그 자리에서 할 수 있는 일"을 전부 합니다 — 상호작용 키는 이것 하나뿐입니다.
+// 물속: 채집 (수면에 떠 있으면 뭍으로 나가기)
+// 뭍:   귤 따기 → 당근·산소통 사기 → 택배 부치기 → 집 사기·고치기 → 말 먹이기 → 물질 들어가기
+//       → 아무것도 없으면 상자 잡기/놓기
 function handleActionKey() {
   if (state.harvestT >= 0 || state.fixT >= 0) return;
-  if (state.diving) { tryCollect(); return; }
+  if (state.diving) {
+    if (drowning > 0) return;
+    // 수면에 떠 있으면 F로 뭍에 나갑니다 (물속에서는 채집)
+    if (lulu.position.y > SEA_Y - 1.2) { leaveDive('exit'); return; }
+    tryCollect();
+    return;
+  }
   if (nearestFruit() >= 0) { tryHarvest(); return; }
-  // 당근 바구니·산소통 판매대는 상점 코앞에 있으므로, 상점(끈)보다 먼저 좁은 범위로 확인합니다
   const carrotDist = Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z);
   if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
   const tankDist = Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z);
@@ -2926,18 +3061,12 @@ function handleActionKey() {
   const stableDist = Math.hypot(state.x - STABLE.x, state.z - STABLE.z);
   if (stableDist < STABLE_RANGE) { tryFeedPony(); return; }
   const bulteokDist = Math.hypot(state.x - BULTEOK.x, state.z - BULTEOK.z);
-  if (bulteokDist < BULTEOK_RANGE) enterDive();
-}
-
-// 물속에서 E를 누르면 물질을 끝내고 뭍으로 나옵니다 (상자 잡기와 같은 키)
-function handleGrabKey() {
-  if (state.diving) {
-    if (drowning > 0) return;   // 정신을 잃는 중엔 아무것도 못 합니다 (죽음 회피 방지)
-    leaveDive('exit');
-    return;
-  }
+  if (bulteokDist < BULTEOK_RANGE) { enterDive(); return; }
+  // 마지막으로: 상자 근처면 잡기/놓기 (잡은 채로 다른 일을 하면 그쪽이 먼저입니다)
   tryToggleGrab();
 }
+
+// (예전의 E키 전용 함수는 상호작용 통일로 handleActionKey에 합쳐졌습니다)
 addEventListener('keydown', (e) => { if (e.code === 'KeyF') handleActionKey(); });
 
 // 시작 화면의 일거리 그림 — 아직 안 그린 것은 파일이 없으므로, 있을 때만 붙입니다.
@@ -2967,7 +3096,6 @@ for (const img of document.querySelectorAll('#startJobs img[data-src]')) {
 
 // 폰용 화면 버튼을 각 기능에 연결합니다 (키보드 F·E·Shift·Space와 똑같은 일을 합니다)
 bindTouchButton('btnAction', (down) => { if (down) { wakeAudio(); startBgm(); handleActionKey(); } });
-bindTouchButton('btnGrab',   (down) => { if (down) { wakeAudio(); startBgm(); handleGrabKey(); } });
 bindTouchButton('btnJump',   (down) => { touchJump = down; });
 bindTouchButton('btnRun',    (down) => { touchRun = down; });
 
