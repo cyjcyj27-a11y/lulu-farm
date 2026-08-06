@@ -2153,8 +2153,9 @@ const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: t
 // (해저 바닥은 따로 만들지 않습니다. 지형 함수가 이 자리를 이미 우묵하게 파냈습니다)
 
 // 채집물 한 종류의 설명. 값이 비쌀수록 드물게 놓습니다.
-// 미역 70% / 소라 20% / 전복 10% — 흔한 건 헐값, 귀한 전복은 만 원짜리 한탕입니다.
+// 미역이 흔하고, 소라·전복은 귀하고, 문어는 물질장에 딱 두 마리 — 찾으면 한탕(5만원)입니다.
 const CATCH_KINDS = {
+  octopus: { name: '문어', price: 50000, count: 2 },
   abalone: { name: '전복', price: 20000, count: 12 },
   conch:   { name: '소라', price: 10000, count: 24 },
   kelp:    { name: '미역', price: 1000,  count: 86 },
@@ -2219,7 +2220,7 @@ const catchMeshes = {};       // 종류별 InstancedMesh
   // 종류별로 한 번에 그리기. 인스턴스 번호와 catchSpots 번호를 맞춰두어야 딸 때 숨길 수 있습니다.
   // 그림을 쓸 수 있으면 직접 그리신 해산물 그림을 작은 판에 세워 씁니다 (진짜 전복·소라·미역 모양).
   // 그림을 못 읽는 경우(더블클릭으로 열었을 때)에는 예전처럼 공·원뿔로 대신합니다.
-  const CATCH_SIZE = { abalone: 0.55, conch: 0.5, kelp: 1.0 };   // 판 한 변의 크기(미터)
+  const CATCH_SIZE = { abalone: 0.55, conch: 0.5, kelp: 1.0, octopus: 0.7 };   // 판 한 변의 크기(미터)
   for (const kind of Object.keys(CATCH_KINDS)) {
     const mine = catchSpots.map((s, i) => ({ s, i })).filter((o) => o.s.kind === kind);
     let m;
@@ -2244,8 +2245,10 @@ const catchMeshes = {};       // 종류별 InstancedMesh
         abalone: new THREE.SphereGeometry(0.26, 8, 6),
         conch:   new THREE.ConeGeometry(0.2, 0.42, 7),
         kelp:    new THREE.SphereGeometry(0.3, 6, 5),
+        octopus: new THREE.SphereGeometry(0.32, 8, 6),
       };
-      const MAT = { abalone: abaloneMat, conch: conchMat, kelp: kelpMat };
+      const MAT = { abalone: abaloneMat, conch: conchMat, kelp: kelpMat,
+        octopus: new THREE.MeshLambertMaterial({ color: 0xc96a4a, flatShading: true }) };
       m = new THREE.InstancedMesh(GEO[kind], MAT[kind], mine.length);
       mine.forEach((o, j) => {
         o.s.slot = j;
@@ -2799,7 +2802,7 @@ function updateRopeBadge() {
       Math.hypot(state.x - PORT.x, state.z - PORT.z) < BULTEOK_RANGE + 5) {
     const nearEnd = Math.hypot(state.x - DIVE_ENTRY.x, state.z - DIVE_ENTRY.z) < DIVE_ENTRY_RANGE;
     if (dayEvent === 'storm') {
-      ropeBadge.textContent = '🌀 태풍이 몰아쳐요 — 오늘은 물질을 쉽니다 (귤은 웃돈!)';
+      ropeBadge.textContent = '🌀 태풍이 몰아쳐요 — 오늘은 물질을 쉽니다';
     } else if (!nearEnd) {
       ropeBadge.textContent = '🤿 축대 끝까지 걸어나가면 물질하러 들어갈 수 있어요';
     } else {
@@ -3319,13 +3322,13 @@ function updateFlyingFruits(dt) {
       // 날아온 귤이 여기서 비로소 "상자 안에 쌓인 귤" 한 알로 바뀝니다
       if (addFruitToBasket()) {
         playDropSound();                            // 나무통에 툭 떨어지는 소리
-        // 황금귤이 열리는 날엔 가끔 반짝이는 놈이 섞여 있습니다 — 그 자리에서 5,000원!
-        if (dayEvent === 'gold' && Math.random() < 0.07) {
-          coins += 5000;
+        // 황금향이 열리는 날엔 열 알에 하나꼴로 황금향이 섞여 있습니다 — 일반 귤 세 배 값!
+        if (dayEvent === 'gold' && Math.random() < 0.10) {
+          coins += 1000;
           stat.gold++;
           updateCoinBadge();
           playShipSound();
-          spawnMoneyPopup(p.x, p.y + 1.1, p.z, '✨ 황금귤! +5,000원', 3);
+          spawnMoneyPopup(p.x, p.y + 1.1, p.z, '✨ 황금향! +1,000원', 3);
         } else {
           spawnMoneyPopup(p.x, p.y + 0.9, p.z, '🍊 +1');   // 한 알 담겼습니다 (돈은 박스로 팔 때 한꺼번에)
         }
@@ -3387,17 +3390,12 @@ function tryShipBox() {
     spawnMoneyPopup(dp.x, popupY, dp.z, '이장님이 오고 계세요 — 잠깐만요');
     return;
   }
-  // 태풍이 오는 날은 뭍의 귤이 귀해져 웃돈(2배)을 받습니다
-  const boxPay = dayEvent === 'storm' ? BOX_PRICE * 2 : BOX_PRICE;
-  coins += boxPay;
+  coins += BOX_PRICE;
   stat.boxes++;
   emptyBasket();                 // 트럭에 실었으니 상자는 다시 비워집니다
   updateCoinBadge();
   playShipSound();
-  spawnMoneyPopup(dp.x, popupY, dp.z,
-    dayEvent === 'storm'
-      ? `🚚 태풍 웃돈! 귤 한 박스 +${boxPay.toLocaleString()}원`
-      : `🚚 이장님이 귤 한 박스를 사셨어요! +${boxPay.toLocaleString()}원`);
+  spawnMoneyPopup(dp.x, popupY, dp.z, `🚚 이장님이 귤 한 박스를 사셨어요! +${BOX_PRICE.toLocaleString()}원`);
   checkAchievements();
 }
 
@@ -3862,8 +3860,8 @@ function rollDayEvent() {
 function dayEventNotice() {
   if (!dayEvent) return;
   const msg = {
-    storm:  '🌀 태풍이 와요! 오늘은 물질 금지 · 대신 귤 박스는 웃돈(2배)',
-    gold:   '✨ 황금귤이 열리는 날! 따다 보면 반짝이는 놈이 섞여 있대요',
+    storm:  '🌀 태풍이 와요! 오늘은 물질을 쉽니다',
+    gold:   '✨ 황금향이 열리는 날! 열 알에 하나는 세 배 값이래요',
     haul:   '🌊 물반 고기반! 오늘 물질 채집물은 1.5배 값',
     market: '🎪 오늘은 장날! 상점 물건이 전부 반값',
   }[dayEvent];
@@ -4053,7 +4051,7 @@ function tutorTalk() {
 // ---------- 12-1f-2a4. 도감(업적) — 섬 살이의 발자취 ----------
 // 게임 곳곳에서 한 일을 세어두고(stat), 조건을 채우면 업적이 달성됩니다.
 // 왼쪽 아래 📖 버튼으로 언제든 펼쳐볼 수 있습니다.
-const stat = { boxes: 0, dives: 0, drowns: 0, races: 0, raceWins: 0, abalone: 0, conch: 0, kelp: 0, gold: 0 };
+const stat = { boxes: 0, dives: 0, drowns: 0, races: 0, raceWins: 0, abalone: 0, conch: 0, kelp: 0, octopus: 0, gold: 0 };
 const ACHIEVEMENTS = [
   { id: 'box1',    name: '첫 출하',     desc: '귤 한 박스를 처음 팔았다' },
   { id: 'box10',   name: '귤 부자',     desc: '귤 박스 10개 판매' },
@@ -4067,7 +4065,8 @@ const ACHIEVEMENTS = [
   { id: 'love100', name: '단짝',        desc: '조랑말 애정 100 달성' },
   { id: 'house',   name: '내 집 마련',  desc: '돌집 수리를 끝냈다' },
   { id: 'furn',    name: '아늑한 집',   desc: '가구 네 가지를 모두 들여놓았다' },
-  { id: 'gold1',   name: '황금귤!',     desc: '황금귤을 처음 발견했다' },
+  { id: 'gold1',   name: '황금향!',     desc: '황금향을 처음 발견했다' },
+  { id: 'octo1',   name: '문어 한탕',   desc: '문어를 처음 잡았다 (한 마리 5만원!)' },
   { id: 'rich',    name: '백만장자',    desc: '돈 1,000,000원 모으기' },
 ];
 const ACH_TESTS = {
@@ -4084,6 +4083,7 @@ const ACH_TESTS = {
   house: () => houseStage >= 3,
   furn: () => FURN_ORDER.every((k) => furnitureOwned[k]),
   gold1: () => stat.gold >= 1,
+  octo1: () => stat.octopus >= 1,
   rich: () => coins >= 1000000,
 };
 let achieved = {};
