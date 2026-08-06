@@ -105,6 +105,8 @@ const DIVE_DEPTH = 9;                    // 이만큼 더 파 내려갑니다
 const SEA_Y = -0.5;                      // 바다 표면 높이 (아래 4번에서 만드는 바다 판과 같은 값)
 
 function groundHeight(x, z) {
+  // 집 내부·상점 내부는 섬에서 멀리 떨어진 곳에 지은 별도의 방들입니다 — 그 안은 평평한 방바닥
+  if (x > 380 && x < 480 && z > 380 && z < 420) return 20;
   let h = 0;
   h += Math.sin(x * 0.032) * 1.3 + Math.cos(z * 0.027) * 1.5;   // 완만한 기복
   h += Math.sin((x + z) * 0.012) * 2.0;
@@ -970,7 +972,7 @@ const citrusTrunkMat = new THREE.MeshLambertMaterial({ color: 0x6f5540, flatShad
 const HOUSE = { x: 58, z: -72 };
 const HOUSE_RANGE = 5.5;
 const HOUSE_W = 8.5, HOUSE_H = 8.5 * 520 / 1110;   // 그림 비율 그대로
-let houseStage = -1;    // -1 = 아직 안 삼, 0~2 = 수리 중, 3 = 완성
+let houseStage = 0;    // 루루가 처음부터 살고 있는 집입니다. 0~2 = 수리 중(허름함), 3 = 완성
 const houseTex = [];
 const house = (() => {
   const g = new THREE.Group();
@@ -1207,6 +1209,429 @@ const CARROT_RANGE = 2.4;
     c.rotation.set((Math.random() - 0.5) * 0.9, 0, (Math.random() - 0.5) * 0.9);
     c.castShadow = true;
     scene.add(c);
+  }
+}
+
+// ---------- 8-2h. 실내 방들 (집 내부 · 상점 내부) ----------
+// 문 앞에 서면 화면이 어두워지며 안으로 들어갑니다. 방은 섬에서 멀리 떨어진
+// 좌표에 지어두고 루루를 순간이동시키는 방식이라, 밖의 섬과 서로 보이지 않습니다.
+// (groundHeight가 이 좌표 범위에서는 방바닥 높이 20을 돌려줍니다)
+// 벽은 안쪽 면만 그려서, 카메라가 벽 밖에 있어도 인형의 집처럼 안이 들여다보입니다.
+const ROOM = { cx: 400, cz: 400, y: 20, w: 12, d: 9 };        // 루루의 집 내부
+const SHOP_ROOM = { cx: 450, cz: 400, y: 20, w: 13, d: 9 };   // 이장님 상점 내부
+
+function buildRoom(R, floorColor, wallColor) {
+  const g = new THREE.Group();
+  const y0 = R.y;
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(R.w, R.d),
+    new THREE.MeshLambertMaterial({ color: floorColor })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(R.cx, y0 + 0.01, R.cz);
+  floor.receiveShadow = true;
+  g.add(floor);
+  const wallMat = new THREE.MeshLambertMaterial({ color: wallColor });
+  const WALL_H = 3.2;
+  const mkWall = (wdt, x, z, ry) => {
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(wdt, WALL_H), wallMat);
+    w.position.set(x, y0 + WALL_H / 2, z);
+    w.rotation.y = ry;
+    g.add(w);
+  };
+  mkWall(R.w, R.cx, R.cz - R.d / 2, 0);            // 북쪽 벽 (안쪽 = +z)
+  mkWall(R.w, R.cx, R.cz + R.d / 2, Math.PI);      // 남쪽 벽 (문이 있는 쪽)
+  mkWall(R.d, R.cx - R.w / 2, R.cz, Math.PI / 2);  // 서쪽 벽
+  mkWall(R.d, R.cx + R.w / 2, R.cz, -Math.PI / 2); // 동쪽 벽
+  const ceil = new THREE.Mesh(
+    new THREE.PlaneGeometry(R.w, R.d),
+    new THREE.MeshLambertMaterial({ color: 0x4a4038 })
+  );
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.set(R.cx, y0 + WALL_H, R.cz);
+  g.add(ceil);
+  // 남쪽 벽의 문 — 밖으로 나가는 자리 표시
+  const doorMark = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 2.5),
+    new THREE.MeshLambertMaterial({ color: 0x2b1d12 })
+  );
+  doorMark.position.set(R.cx, y0 + 1.25, R.cz + R.d / 2 - 0.03);
+  doorMark.rotation.y = Math.PI;
+  g.add(doorMark);
+  // 방을 밝히는 따뜻한 등불
+  const lamp = new THREE.PointLight(0xffe0b0, 1.2, 22);
+  lamp.position.set(R.cx, y0 + 2.6, R.cz);
+  g.add(lamp);
+  scene.add(g);
+  return g;
+}
+buildRoom(ROOM, 0x7a6a52, 0x8d8b85);        // 집 안 — 다져진 흙바닥에 돌벽 (폐가답게)
+buildRoom(SHOP_ROOM, 0x9a7748, 0xd3b97e);   // 상점 안 — 나무 바닥에 초가빛 벽
+
+// ---------- 8-2h-2. 가구 (상점에서 사서 집을 꾸밉니다) ----------
+// 처음엔 집이 텅 비어서 맨땅에서 잡니다. 상점 안에서 가구를 사면 집 안에 놓입니다.
+const FURN_ORDER = ['bed', 'chair', 'table', 'closet'];
+const FURNITURE = {
+  bed:    { name: '침대', price: 20000 },
+  chair:  { name: '의자', price: 6000 },
+  table:  { name: '식탁', price: 12000 },
+  closet: { name: '옷장', price: 15000 },
+};
+let furnitureOwned = { bed: false, chair: false, table: false, closet: false };
+
+// 가구 만들기 — 집 배치용과 상점 진열용 양쪽에서 씁니다
+const furnWoodMat = new THREE.MeshLambertMaterial({ color: 0x8a6038, flatShading: true });
+const furnDarkMat = new THREE.MeshLambertMaterial({ color: 0x5e3f24, flatShading: true });
+const furnClothMat = new THREE.MeshLambertMaterial({ color: 0xf6ebd8, flatShading: true });
+const furnBlanketMat = new THREE.MeshLambertMaterial({ color: 0xe09a52, flatShading: true });
+function makeBedMesh() {
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 1.4), furnWoodMat);
+  frame.position.y = 0.18;
+  g.add(frame);
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.2, 1.25), furnClothMat);
+  mattress.position.y = 0.45;
+  g.add(mattress);
+  const blanket = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 1.28), furnBlanketMat);
+  blanket.position.set(-0.4, 0.58, 0);
+  g.add(blanket);
+  const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.14, 0.8), furnClothMat);
+  pillow.position.set(0.8, 0.6, 0);
+  g.add(pillow);
+  return g;
+}
+function makeChairMesh() {
+  const g = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 0.55), furnWoodMat);
+  seat.position.y = 0.45;
+  g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.6, 0.08), furnWoodMat);
+  back.position.set(0, 0.78, 0.24);
+  g.add(back);
+  [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]].forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.45, 0.07), furnDarkMat);
+    leg.position.set(lx, 0.22, lz);
+    g.add(leg);
+  });
+  return g;
+}
+function makeTableMesh() {
+  const g = new THREE.Group();
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 1.1), furnWoodMat);
+  top.position.y = 0.78;
+  g.add(top);
+  [[-0.8, -0.42], [0.8, -0.42], [-0.8, 0.42], [0.8, 0.42]].forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.78, 0.1), furnDarkMat);
+    leg.position.set(lx, 0.39, lz);
+    g.add(leg);
+  });
+  return g;
+}
+function makeClosetMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.5, 0.7), furnWoodMat);
+  body.position.y = 1.25;
+  g.add(body);
+  const split = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.3, 0.04), furnDarkMat);
+  split.position.set(0, 1.25, 0.36);
+  g.add(split);
+  [-0.28, 0.28].forEach((hx) => {
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), furnDarkMat);
+    knob.position.set(hx, 1.25, 0.38);
+    g.add(knob);
+  });
+  return g;
+}
+const FURN_BUILDERS = { bed: makeBedMesh, chair: makeChairMesh, table: makeTableMesh, closet: makeClosetMesh };
+
+// 집 안에 실제로 놓이는 가구 — 사기 전에는 숨겨져 있습니다
+const furnitureMeshes = {};
+{
+  const spots = {
+    bed:    [ROOM.cx - 4.2, ROOM.cz - 2.4, 0],
+    chair:  [ROOM.cx + 1.6, ROOM.cz + 0.6, 0],
+    table:  [ROOM.cx + 1.6, ROOM.cz - 0.8, 0],
+    closet: [ROOM.cx + 4.4, ROOM.cz - 3.7, 0],
+  };
+  for (const k of FURN_ORDER) {
+    const g = FURN_BUILDERS[k]();
+    g.position.set(spots[k][0], ROOM.y, spots[k][1]);
+    g.rotation.y = spots[k][2];
+    g.visible = false;
+    scene.add(g);
+    furnitureMeshes[k] = g;
+  }
+}
+function applyFurniture() {
+  for (const k of FURN_ORDER) furnitureMeshes[k].visible = furnitureOwned[k];
+}
+
+// ---------- 8-2h-3. 망사리 (물질 필수품 — 등에 메고 다니는 실물) ----------
+// 해녀는 망사리(그물 자루)에 잡은 것을 담습니다. 이게 있어야 물질을 나갈 수 있고,
+// 상자처럼 실제 물건이라 등에 메고 다니다가 내려놓을 수도 있습니다. 상점 안에서 팝니다.
+let hasNet = false;       // 망사리를 샀는지
+let netCarried = false;   // 지금 등에 메고 있는지 (내려놓으면 그 자리에 놓입니다)
+const NET_PRICE = 10000;
+const NET_PICK_RANGE = 2.2;
+
+// 망사리 한 개 — 그물을 씌운 자루에, 해녀들이 쓰는 주황 부표(테왁)를 달았습니다
+function makeNetBag() {
+  const g = new THREE.Group();
+  const bagMat = new THREE.MeshLambertMaterial({ color: 0xc9a86a, flatShading: true });
+  const netMat = new THREE.MeshBasicMaterial({ color: 0x6b5537, wireframe: true });
+  const tewakMat = new THREE.MeshLambertMaterial({ color: 0xe0762e, flatShading: true });
+  const bag = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 7), bagMat);
+  bag.scale.set(1, 1.25, 1);
+  bag.position.y = 0.34;
+  bag.castShadow = true;
+  g.add(bag);
+  const netOver = new THREE.Mesh(new THREE.SphereGeometry(0.29, 8, 7), netMat);
+  netOver.scale.copy(bag.scale);
+  netOver.position.copy(bag.position);
+  g.add(netOver);
+  const tewak = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 7), tewakMat);
+  tewak.position.set(0.17, 0.76, 0);
+  tewak.castShadow = true;
+  g.add(tewak);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.028, 6, 10), shopRopeMat);
+  ring.position.y = 0.7;
+  g.add(ring);
+  return g;
+}
+// 루루가 실제로 들고 다니는 망사리 — 사기 전에는 숨겨져 있습니다
+const netObj = makeNetBag();
+netObj.visible = false;
+scene.add(netObj);
+
+// 등에서 내려 발 앞에 놓기 / 다시 주워 메기
+function dropNet() {
+  netCarried = false;
+  const fx = state.x + Math.sin(state.facing) * 0.8;
+  const fz = state.z + Math.cos(state.facing) * 0.8;
+  netObj.position.set(fx, groundHeight(fx, fz), fz);
+  netObj.rotation.y = state.facing;
+  playDropSound();
+  spawnMoneyPopup(fx, groundHeight(fx, fz) + 1.2, fz, '🧺 망사리를 내려놨어요');
+}
+function pickUpNet() {
+  netCarried = true;
+  playPickSound();
+  spawnMoneyPopup(state.x, groundHeight(state.x, state.z) + 1.4, state.z, '🧺 망사리를 챙겼어요');
+}
+// 메고 있는 동안 루루 등 뒤를 살랑살랑 따라다닙니다 (매 프레임 호출)
+const netFollow = new THREE.Vector3();
+function updateNet(dt, t) {
+  if (!netCarried) return;
+  const back = state.facing + Math.PI;
+  netFollow.set(
+    state.x + Math.sin(back) * 0.5,
+    lulu.position.y + 0.95 + Math.sin(t * 5) * 0.03,
+    state.z + Math.cos(back) * 0.5
+  );
+  netObj.position.lerp(netFollow, 1 - Math.pow(0.001, dt));
+  netObj.rotation.y = state.facing;
+}
+
+// ---------- 8-2h-4. 상점 안 진열대 (가격표 달고, F로 구입) ----------
+// 상점 문으로 들어오면 당근·산소통·망사리·가구가 가격표와 함께 진열되어 있습니다.
+// 물건 앞에 서서 F(🐾)를 누르면 삽니다.
+function makePriceSign(name, price) {
+  const c = document.createElement('canvas');
+  c.width = 192; c.height = 96;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f0e4c8'; g.fillRect(0, 0, 192, 96);
+  g.strokeStyle = '#8a6038'; g.lineWidth = 6; g.strokeRect(3, 3, 186, 90);
+  g.fillStyle = '#3b2410'; g.textAlign = 'center';
+  g.font = 'bold 34px "맑은 고딕", Malgun Gothic, sans-serif';
+  g.fillText(name, 96, 40);
+  g.fillStyle = '#b3541e';
+  g.font = 'bold 30px "맑은 고딕", Malgun Gothic, sans-serif';
+  g.fillText(price.toLocaleString() + '원', 96, 78);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// 판매 물품 목록 — 진열 위치는 북쪽 벽을 따라 한 줄입니다
+const SHOP_GOODS = [
+  { key: 'carrot', name: '당근',   emoji: '🥕', get price() { return CARROT_PRICE; },
+    x: SHOP_ROOM.cx - 4.6, z: SHOP_ROOM.cz - 3.4 },
+  { key: 'tank',   name: '산소통', emoji: '🤿', get price() { return TANK_PRICE; },
+    x: SHOP_ROOM.cx - 3.0, z: SHOP_ROOM.cz - 3.4 },
+  { key: 'net',    name: '망사리', emoji: '🧺', get price() { return NET_PRICE; },
+    x: SHOP_ROOM.cx - 1.4, z: SHOP_ROOM.cz - 3.4 },
+  { key: 'bed',    name: '침대',   emoji: '🛏', get price() { return FURNITURE.bed.price; },
+    x: SHOP_ROOM.cx + 0.6, z: SHOP_ROOM.cz - 3.3 },
+  { key: 'table',  name: '식탁',   emoji: '🍽', get price() { return FURNITURE.table.price; },
+    x: SHOP_ROOM.cx + 2.4, z: SHOP_ROOM.cz - 3.3 },
+  { key: 'chair',  name: '의자',   emoji: '🪑', get price() { return FURNITURE.chair.price; },
+    x: SHOP_ROOM.cx + 3.9, z: SHOP_ROOM.cz - 3.3 },
+  { key: 'closet', name: '옷장',   emoji: '🚪', get price() { return FURNITURE.closet.price; },
+    x: SHOP_ROOM.cx + 5.3, z: SHOP_ROOM.cz - 3.3 },
+];
+
+// 진열: 받침대 + 물건 + 가격표
+{
+  const y0 = SHOP_ROOM.y;
+  for (const good of SHOP_GOODS) {
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 0.8), shopWoodMat);
+    stand.position.set(good.x, y0 + 0.08, good.z);
+    scene.add(stand);
+    let item = null;
+    if (good.key === 'carrot') {
+      item = new THREE.Group();
+      const carrotMat = new THREE.MeshLambertMaterial({ color: 0xe06a1d, flatShading: true });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const cn = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 6), carrotMat);
+        cn.position.set(Math.cos(a) * 0.16, 0.3, Math.sin(a) * 0.16);
+        cn.rotation.set((Math.random() - 0.5) * 0.9, 0, (Math.random() - 0.5) * 0.9);
+        item.add(cn);
+      }
+    } else if (good.key === 'tank') {
+      item = new THREE.Group();
+      const tankMat = new THREE.MeshLambertMaterial({ color: 0xd8862a, flatShading: true });
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.62, 4, 10), tankMat);
+      body.position.y = 0.66;
+      item.add(body);
+      const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 6),
+        new THREE.MeshLambertMaterial({ color: 0x8b8f94, flatShading: true }));
+      valve.position.y = 1.12;
+      item.add(valve);
+    } else if (good.key === 'net') {
+      item = makeNetBag();
+      item.scale.setScalar(0.9);
+    } else {
+      item = FURN_BUILDERS[good.key]();
+      item.scale.setScalar(0.55);   // 진열용은 아담하게
+    }
+    item.position.set(good.x, y0 + 0.16, good.z);
+    scene.add(item);
+    // 가격표 — 물건 위에 걸린 나무 팻말
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.58),
+      new THREE.MeshBasicMaterial({ map: makePriceSign(good.name, good.price) }));
+    sign.position.set(good.x, y0 + 2.0, good.z + 0.1);
+    scene.add(sign);
+  }
+}
+
+// 물건 하나 사기 — 물건 앞에서 F를 눌렀을 때
+function buyShopGood(good) {
+  const px = state.x, pz = state.z;
+  const py = SHOP_ROOM.y + 1.6;
+  const already =
+    (good.key === 'tank' && hasTank) ||
+    (good.key === 'net' && hasNet) ||
+    (FURNITURE[good.key] && furnitureOwned[good.key]);
+  if (already) {
+    spawnMoneyPopup(px, py, pz, `이미 ${good.name}${good.key === 'tank' ? '이' : '가'} 있어요`);
+    return;
+  }
+  if (coins < good.price) {
+    spawnMoneyPopup(px, py, pz, `${(good.price - coins).toLocaleString()}원 부족`);
+    return;
+  }
+  coins -= good.price;
+  updateCoinBadge();
+  if (good.key === 'carrot') {
+    carrots++;
+    updateCarrotBadge();
+    playPickSound();
+    spawnMoneyPopup(px, py, pz, `🥕 당근 구입! (${carrots}개)`);
+  } else if (good.key === 'tank') {
+    hasTank = true;
+    BREATH_MAX = TANK_BREATH;
+    playShipSound();
+    spawnMoneyPopup(px, py, pz, '🤿 산소통 구입! 숨이 60초로 늘었어요');
+  } else if (good.key === 'net') {
+    hasNet = true;
+    netCarried = true;
+    netObj.visible = true;
+    netObj.position.set(px, SHOP_ROOM.y + 1, pz);
+    playShipSound();
+    spawnMoneyPopup(px, py, pz, '🧺 망사리 구입! 등에 메고 포구로 가면 물질할 수 있어요');
+  } else {
+    furnitureOwned[good.key] = true;
+    applyFurniture();
+    playShipSound();
+    spawnMoneyPopup(px, py, pz, `🛋 ${good.name} 구입! 집 안에 놓아뒀어요`);
+  }
+}
+// 지금 서 있는 자리에서 살 수 있는 물건 (없으면 null)
+function nearestShopGood() {
+  let best = null, bestD = 1.5;
+  for (const good of SHOP_GOODS) {
+    const d = Math.hypot(state.x - good.x, state.z - good.z);
+    if (d < bestD) { bestD = d; best = good; }
+  }
+  return best;
+}
+
+// ---------- 8-2h-5. 문 드나들기 (집 · 상점) ----------
+// 밖에서 문 앞에 서면 안으로, 안에서 남쪽 문 쪽으로 걸어가면 밖으로.
+// 화면이 잠깐 어두워졌다 밝아지는 사이 순간이동합니다.
+const SHOP_DOOR = { x: 6, z: 42.2 };    // 상점 문 앞 (밖)
+let transitioning = false;
+const sceneFade = document.getElementById('sceneFade');
+function fadeTeleport(fn) {
+  transitioning = true;
+  if (sceneFade) sceneFade.classList.add('show');
+  setTimeout(() => {
+    fn();
+    if (sceneFade) sceneFade.classList.remove('show');
+    setTimeout(() => { transitioning = false; }, 300);
+  }, 380);
+}
+function teleportInto(R, insideFlagName, greet) {
+  fadeTeleport(() => {
+    state[insideFlagName] = true;
+    state.x = R.cx; state.z = R.cz + 2.2;
+    state.vy = 0; state.onGround = true;
+    state.facing = Math.PI;   // 방 안쪽을 바라봅니다
+    state.idleTime = 0; state.sit = 0;
+    lulu.position.set(state.x, R.y, state.z);
+    camYaw = 0;               // 카메라는 문 쪽(남쪽)에서 방 안을 들여다봅니다
+    camera.position.set(state.x, R.y + 4, state.z + 8);
+    if (greet) spawnMoneyPopup(state.x, R.y + 2, state.z, greet);
+  });
+}
+function teleportOut(outX, outZ) {
+  fadeTeleport(() => {
+    state.inside = false; state.inShop = false;
+    state.x = outX; state.z = outZ;
+    state.vy = 0;
+    state.facing = 0;         // 마을 쪽(북쪽)을 바라봅니다
+    state.idleTime = 0; state.sit = 0;
+    lulu.position.set(state.x, groundHeight(state.x, state.z), state.z);
+    camYaw = Math.PI;
+    camera.position.set(state.x, groundHeight(state.x, state.z) + 5, state.z - 8);
+  });
+}
+// 매 프레임 문 앞에 서 있는지 확인합니다
+function updateDoors() {
+  if (transitioning || state.diving) return;
+  if (state.inside) {
+    if (Math.hypot(state.x - ROOM.cx, state.z - (ROOM.cz + ROOM.d / 2 - 0.3)) < 1.0) {
+      teleportOut(HOUSE.x, HOUSE.z + 5.4);
+    }
+    return;
+  }
+  if (state.inShop) {
+    if (Math.hypot(state.x - SHOP_ROOM.cx, state.z - (SHOP_ROOM.cz + SHOP_ROOM.d / 2 - 0.3)) < 1.0) {
+      teleportOut(SHOP_DOOR.x, SHOP_DOOR.z - 1.6);
+    }
+    return;
+  }
+  // 밖: 집 문 앞
+  if (Math.hypot(state.x - HOUSE.x, state.z - (HOUSE.z + 3.6)) < 1.2) {
+    const empty = !FURN_ORDER.some((k) => furnitureOwned[k]);
+    teleportInto(ROOM, 'inside',
+      empty ? '🏚 텅 빈 집… 맨땅이라도 몸 누일 곳은 되네요' : '🏡 내 집에 왔어요');
+    return;
+  }
+  // 밖: 상점 문 앞
+  if (Math.hypot(state.x - SHOP_DOOR.x, state.z - SHOP_DOOR.z) < 0.9) {
+    teleportInto(SHOP_ROOM, 'inShop', '🏪 어서 오세요! 물건 앞에서 사면 됩니다');
   }
 }
 
@@ -1996,6 +2421,8 @@ const state = {
   harvestT: -1,  // 0 이상이면 감귤 따는 애니메이션 재생 중 (초 단위로 증가)
   grabbing: false, // true면 상자를 직접 손으로 잡고 있는 중 (E키로 잡기/놓기)
   diving: false,   // true면 물질 중 (바닷속에 있음)
+  inside: false,   // true면 집 안에 있음 (문 앞에 서면 드나듭니다)
+  inShop: false,   // true면 상점 안에 있음
   pickT: -1,       // 0 이상이면 전복 따는 동작 재생 중 (물속 전용)
   fixT: -1,        // 0 이상이면 집 고치는 동작 재생 중
 };
@@ -2041,10 +2468,38 @@ function updateRopeBadge() {
     ropeBadge.textContent = `🤿 ${KEY_ACTION} 채집 · ${KEY_UP} 떠오르기 · 수면에서 ${KEY_ACTION} 뭍에 나가기`;
     return;
   }
-  // 포구 가까이 오면 물질하러 들어가는 법을 알려줍니다
+  // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
+  if (state.inShop) {
+    const good = nearestShopGood();
+    if (good) {
+      const owned =
+        (good.key === 'tank' && hasTank) ||
+        (good.key === 'net' && hasNet) ||
+        (FURNITURE[good.key] && furnitureOwned[good.key]);
+      ropeBadge.textContent = owned
+        ? `${good.emoji} ${good.name} — 보유 중`
+        : `${good.emoji} ${good.name} ${good.price.toLocaleString()}원 — ${KEY_ACTION}으로 구입`;
+    } else {
+      ropeBadge.textContent = '🏪 상점 안 — 물건 앞에 서면 살 수 있어요 (문 쪽으로 가면 밖으로)';
+    }
+    return;
+  }
+  // 집 안: 꾸미기 안내
+  if (state.inside) {
+    const missing = FURN_ORDER.filter((k) => !furnitureOwned[k]).length;
+    ropeBadge.textContent = missing === 0
+      ? '🏡 아늑한 내 집 — 문 쪽으로 걸어가면 밖으로 나갑니다'
+      : '🏚 텅 빈 집 — 상점 안에서 가구를 사서 꾸며보세요 (문 쪽으로 가면 밖으로)';
+    return;
+  }
+  // 포구 가까이 오면 물질하러 들어가는 법을 알려줍니다 (망사리가 없으면 그것부터)
   if (typeof PORT !== 'undefined' &&
       Math.hypot(state.x - PORT.x, state.z - PORT.z) < BULTEOK_RANGE) {
-    ropeBadge.textContent = `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다`;
+    ropeBadge.textContent = netCarried
+      ? `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다`
+      : (hasNet
+        ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
+        : `🧺 망사리가 있어야 물질합니다 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
     return;
   }
   // 헌집 가까이 오면 지금 할 수 있는 일(구입/수리)을 알려줍니다
@@ -2702,9 +3157,22 @@ function leaveDive(reason) {
 
   const py = groundHeight(BULTEOK.x, BULTEOK.z) + 2.2;
   if (reason === 'drown') {
-    // 정신을 잃고 뭍에 떠밀려 왔습니다 — 망사리에 담았던 것은 전부 바다에 흘렸습니다
+    // 정신을 잃고 뭍에 떠밀려 왔습니다 — 기절한 사이 도둑이 들어 돈이 전부 사라졌습니다.
+    // 그게 숨을 아껴야 하는 진짜 이유입니다. (죽는 순간 바로 저장해 새로고침 꼼수도 안 통합니다)
+    const lostCoins = coins;
+    coins = 0;
+    updateCoinBadge();
+    saveGame(true);
+    // DIE 화면은 뭍에서 깨어나고 잠시 뒤에 걷힙니다
+    if (deathOverlay) setTimeout(() => deathOverlay.classList.remove('show'), 1100);
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
-      lost > 0 ? `😵 정신을 잃었어요… 망사리 ${lost}개를 바다에 흘렸습니다` : '😵 정신을 잃고 떠밀려 왔어요');
+      lostCoins > 0
+        ? '💸 의식을 잃은 사이 누군가 집에 들어와 돈을 다 훔쳐갔습니다'
+        : '😵 정신을 잃고 떠밀려 왔어요');
+    if (lost > 0) {
+      setTimeout(() => spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
+        `🧺 망사리에 담았던 ${lost}개도 바다에 흘렸습니다`), 1700);
+    }
   } else if (caught > 0) {
     coins += pay;
     updateCoinBadge();
@@ -2773,6 +3241,8 @@ function tryCollect() {
 // 다 떨어지면 루루가 스스로 수면을 향해 떠오른 다음 뭍으로 나옵니다.
 const BREATH_LOW = 0.3;        // 이 아래로 떨어지면 "숨이 차는" 구간
 const PICK_DURATION = 0.55;    // 전복 따는 동작이 재생되는 시간(초)
+// 숨이 다하면 화면이 어두워지며 제주 속담과 DIE 자막이 떠오릅니다
+const deathOverlay = document.getElementById('deathOverlay');
 function updateDiving(dt) {
   if (state.pickT >= 0) {
     state.pickT += dt;
@@ -2785,7 +3255,7 @@ function updateDiving(dt) {
     // 숨이 다해 정신을 잃는 중 — 몸이 축 처져 가라앉고, 화면이 조여들다가 뭍에서 깨어납니다.
     // 이 동안 딴 것(망사리)은 전부 바다에 흘려보냅니다. 그게 숨을 아껴야 하는 이유입니다.
     drowning -= dt;
-    state.vy = Math.min(state.vy, -0.6);
+    state.vy = Math.min(state.vy, -0.35);   // 몸에 힘이 빠져 아주 천천히 가라앉습니다
     swimVel.x *= 0.9; swimVel.z *= 0.9;
     if (vignette) vignette.style.opacity = Math.min(1, 1.4 - drowning * 0.6);
     if (drowning <= 0) { leaveDive('drown'); return; }
@@ -2799,9 +3269,9 @@ function updateDiving(dt) {
     breath -= dt;
     if (breath <= 0) {
       breath = 0;
-      drowning = 2.2;                                   // 정신을 잃습니다 — 이제 되돌릴 수 없습니다
+      drowning = 3.4;                                   // 정신을 잃습니다 — 이제 되돌릴 수 없습니다
+      if (deathOverlay) deathOverlay.classList.add('show');   // '욕심내민 바당이 데려간다' + DIE
       playDrownSound();
-      spawnMoneyPopup(state.x, lulu.position.y + 1.2, state.z, '😵 숨이 다했어요…');
     }
   }
 
@@ -2829,13 +3299,12 @@ const TOOL_INFO = {
 };
 
 function houseBadgeText() {
-  if (houseStage < 0) return `🏚 팝니다 — ${KEY_ACTION}으로 구입 (${HOUSE_PRICE.toLocaleString()}원)`;
-  if (houseStage >= 3) return '🏡 내 집! 창고 덕에 상자에 48알까지 담깁니다';
+  if (houseStage >= 3) return '🏡 내 집! 창고(48알) · 문 앞에 서면 안으로 들어갑니다';
   const t = TOOL_INFO[STAGE_TOOLS[houseStage]];
   if (!tools[STAGE_TOOLS[houseStage]]) {
     return `🏚 ${t.work}에는 ${t.name}이 필요해요 — 이장님 상점에서 (${TOOL_PRICE.toLocaleString()}원)`;
   }
-  return `${t.icon} ${t.work} ${fixSwings}/${SWINGS_PER_STAGE} — ${KEY_ACTION}으로 계속`;
+  return `${t.icon} ${t.work} ${fixSwings}/${SWINGS_PER_STAGE} — ${KEY_ACTION}으로 계속 · 문 앞에 서면 안으로`;
 }
 
 function tryFixHouse() {
@@ -2978,9 +3447,14 @@ function updateMayor(dt, t) {
 const SAVE_KEY = 'lulu_jeju_save';
 function saveGame(quiet) {
   try {
+    // 실내(집·상점)에 있을 때는 그 집 문 앞 위치로 저장합니다 — 다시 켜면 문 앞에서 시작
+    const outX = state.inside ? HOUSE.x : (state.inShop ? SHOP_DOOR.x : state.x);
+    const outZ = state.inside ? HOUSE.z + 5.4 : (state.inShop ? SHOP_DOOR.z - 1.6 : state.z);
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       coins, carrots, ponyLove, hasTank, houseStage, fixSwings,
-      tools, basketCount, cap: BASKET_CAP, x: state.x, z: state.z,
+      tools, basketCount, cap: BASKET_CAP, x: outX, z: outZ,
+      hasNet, netCarried, netX: netObj.position.x, netZ: netObj.position.z,
+      furn: furnitureOwned,
     }));
     if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '💾 저장했어요');
   } catch (e) { /* 시크릿 창 등에서는 저장이 막힐 수 있습니다 */ }
@@ -2994,13 +3468,26 @@ function loadGame() {
   ponyLove = d.ponyLove || 0;
   hasTank = !!d.hasTank;
   if (hasTank) BREATH_MAX = TANK_BREATH;
-  houseStage = (d.houseStage === undefined) ? -1 : d.houseStage;
+  houseStage = (d.houseStage === undefined) ? 0 : Math.max(0, d.houseStage);   // 집은 처음부터 루루의 것
   fixSwings = d.fixSwings || 0;
   if (d.tools) Object.assign(tools, d.tools);
   BASKET_CAP = d.cap || 36;
   applyHouseLook();
   for (let i = 0; i < (d.basketCount || 0); i++) addFruitToBasket();
-  if (typeof d.x === 'number') {
+  // 망사리 — 메고 있었으면 다시 등에, 내려놨었으면 그 자리에 그대로
+  hasNet = !!d.hasNet;
+  if (hasNet) {
+    netObj.visible = true;
+    netCarried = d.netCarried !== false;
+    if (!netCarried && typeof d.netX === 'number' && typeof d.netZ === 'number') {
+      netObj.position.set(d.netX, groundHeight(d.netX, d.netZ), d.netZ);
+    }
+  }
+  // 가구 — 산 것들을 집 안에 다시 놓습니다
+  furnitureOwned = Object.assign({ bed: false, chair: false, table: false, closet: false }, d.furn || {});
+  applyFurniture();
+  // 예전 저장이 실내 좌표를 담고 있으면 무시하고 섬의 시작 자리에서 깨어납니다
+  if (typeof d.x === 'number' && d.x < 380) {
     state.x = d.x; state.z = d.z;
     lulu.position.set(state.x, groundHeight(state.x, state.z), state.z);
   }
@@ -3009,24 +3496,14 @@ function loadGame() {
 // (불러오기는 스크립트 맨 아래에서 합니다 — 여기서 부르면 아직 안 만들어진
 //  배지들을 건드려 게임 전체가 멈춥니다)
 
-const btnRestart = document.getElementById('btnRestart');
 const btnSave = document.getElementById('btnSave');
-const btnQuit = document.getElementById('btnQuit');
 if (btnSave) btnSave.addEventListener('pointerdown', (e) => { e.preventDefault(); saveGame(); });
-if (btnRestart) btnRestart.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  if (confirm('처음부터 다시 시작할까요? 저장한 진행이 지워집니다.')) {
-    try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
-    location.reload();
-  }
-});
-if (btnQuit) btnQuit.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  saveGame(true);            // 나가기 전에 조용히 저장해 둡니다
-  window.close();            // 브라우저가 허락하면 탭이 닫힙니다
-  setTimeout(() => spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z,
-    '저장했어요 — 탭을 닫으시면 됩니다'), 150);
-});
+// (다시하기·종료 버튼은 뺐습니다. 저장은 아래 자동 저장이 알아서 해줍니다)
+
+// 자동 저장 — 몇 초에 한 번씩, 그리고 창을 닫거나 다른 앱으로 넘어가는 순간에도 조용히 저장합니다
+setInterval(() => saveGame(true), 5000);
+addEventListener('pagehide', () => saveGame(true));
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
 
 // ---------- 12-1f-3. 전체 지도 (M키 / 🗺 배지) ----------
 // 지도는 따로 그림을 만들지 않고, 게임이 쓰는 지형 높이 함수(groundHeight)를 그대로
@@ -3227,6 +3704,22 @@ function handleActionKey() {
     tryCollect();
     return;
   }
+  // 상점 안: 물건 앞이면 그 물건을 삽니다
+  if (state.inShop) {
+    const good = nearestShopGood();
+    if (good) buyShopGood(good);
+    return;
+  }
+  // 집 안: 내려놓은 망사리를 줍거나, 멘 망사리를 내려놓습니다
+  if (state.inside) {
+    if (hasNet && !netCarried &&
+        Math.hypot(state.x - netObj.position.x, state.z - netObj.position.z) < NET_PICK_RANGE) {
+      pickUpNet();
+    } else if (netCarried) {
+      dropNet();
+    }
+    return;
+  }
   if (nearestFruit() >= 0) { tryHarvest(); return; }
   const carrotDist = Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z);
   if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
@@ -3236,12 +3729,35 @@ function handleActionKey() {
   if (toolDist < TOOL_RANGE) { tryBuyTool(); return; }
   const depotDist = Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z);
   if (depotDist < DEPOT_RANGE) { tryShipBox(); return; }
+  // 내려놓은 망사리 줍기 — 작은 물건이라 집수리 같은 넓은 범위보다 먼저 확인합니다
+  if (hasNet && !netCarried &&
+      Math.hypot(state.x - netObj.position.x, state.z - netObj.position.z) < NET_PICK_RANGE) {
+    pickUpNet();
+    return;
+  }
   const houseDist = Math.hypot(state.x - HOUSE.x, state.z - HOUSE.z);
   if (houseDist < HOUSE_RANGE + 3) { tryFixHouse(); return; }
   const stableDist = Math.hypot(state.x - STABLE.x, state.z - STABLE.z);
   if (stableDist < STABLE_RANGE) { tryFeedPony(); return; }
   const bulteokDist = Math.hypot(state.x - BULTEOK.x, state.z - BULTEOK.z);
-  if (bulteokDist < BULTEOK_RANGE) { enterDive(); return; }
+  if (bulteokDist < BULTEOK_RANGE) {
+    // 망사리를 메고 있어야만 바다에 들어갈 수 있습니다
+    if (!netCarried) {
+      const py = groundHeight(BULTEOK.x, BULTEOK.z) + 2.2;
+      spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
+        hasNet ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
+               : `🧺 망사리가 있어야 물질할 수 있어요 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
+      return;
+    }
+    enterDive();
+    return;
+  }
+  // 망사리를 멘 채 빈 데서 누르면 내려놓습니다 (상자 근처면 상자 잡기가 먼저)
+  if (netCarried && !state.grabbing &&
+      Math.hypot(basketPos.x - state.x, basketPos.z - state.z) >= GRAB_RANGE) {
+    dropNet();
+    return;
+  }
   // 마지막으로: 상자 근처면 잡기/놓기 (잡은 채로 다른 일을 하면 그쪽이 먼저입니다)
   tryToggleGrab();
 }
@@ -3277,7 +3793,16 @@ for (const img of document.querySelectorAll('#startJobs img[data-src]')) {
 // 폰용 화면 버튼을 각 기능에 연결합니다 (키보드 F·E·Shift·Space와 똑같은 일을 합니다)
 bindTouchButton('btnAction', (down) => { if (down) { wakeAudio(); startBgm(); handleActionKey(); } });
 bindTouchButton('btnJump',   (down) => { touchJump = down; });
-bindTouchButton('btnRun',    (down) => { touchRun = down; });
+// 달리기는 꾹 누르고 있는 대신, 한 번 누르면 켜지고 다시 누르면 꺼지는 토글입니다.
+// (왼손은 조이스틱을 잡고 있어서 버튼까지 계속 누르고 있기 어렵기 때문)
+{
+  const runBtn = document.getElementById('btnRun');
+  if (runBtn) runBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    touchRun = !touchRun;
+    runBtn.classList.toggle('on', touchRun);
+  });
+}
 
 // 점프 높이는 JUMP²/(2×GRAVITY). 7.4이면 1.24미터라 돌담(1.3미터쯤)을 아슬아슬하게 못 넘었습니다.
 // 고양이답게 8.9로 올리면 1.8미터까지 떠서 담을 여유 있게 뛰어넘습니다.
@@ -3386,6 +3911,11 @@ function updateLulu(dt) {
       state.x = DIVE.x + (dx / dr) * DIVE.r;
       state.z = DIVE.z + (dz / dr) * DIVE.r;
     }
+  } else if (state.inside || state.inShop) {
+    // 실내에서는 벽 안쪽까지만 다닐 수 있습니다
+    const R = state.inside ? ROOM : SHOP_ROOM;
+    state.x = Math.min(R.cx + R.w / 2 - 0.6, Math.max(R.cx - R.w / 2 + 0.6, state.x));
+    state.z = Math.min(R.cz + R.d / 2 - 0.4, Math.max(R.cz - R.d / 2 + 0.6, state.z));
   } else {
     const rr = Math.hypot(state.x, state.z);
     if (rr > WALK_R) {
@@ -3428,7 +3958,8 @@ function updateLulu(dt) {
   state.walkPhase += dt * (6 + state.speed * 9);
 
   // 오래 가만히 있으면 앉기
-  const wantSit = state.idleTime > 5 && state.onGround ? 1 : 0;
+  // (예전에는 5초 넘게 가만히 있으면 앉았다가 낮잠을 잤는데, 그 연출은 뺐습니다)
+  const wantSit = 0;
   state.sit += (wantSit - state.sit) * Math.min(1, dt * 3.5);
 
   const s = state.sit;
@@ -3607,6 +4138,8 @@ function animate() {
   updateFlyingFruits(dt);
   updateFilledFruits(dt);
   updateDiving(dt);   // 물질 중이면 숨을 깎고, 다 떨어지면 뭍으로 올려보냅니다
+  updateNet(dt, t);   // 망사리를 멨으면 등 뒤를 따라다닙니다
+  updateDoors();      // 문 앞에 서면 집·상점 안팎을 드나듭니다
   updateHouse(dt);    // 집 고치는 동작이 끝나면 수리 단계를 올립니다
   updateMayor(dt, t); // 이장님이 상점과 택배사 사이를 오갑니다
   updateCarrotFx(dt); // 먹인 당근이 조랑말 입가에서 냠냠 사라집니다
