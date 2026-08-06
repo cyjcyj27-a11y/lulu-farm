@@ -1149,10 +1149,10 @@ function tryBuyTool() {
 
 let carrots = 0;      // 들고 있는 당근
 let ponyLove = 0;     // 조랑말과 쌓은 애정 (당근 하나에 1씩)
-let hasTank = false;  // 해녀 산소통 — 사면 숨이 26초에서 60초로 늘어납니다
+let hasTank = false;  // 해녀 산소통 — 사면 숨이 60초에서 3분으로 늘어납니다
 const CARROT_PRICE = 1000;
 const TANK_PRICE = 30000;
-const TANK_BREATH = 60;   // 산소통을 멘 뒤의 숨 (원래 26초의 2배 이상)
+const TANK_BREATH = 180;   // 산소통을 멘 뒤의 숨 — 3분
 
 // 산소통 판매대 — 상점 정면 동쪽. 당근 바구니(서쪽)와 반대편에 나란히 놓입니다.
 const TANK_SPOT = { x: 9.4, z: 42.4 };
@@ -1197,7 +1197,7 @@ function tryBuyTank() {
   BREATH_MAX = TANK_BREATH;   // 지금 물질 중이 아니어도, 다음 잠수부터 바로 적용됩니다
   updateCoinBadge();
   playShipSound();
-  spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, '🤿 산소통 구입! 숨이 60초로 늘었어요');
+  spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, '🤿 산소통 구입! 숨이 3분으로 늘었어요');
 }
 // 당근 바구니 — 상점 정면 서쪽에 놓인 판매대입니다. 상점(끈)과 자리를 나눠 씁니다.
 const CARROT_SPOT = { x: 3.2, z: 42.6 };
@@ -1549,7 +1549,7 @@ function buyShopGood(good) {
     hasTank = true;
     BREATH_MAX = TANK_BREATH;
     playShipSound();
-    spawnMoneyPopup(px, py, pz, '🤿 산소통 구입! 숨이 60초로 늘었어요');
+    spawnMoneyPopup(px, py, pz, '🤿 산소통 구입! 숨이 3분으로 늘었어요');
   } else if (good.key === 'net') {
     hasNet = true;
     netCarried = true;
@@ -2329,6 +2329,7 @@ addEventListener('wheel', (e) => {
 // 손가락 여러 개를 동시에 쓰므로, 어느 손가락이 무슨 역할인지 번호(identifier)로 기억해둡니다.
 const touchMove = { f: 0, r: 0 };     // 조이스틱이 만들어내는 앞뒤(f)·좌우(r) 입력 (-1 ~ 1)
 let touchJump = false, touchRun = false;   // 화면 버튼을 누르고 있는 동안 true
+let touchDive = false;                     // 물속에서 💨 버튼을 누르고 있는 동안 true (잠수)
 let stickId = null, stickX = 0, stickY = 0;    // 이동용 손가락
 let lookId = null, lookX = 0, lookY = 0;       // 시야용 손가락
 let pinchDist = 0;                             // 줌용 두 손가락 사이 거리
@@ -2466,13 +2467,14 @@ function updateBasketBadge() {
 const KEY_ACTION = IS_TOUCH ? '🐾 버튼' : 'F';
 const KEY_GRAB = KEY_ACTION;   // 상호작용 키를 하나로 통일했습니다
 const KEY_UP = IS_TOUCH ? '⤴ 버튼' : 'Space';
+const KEY_DOWN = IS_TOUCH ? '💨 버튼' : 'Shift';   // 물속에서 아래로 잠수하기
 
 function updateRopeBadge() {
   if (!ropeBadge) return;
   ropeBadge.style.display = 'block';   // 아래 분기 중 하나가 걸리면 보입니다 (없으면 끝에서 숨김)
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
-    ropeBadge.textContent = `🤿 ${KEY_ACTION} 채집 · ${KEY_UP} 떠오르기 · 수면에서 ${KEY_ACTION} 뭍에 나가기`;
+    ropeBadge.textContent = `🤿 ${KEY_ACTION} 채집 · ${KEY_DOWN} 잠수 · ${KEY_UP} 떠오르기 · 수면에서 ${KEY_ACTION} 나가기`;
     return;
   }
   // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
@@ -2537,8 +2539,8 @@ function updateRopeBadge() {
   if (typeof TANK_SPOT !== 'undefined' &&
       Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z) < TANK_RANGE) {
     ropeBadge.textContent = hasTank
-      ? '🤿 산소통 보유 중 — 숨 60초'
-      : `🤿 해녀 산소통 — ${KEY_ACTION}으로 구입 (${TANK_PRICE.toLocaleString()}원, 숨 26→60초)`;
+      ? '🤿 산소통 보유 중 — 숨 3분'
+      : `🤿 해녀 산소통 — ${KEY_ACTION}으로 구입 (${TANK_PRICE.toLocaleString()}원, 숨 60초→3분)`;
     return;
   }
   if (typeof STABLE !== 'undefined' &&
@@ -3058,7 +3060,7 @@ const DIVE_ENTRY_RANGE = 2.6;
 // ※ 예전에는 안내 문구가 5.2미터부터 뜨는데 실제 인식은 3.2미터라, 그 사이 2미터 구간에서
 //   "누르세요"라고 해놓고 눌러도 아무 일이 안 일어났습니다. 이제 둘을 같은 값으로 맞춥니다.
 const BULTEOK_RANGE = 6.0;
-let BREATH_MAX = 26;           // 한 번 잠수해서 버틸 수 있는 시간(초). 산소통을 사면 60초로 늘어납니다
+let BREATH_MAX = 60;           // 한 번 잠수해서 버틸 수 있는 시간(초). 산소통을 사면 3분으로 늘어납니다
 const NET_CAP = 24;            // 망사리에 담을 수 있는 개수
 const CATCH_RANGE = 1.7;       // 이 거리 안의 것만 딸 수 있음
 let breath = BREATH_MAX;
@@ -3811,24 +3813,43 @@ bindTouchButton('btnAction', (down) => { if (down) { wakeAudio(); startBgm(); ha
 bindTouchButton('btnJump',   (down) => { touchJump = down; });
 // 달리기는 꾹 누르고 있는 대신, 한 번 누르면 켜지고 다시 누르면 꺼지는 토글입니다.
 // (왼손은 조이스틱을 잡고 있어서 버튼까지 계속 누르고 있기 어렵기 때문)
+// 물속에서는 같은 버튼이 "잠수(아래로)"가 됩니다 — 누르고 있는 동안 내려갑니다.
 {
   const runBtn = document.getElementById('btnRun');
-  if (runBtn) runBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    touchRun = !touchRun;
-    runBtn.classList.toggle('on', touchRun);
-  });
+  let holdingDive = false;
+  if (runBtn) {
+    runBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (state.diving) {
+        touchDive = true; holdingDive = true;
+        runBtn.classList.add('on');
+        return;
+      }
+      touchRun = !touchRun;
+      runBtn.classList.toggle('on', touchRun);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) =>
+      runBtn.addEventListener(ev, () => {
+        if (holdingDive) {
+          touchDive = false; holdingDive = false;
+          runBtn.classList.remove('on');
+        }
+      }));
+  }
 }
 
 // 점프 높이는 JUMP²/(2×GRAVITY). 7.4이면 1.24미터라 돌담(1.3미터쯤)을 아슬아슬하게 못 넘었습니다.
 // 고양이답게 8.9로 올리면 1.8미터까지 떠서 담을 여유 있게 뛰어넘습니다.
 const WALK = 4.2, RUN = 8.0, GRAVITY = 22, JUMP = 8.9;
-// 물속 움직임 — 예전에는 너무 미끄러지고(빙판 같고) 가라앉는 힘이 세서 부자연스러웠습니다.
-// 지금은: 밀면 금방 붙고, 놓으면 물이 잡아줘서 곧 멈추고, 가만히 있으면 아주 천천히 가라앉습니다.
-const SWIM_ACCEL = 14.0;    // 물을 밀어내며 붙는 속도 (금방 최고 속도에 닿습니다)
-const SWIM_DRAG = 3.2;      // 손을 놨을 때 물이 잡아주는 정도 (클수록 빨리 멈춤)
-const SWIM_MAX = 4.0;       // 물속 최고 속도
-const SWIM_UP = 12.0, WATER_SINK = 1.6;   // SEA_Y는 지형 함수보다 먼저 필요해서 위(2번)에 있습니다
+// 물속 움직임 — 「인사이드」의 물속 구간을 참고했습니다.
+// 몸에 부력이 있어서 가만히 있으면 가라앉지 않고 살며시 떠오르고,
+// 방향키로는 느리고 묵직하게 헤엄칩니다. 내려가려면 Shift(💨 버튼)를 눌러 잠수합니다.
+const SWIM_ACCEL = 8.0;     // 물을 밀어내며 붙는 속도 (천천히 붙습니다)
+const SWIM_DRAG = 2.4;      // 손을 놨을 때 물이 잡아주는 정도
+const SWIM_MAX = 2.6;       // 물속 최고 속도 — 뭍 걷기(4.2)보다 한참 느립니다
+const SWIM_UP = 7.0;        // 위로 헤엄치는 힘 (Space·⤴ 버튼)
+const SWIM_DOWN = 7.0;      // 아래로 잠수하는 힘 (Shift·💨 버튼)
+const BUOYANCY = 0.9;       // 부력 — 아무것도 안 누르면 이 힘으로 살며시 떠오릅니다
 const swimVel = { x: 0, z: 0 };   // 물속에서만 쓰는 좌우 관성
 const moveDir = new THREE.Vector3();
 
@@ -3948,10 +3969,12 @@ function updateLulu(dt) {
   const gy = state.diving ? seabedHeight(state.x, state.z) : groundHeight(state.x, state.z);
   const wantUp = keys['Space'] || touchJump;
   if (state.diving) {
-    if (wantUp) state.vy += SWIM_UP * dt;         // 누르고 있는 동안 계속 떠오름
-    state.vy -= WATER_SINK * dt;                  // 놓으면 천천히 가라앉음
-    state.vy *= Math.max(0, 1 - 2.0 * dt);        // 물의 저항 — 위아래 움직임도 부드럽게 잦아듭니다
-    state.vy = Math.max(-2.2, Math.min(3.6, state.vy));
+    const wantDown = keys['ShiftLeft'] || keys['ShiftRight'] || touchDive;
+    if (wantUp) state.vy += SWIM_UP * dt;           // 위로 헤엄치기
+    else if (wantDown) state.vy -= SWIM_DOWN * dt;  // 아래로 잠수하기
+    else state.vy += BUOYANCY * dt;                 // 부력 — 가만히 있으면 살며시 떠오릅니다
+    state.vy *= Math.max(0, 1 - 2.6 * dt);          // 물의 저항 — 움직임이 부드럽게 잦아듭니다
+    state.vy = Math.max(-2.0, Math.min(2.2, state.vy));
   } else {
     if (wantUp && state.onGround && state.harvestT < 0) {
       state.vy = JUMP;
