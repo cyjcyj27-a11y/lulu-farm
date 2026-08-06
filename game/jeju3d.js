@@ -2728,6 +2728,17 @@ function updateRopeBadge() {
     ropeBadge.textContent = houseBadgeText();
     return;
   }
+  // 이장님·돌하르방 안내
+  if (typeof mayor !== 'undefined' && mayorGroup &&
+      Math.hypot(state.x - mayor.x, state.z - mayor.z) < MAYOR_TALK_RANGE) {
+    ropeBadge.textContent = `🧢 이장님과 이야기 (${KEY_ACTION})`;
+    return;
+  }
+  if (typeof TUTOR_SPOT !== 'undefined' &&
+      Math.hypot(state.x - TUTOR_SPOT.x, state.z - TUTOR_SPOT.z) < TUTOR_RANGE) {
+    ropeBadge.textContent = `🗿 돌하르방과 이야기 (${KEY_ACTION})`;
+    return;
+  }
   // 당근 바구니·산소통·마구간 안내
   if (typeof CARROT_SPOT !== 'undefined' &&
       Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z) < CARROT_RANGE) {
@@ -3766,6 +3777,92 @@ function updatePony(t) {
   ponyCard.scale.set(Wp, Hp, 1);
 }
 
+// ---------- 12-1f-2a3. 대화 — 이장님·돌하르방과 이야기 ----------
+// NPC 앞에서 F(🐾)를 누르면 화면 아래 종이 카드에 대사가 뜨고,
+// 다시 누르면 다음 줄로 넘어갑니다. 이장님은 지금 섬 상황을 보고 말합니다.
+const talkBoxEl = document.getElementById('talkBox');
+const talkNameEl = document.getElementById('talkName');
+const talkTextEl = document.getElementById('talkText');
+let talkLines = [], talkIdx = -1, talkDone = null;
+function talkOpen() { return talkIdx >= 0; }
+function startTalk(name, lines, onDone) {
+  talkLines = lines;
+  talkIdx = 0;
+  talkDone = onDone || null;
+  if (talkNameEl) talkNameEl.textContent = name;
+  if (talkBoxEl) talkBoxEl.style.display = 'block';
+  if (talkTextEl) talkTextEl.textContent = talkLines[0];
+}
+function advanceTalk() {
+  talkIdx++;
+  if (talkIdx >= talkLines.length) {
+    talkIdx = -1;
+    if (talkBoxEl) talkBoxEl.style.display = 'none';
+    if (talkDone) { const f = talkDone; talkDone = null; f(); }
+    return;
+  }
+  if (talkTextEl) talkTextEl.textContent = talkLines[talkIdx];
+}
+if (talkBoxEl) talkBoxEl.addEventListener('pointerdown', (e) => { e.preventDefault(); advanceTalk(); });
+
+function isNight() { return (gameT / DAY_LEN) >= DAY_PORTION; }
+
+// 이장님 대사 — 급한 일부터 챙겨주는 참견쟁이 어른입니다
+const MAYOR_TALK_RANGE = 2.2;
+function mayorTalkLines() {
+  if (!ponyAlive) return [
+    '말이 그리 되다니… 마음이 아프네.',
+    '마구간에 가면 새 친구를 데려올 수 있다네. 이번엔 꼭 매일 챙겨주게.',
+  ];
+  if (hungerDays() >= 3) return [
+    '자네 말이 며칠째 울던데… 당근은 줬는가?',
+    '산 것은 끼니를 거르면 못 버티네. 어서 가보게.',
+  ];
+  if (basketCount >= BASKET_CAP) return [
+    '오, 귤이 실하네! 상자가 가득이야.',
+    '택배사 앞으로 가져오게 — 알당 100원, 후하게 쳐줌세.',
+  ];
+  if (!ponyFedToday()) return [
+    '오늘 말한테 당근은 줬는가?',
+    '아침마다 한 개씩 — 그게 말 키우는 법이라네.',
+  ];
+  if (isNight()) return [
+    '밤바람이 차다, 얼른 들어가게.',
+    '별 보며 걷는 것도 제주 맛이긴 하지만 말이야.',
+  ];
+  if (!hasNet) return [
+    '물질을 해보고 싶으면 상점 안에서 망사리부터 사게.',
+    '망사리 없이 바다에 드는 건 안 될 말이지.',
+  ];
+  const idle = [
+    ['혼저 옵서예~ 오늘도 부지런하구만.'],
+    ['귤은 알이 굵을 때 따야 제값을 받네.'],
+    ['우리 섬 바다는 인심이 좋아. 욕심만 안 부리면 말이야.'],
+    ['집은 좀 고쳐놨는가? 다 고치면 창고가 생겨 상자가 커진다네.'],
+    ['자네 말, 요즘 눈빛이 다르던데? 경마에 한번 내보내 보게.'],
+    ['바닥재랑 벽지도 들여놨네. 상점 왼쪽을 둘러보게.'],
+  ];
+  return idle[Math.floor(Math.random() * idle.length)];
+}
+
+// 돌하르방 — 상점 앞을 지키는 안내석. 처음 온 사람에게 섬 사는 법을 알려줍니다
+const TUTOR_SPOT = { x: 2.2, z: 45.4 };
+const TUTOR_RANGE = 2.6;
+let tutorialSeen = false;
+const TUTOR_LINES = [
+  '혼저 옵서예! 나는 이 섬을 지키는 돌하르방이우다.',
+  '🍊 귤나무 앞에서 🐾(F)를 누르면 귤을 딴다네. 상자에 담아 택배사의 이장님께 팔면 돈이 되지.',
+  '🏪 상점 문 앞에 서면 안으로 들어가네. 당근을 사서 말에게 매일 하나씩 먹이게 — 굶기면 큰일 나!',
+  '🤿 물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가면 되네. 숨은 반만 쓰고 올라오게!',
+  '🏠 남쪽 언덕 돌집이 자네 집이야. 문 앞에 서면 들어가지고, 가구를 사다 꾸밀 수도 있다네.',
+  '🏇 말과 정이 들면 마구간 옆 팻말에서 경마에도 나가보게. 그럼, 좋은 하루 되시게!',
+];
+function tutorTalk() {
+  startTalk('돌하르방', TUTOR_LINES, () => {
+    if (!tutorialSeen) { tutorialSeen = true; saveGame(true); }
+  });
+}
+
 // ---------- 12-1f-2b. 저장 · 처음부터 · 종료 ----------
 // 진행 상황을 브라우저 안(localStorage)에 남깁니다. 게임을 켜면 자동으로 이어집니다.
 // (딴 귤·채집물 위치까지는 저장하지 않습니다 — 자원은 켤 때마다 새로 차 있습니다)
@@ -3780,7 +3877,7 @@ function saveGame(quiet) {
       tools, basketCount, cap: BASKET_CAP, x: outX, z: outZ,
       hasNet, netCarried, netX: netObj.position.x, netZ: netObj.position.z,
       furn: furnitureOwned,
-      gameT, dayCount, lastFedDay, ponyAlive,
+      gameT, dayCount, lastFedDay, ponyAlive, tutorialSeen,
       floorC: houseFloorColor, wallC: houseWallColor,
     }));
     if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '💾 저장했어요');
@@ -3818,6 +3915,7 @@ function loadGame() {
   dayCount = d.dayCount || 1;
   lastFedDay = d.lastFedDay || 0;
   ponyAlive = d.ponyAlive !== false;
+  tutorialSeen = !!d.tutorialSeen;
   applyPonyAlive();
   // 집 인테리어 (바닥재·벽지)
   houseFloorColor = d.floorC || 0;
@@ -4147,6 +4245,8 @@ function tryFeedPony() {
 // 뭍:   귤 따기 → 당근·산소통 사기 → 택배 부치기 → 집 사기·고치기 → 말 먹이기 → 물질 들어가기
 //       → 아무것도 없으면 상자 잡기/놓기
 function handleActionKey() {
+  // 대화 중이면 F는 "다음 줄"입니다
+  if (talkOpen()) { advanceTalk(); return; }
   if (state.harvestT >= 0 || state.fixT >= 0) return;
   if (state.diving) {
     if (drowning > 0) return;
@@ -4174,6 +4274,15 @@ function handleActionKey() {
     return;
   }
   if (nearestFruit() >= 0) { tryHarvest(); return; }
+  // 이장님·돌하르방과 이야기하기
+  if (mayorGroup && Math.hypot(state.x - mayor.x, state.z - mayor.z) < MAYOR_TALK_RANGE) {
+    startTalk('이장님', mayorTalkLines());
+    return;
+  }
+  if (Math.hypot(state.x - TUTOR_SPOT.x, state.z - TUTOR_SPOT.z) < TUTOR_RANGE) {
+    tutorTalk();
+    return;
+  }
   const carrotDist = Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z);
   if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
   const tankDist = Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z);
@@ -4240,6 +4349,11 @@ for (const img of document.querySelectorAll('#startJobs img[data-src]')) {
       setTimeout(() => startEl.remove(), 500);   // 사라지고 나면 화면에서 완전히 치웁니다
       wakeAudio();
       startBgm();
+      // 처음 온 사람에게는 돌하르방이 손짓합니다
+      if (!tutorialSeen) {
+        setTimeout(() => spawnMoneyPopup(TUTOR_SPOT.x, groundHeight(TUTOR_SPOT.x, TUTOR_SPOT.z) + 3.4, TUTOR_SPOT.z,
+          '🗿 돌하르방이 할 말이 있대요 — 가까이 가서 🐾', 8), 900);
+      }
     };
     startEl.addEventListener('pointerdown', begin, { once: true });
     addEventListener('keydown', begin, { once: true });
