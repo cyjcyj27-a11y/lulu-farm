@@ -2198,9 +2198,9 @@ if (CAN_USE_IMAGES) {
   // 해녀 물질 — 헤엄·둥둥·수면은 영상에서 뽑아 8칸씩이라 훨씬 부드럽게 움직입니다
   loadSheet('diveSwim',  'dive_swim.webp',  8,  164);          // 물속 활공 (옆모습, 원본은 왼쪽을 봄)
   loadSheet('diveIdle',  'dive_idle.webp',  8,  139);          // 물속에 가만히 떠 있기 (정면)
-  loadSheet('diveFloat', 'dive_float.webp', 8,  173);          // 수면에 떠서 숨 고르기 (정면)
+  loadSheet('diveFloat', 'dive_float.webp', 8,  202);          // 수면에 떠서 숨 고르기 — 입수 첫 모습 (직접 뽑으신 영상)
   loadSheet('divePick',  'dive_pick.webp',  6,  190);          // 전복·소라를 딸 때 (한 번만 재생)
-  loadSheet('diveUp',    'dive_up.webp',    5,  140);          // 수면으로 떠오를 때
+  loadSheet('diveUp',    'dive_up.webp',    8,  165);          // 수면으로 떠오를 때 (직접 뽑으신 영상)
   loadSheet('diveDown',  'dive_down.webp',  8,  175);          // 아래로 잠수할 때 (직접 뽑으신 영상에서 변환)
   // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
   loadSheet('fixHouse',  'fix_house.webp',  3,  167);
@@ -2330,7 +2330,6 @@ addEventListener('wheel', (e) => {
 // 손가락 여러 개를 동시에 쓰므로, 어느 손가락이 무슨 역할인지 번호(identifier)로 기억해둡니다.
 const touchMove = { f: 0, r: 0 };     // 조이스틱이 만들어내는 앞뒤(f)·좌우(r) 입력 (-1 ~ 1)
 let touchJump = false, touchRun = false;   // 화면 버튼을 누르고 있는 동안 true
-let touchDive = false;                     // 물속에서 💨 버튼을 누르고 있는 동안 true (잠수)
 let stickId = null, stickX = 0, stickY = 0;    // 이동용 손가락
 let lookId = null, lookX = 0, lookY = 0;       // 시야용 손가락
 let pinchDist = 0;                             // 줌용 두 손가락 사이 거리
@@ -2468,14 +2467,15 @@ function updateBasketBadge() {
 const KEY_ACTION = IS_TOUCH ? '🐾 버튼' : 'F';
 const KEY_GRAB = KEY_ACTION;   // 상호작용 키를 하나로 통일했습니다
 const KEY_UP = IS_TOUCH ? '⤴ 버튼' : 'Space';
-const KEY_DOWN = IS_TOUCH ? '💨 버튼' : 'Shift';   // 물속에서 아래로 잠수하기
 
 function updateRopeBadge() {
   if (!ropeBadge) return;
   ropeBadge.style.display = 'block';   // 아래 분기 중 하나가 걸리면 보입니다 (없으면 끝에서 숨김)
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
-    ropeBadge.textContent = `🤿 ${KEY_ACTION} 채집 · ${KEY_DOWN} 잠수 · ${KEY_UP} 떠오르기 · 수면에서 ${KEY_ACTION} 나가기`;
+    ropeBadge.textContent = IS_TOUCH
+      ? '🤿 🐾 채집 · 조이스틱 위로 떠오르기 · 아래로 잠수 · 수면에서 🐾 나가기'
+      : '🤿 F 채집 · ↑ 떠오르기 · ↓ 잠수 · ← → 헤엄 · 수면에서 F 나가기';
     return;
   }
   // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
@@ -3814,29 +3814,13 @@ bindTouchButton('btnAction', (down) => { if (down) { wakeAudio(); startBgm(); ha
 bindTouchButton('btnJump',   (down) => { touchJump = down; });
 // 달리기는 꾹 누르고 있는 대신, 한 번 누르면 켜지고 다시 누르면 꺼지는 토글입니다.
 // (왼손은 조이스틱을 잡고 있어서 버튼까지 계속 누르고 있기 어렵기 때문)
-// 물속에서는 같은 버튼이 "잠수(아래로)"가 됩니다 — 누르고 있는 동안 내려갑니다.
 {
   const runBtn = document.getElementById('btnRun');
-  let holdingDive = false;
-  if (runBtn) {
-    runBtn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      if (state.diving) {
-        touchDive = true; holdingDive = true;
-        runBtn.classList.add('on');
-        return;
-      }
-      touchRun = !touchRun;
-      runBtn.classList.toggle('on', touchRun);
-    });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) =>
-      runBtn.addEventListener(ev, () => {
-        if (holdingDive) {
-          touchDive = false; holdingDive = false;
-          runBtn.classList.remove('on');
-        }
-      }));
-  }
+  if (runBtn) runBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    touchRun = !touchRun;
+    runBtn.classList.toggle('on', touchRun);
+  });
 }
 
 // 점프 높이는 JUMP²/(2×GRAVITY). 7.4이면 1.24미터라 돌담(1.3미터쯤)을 아슬아슬하게 못 넘었습니다.
@@ -3886,11 +3870,14 @@ function updateLulu(dt) {
   const spd = (running ? RUN : WALK) * tilt;
 
   if (state.diving) {
-    // 물속: 미는 동안 서서히 붙고, 손을 놓아도 관성으로 한참 미끄러집니다 (인사이드식 묵직함)
-    if (moving) {
+    // 물속에서는 방향키만 씁니다: ← →(조이스틱 좌우)는 좌우 헤엄,
+    // ↑ ↓(조이스틱 위아래)는 아래쪽 점프·중력 계산에서 뜨고 가라앉기에 씁니다.
+    moveDir.set(rgtX * r, 0, rgtZ * r);
+    const sideTilt = Math.min(1, Math.abs(r));
+    if (moveDir.lengthSq() > 0.0001) {
       moveDir.normalize();
-      swimVel.x += moveDir.x * SWIM_ACCEL * tilt * dt;
-      swimVel.z += moveDir.z * SWIM_ACCEL * tilt * dt;
+      swimVel.x += moveDir.x * SWIM_ACCEL * sideTilt * dt;
+      swimVel.z += moveDir.z * SWIM_ACCEL * sideTilt * dt;
       state.idleTime = 0;
     } else {
       state.idleTime += dt;
@@ -3970,9 +3957,9 @@ function updateLulu(dt) {
   const gy = state.diving ? seabedHeight(state.x, state.z) : groundHeight(state.x, state.z);
   const wantUp = keys['Space'] || touchJump;
   if (state.diving) {
-    const wantDown = keys['ShiftLeft'] || keys['ShiftRight'] || touchDive;
-    if (wantUp) state.vy += SWIM_UP * dt;           // 위로 헤엄치기
-    else if (wantDown) state.vy -= SWIM_DOWN * dt;  // 아래로 잠수하기
+    // ↑(조이스틱 위)로 떠오르고, ↓(아래)로 잠수합니다 — f는 위에서 계산한 앞뒤 입력값
+    if (f > 0.1) state.vy += SWIM_UP * Math.min(1, f) * dt;         // 위로 헤엄치기
+    else if (f < -0.1) state.vy -= SWIM_DOWN * Math.min(1, -f) * dt; // 아래로 잠수하기
     else state.vy += BUOYANCY * dt;                 // 부력 — 가만히 있으면 살며시 떠오릅니다
     state.vy *= Math.max(0, 1 - 2.6 * dt);          // 물의 저항 — 움직임이 부드럽게 잦아듭니다
     state.vy = Math.max(-2.0, Math.min(2.2, state.vy));
@@ -4080,9 +4067,9 @@ function updateSpriteLulu(groundY) {
       sheet = SHEETS.diveFloat;
       cell = Math.floor(t * 6) % sheet.frames;
     } else if (state.vy > 0.5 || surfacing > 0) {
-      // 위로 헤엄쳐 떠오르는 중 (⤴·Space)
+      // 위로 헤엄쳐 떠오르는 중 (↑)
       sheet = SHEETS.diveUp;
-      cell = pingpong(Math.floor(t * 7), sheet.frames);
+      cell = Math.floor(t * 8) % sheet.frames;
     } else if (state.vy < -0.4) {
       // 아래로 잠수하는 중 (💨·Shift) — 전용 잠수 그림이 있으면 그걸, 없으면 활공 그림을 기울여 씁니다
       sheet = SHEETS.diveDown || SHEETS.diveSwim;

@@ -146,6 +146,8 @@
     user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   }
   .ibtn:active { background: rgba(255,190,80,.7); }
+  /* 버튼 속 그림(제주도 지도 아이콘)이 손가락 입력을 가로채지 않게 합니다 */
+  .ibtn svg { pointer-events: none; display: block; }
 
   /* ---- 전체 지도 (M키 / 🗺 배지) ---- */
   #mapWrap {
@@ -333,7 +335,7 @@
     <b>달리기</b> Shift<br>
     <b>점프</b> Space<br>
     <b>상호작용</b> F 하나로 전부 (따기·사기·택배·수리·먹이기·상자·물질)<br>
-    <b>물속에서</b> F 채집 · Shift 잠수 · Space 떠오르기 · 수면에서 F 나가기<br>
+    <b>물속에서</b> F 채집 · ↑ 떠오르기 · ↓ 잠수 · ← → 헤엄 · 수면에서 F 나가기<br>
     <b>전체 지도</b> M (또는 🗺 배지)<br>
     <b>왼쪽 아래</b> 💾 저장 · 🗺 지도 · 🎵 음악 (자동 저장도 됩니다)
   </div>
@@ -353,7 +355,14 @@
 
   <div id="iconRow">
     <button class="ibtn" id="btnSave" title="저장하기">💾</button>
-    <button class="ibtn" id="mapBadge" title="지도 (M)">🗺</button>
+    <button class="ibtn" id="mapBadge" title="지도 (M)">
+      <!-- 제주도를 단순화한 모양: 동서로 길쭉한 섬 가운데에 한라산이 볼록 -->
+      <svg width="24" height="15" viewBox="0 0 48 30" aria-hidden="true">
+        <path d="M5 18 Q3 12 10 10 Q16 4 24 5 Q34 3 41 9 Q46 12 44 17 Q42 22 33 24 Q22 27 12 24 Q6 22 5 18 Z"
+              fill="#8fce76" stroke="#3c6e33" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M19 13 L24 7 L29 13 Z" fill="#3c6e33"/>
+      </svg>
+    </button>
     <button class="ibtn" id="musicBadge" title="배경음악">🎵</button>
   </div>
   <div class="badge" id="carrotBadge">🥕 당근 0개</div>
@@ -427,6 +436,6 @@
 
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=29"></script>
+<script src="jeju3d.js?v=30"></script>
 </body>
 </html>
