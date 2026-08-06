@@ -240,6 +240,9 @@
     user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
     touch-action: none;
   }
+  /* 버튼 안의 글자·이모지는 손가락 입력을 받지 않게 합니다.
+     그래야 어디를 눌러도 항상 버튼 자체가 눌린 것으로 처리됩니다. */
+  .tbtn * { pointer-events: none; }
   .tbtn .k { font-size: 22px; }
   .tbtn.on { background: rgba(255,190,80,.75); border-color: #fff; }
   /* 폰은 화면이 좁아서 조작 안내표와 아래쪽 설명은 접어둡니다 */

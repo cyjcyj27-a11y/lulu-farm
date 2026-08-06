@@ -1146,18 +1146,21 @@ const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: t
   const y = groundHeight(PORT.x, PORT.z);
   const deckMat = new THREE.MeshLambertMaterial({ color: 0x9a9689, flatShading: true });
 
-  // 바다 쪽으로 뻗어나간 돌 축대(부두). 물가에서 시작해 물 위로 걸쳐 있습니다.
-  const DECK_TOP = 0.55;                    // 축대 윗면 높이 (바다 표면 -0.5보다 조금 위)
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(5.0, 3.0, 10), deckMat);
-  deck.position.set(PORT.x, DECK_TOP - 1.5, PORT.z + 5.5);
+  // 바다 쪽으로 뻗어나간 돌 축대(부두).
+  // 윗면을 물가 땅높이에 딱 맞춰야 잔디밭에서 그대로 이어져 보입니다.
+  // (예전에는 축대를 바다 표면에 맞춰 놓아서, 잔디밭보다 3미터 아래로 파묻혀 보였습니다)
+  const DECK_TOP = y;                       // y = 포구 자리의 땅높이
+  const DECK_H = DECK_TOP - SEA_Y + 5;       // 물 밑으로 5미터 더 내려가 바닥에 닿게
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(5.0, DECK_H, 11), deckMat);
+  deck.position.set(PORT.x, DECK_TOP - DECK_H / 2, PORT.z + 5.0);
   deck.castShadow = true; deck.receiveShadow = true;
   scene.add(deck);
   // 축대 옆면을 두른 현무암 — 제주 포구의 거친 돌쌓기
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 44; i++) {
     const side = i % 2 ? 1 : -1;
-    const t = (i / 40) * 10;
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), i % 3 ? darkStoneMat : stoneMat);
-    rock.position.set(PORT.x + side * 2.5, DECK_TOP - 0.5 + Math.random() * 0.5, PORT.z + 0.6 + t);
+    const t = (i / 44) * 11;
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45, 0), i % 3 ? darkStoneMat : stoneMat);
+    rock.position.set(PORT.x + side * 2.5, DECK_TOP - 0.25 - Math.random() * 0.5, PORT.z - 0.5 + t);
     rock.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
     rock.castShadow = true;
     scene.add(rock);
@@ -1723,28 +1726,34 @@ function updateBasketBadge() {
 }
 // 상자(basketPos)와 잡기 범위(GRAB_RANGE)는 아래 12-1b에서 정의되므로,
 // 이 배지 내용은 그쪽 값들이 다 준비된 뒤(매 프레임 updateBasket 안에서) 갱신합니다.
+// 안내 문구에 쓸 조작 이름. 폰에는 키보드가 없으므로 화면 버튼 이름으로 바꿔 말해줍니다.
+// (예전에는 폰에서도 "F를 누르세요"라고만 해서, 누를 F가 없어 물질하러 못 들어갔습니다)
+const KEY_ACTION = IS_TOUCH ? '🍊 버튼' : 'F';
+const KEY_GRAB = IS_TOUCH ? '📦 버튼' : 'E';
+const KEY_UP = IS_TOUCH ? '⤴ 버튼' : 'Space';
+
 function updateRopeBadge() {
   if (!ropeBadge) return;
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
-    ropeBadge.textContent = '🤿 F로 채집 · Space로 떠오르기 · E로 뭍에 나가기';
+    ropeBadge.textContent = `🤿 ${KEY_ACTION} 채집 · ${KEY_UP} 떠오르기 · ${KEY_GRAB} 뭍에 나가기`;
     return;
   }
-  // 불턱 가까이 오면 물질하러 들어가는 법을 알려줍니다
-  if (typeof BULTEOK !== 'undefined' &&
-      Math.hypot(state.x - BULTEOK.x, state.z - BULTEOK.z) < BULTEOK_RANGE + 2) {
-    ropeBadge.textContent = '🤿 F를 누르면 바다로 물질하러 들어갑니다';
+  // 포구 가까이 오면 물질하러 들어가는 법을 알려줍니다
+  if (typeof PORT !== 'undefined' &&
+      Math.hypot(state.x - PORT.x, state.z - PORT.z) < BULTEOK_RANGE) {
+    ropeBadge.textContent = `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다`;
     return;
   }
   if (hasRope) {
     ropeBadge.textContent = '🪢 끈으로 편하게 끄는 중';
   } else if (state.grabbing) {
-    ropeBadge.textContent = '🤝 상자를 잡고 끄는 중 (E로 놓기)';
+    ropeBadge.textContent = `🤝 상자를 잡고 끄는 중 (${KEY_GRAB}로 놓기)`;
   } else {
     const dist = Math.hypot(basketPos.x - state.x, basketPos.z - state.z);
     ropeBadge.textContent = dist < GRAB_RANGE
-      ? '📦 E를 누르면 상자를 잡을 수 있어요'
-      : `📦 밀거나, 가까이 가서 E로 잡아 끌 수 있어요 (끈: ${ROPE_PRICE.toLocaleString()}원)`;
+      ? `📦 ${KEY_GRAB}을 누르면 상자를 잡을 수 있어요`
+      : `📦 밀거나, 가까이 가서 ${KEY_GRAB}로 잡아 끌 수 있어요 (끈: ${ROPE_PRICE.toLocaleString()}원)`;
   }
 }
 updateCoinBadge();
@@ -2248,7 +2257,10 @@ function tryShipBox() {
 // ---------- 12-1e. 해녀 물질 ----------
 // 불턱에서 F를 누르면 바닷속으로 들어갑니다. 숨은 한정돼 있어서, 다 떨어지기 전에
 // 수면으로 올라와야 합니다. 딴 것은 망사리에 담기고, 뭍으로 나올 때 한꺼번에 팝니다.
-const BULTEOK_RANGE = 3.2;
+// 포구는 축대가 넓어서 인식 범위도 넉넉해야 합니다.
+// ※ 예전에는 안내 문구가 5.2미터부터 뜨는데 실제 인식은 3.2미터라, 그 사이 2미터 구간에서
+//   "누르세요"라고 해놓고 눌러도 아무 일이 안 일어났습니다. 이제 둘을 같은 값으로 맞춥니다.
+const BULTEOK_RANGE = 6.0;
 const BREATH_MAX = 26;         // 한 번 잠수해서 버틸 수 있는 시간(초)
 const NET_CAP = 24;            // 망사리에 담을 수 있는 개수
 const CATCH_RANGE = 1.7;       // 이 거리 안의 것만 딸 수 있음
