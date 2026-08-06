@@ -89,6 +89,21 @@ function bump(x, z, cx, cz, amp, size) {
   return amp * Math.exp(-(dx * dx + dz * dz) / (2 * size * size));
 }
 
+// 물질하는 곳 — 포구(배 대는 자리) 앞바다입니다.
+// 지형 높이 함수보다 먼저 정해둬야, 이 자리를 움푹 파낸 지형을 만들 수 있습니다.
+//
+// ※ 처음에는 바닷속 바닥을 따로 만들어 -13에 깔았는데, 섬 지형 판이 그 위(-6.5)를 덮고 있어서
+//    물에 들어가면 지형 판만 보이고 루루도 미역도 하나도 안 보였습니다.
+//    그래서 바닥을 따로 만들지 않고 지형 자체를 파내는 방식으로 바꿨습니다.
+// 포구는 물가에 바짝 붙은 마른 땅에 둡니다. (0,92)는 물가에서 1.2미터 위,
+// 여기서 두 걸음만 나가면 바로 물이라 "여기서 바다로 들어간다"는 게 한눈에 보입니다.
+const PORT = { x: 0, z: 92 };
+// 물질장은 물가(z≈93)에서 충분히 떨어뜨려야 합니다. 가장자리가 뭍에 닿으면
+// 마른 땅 위에서도 잠수 상태로 서 있게 됩니다.
+const DIVE = { x: 0, z: 118, r: 20 };    // 물질장 (포구 앞바다)
+const DIVE_DEPTH = 9;                    // 이만큼 더 파 내려갑니다
+const SEA_Y = -0.5;                      // 바다 표면 높이 (아래 4번에서 만드는 바다 판과 같은 값)
+
 function groundHeight(x, z) {
   let h = 0;
   h += Math.sin(x * 0.032) * 1.3 + Math.cos(z * 0.027) * 1.5;   // 완만한 기복
@@ -102,8 +117,17 @@ function groundHeight(x, z) {
   // 섬 가장자리는 바다 쪽으로 서서히 내려가게
   const r = Math.sqrt(x * x + z * z);
   const edge = 1 - smoothstep(ISLAND_R - 22, ISLAND_R + 16, r);
-  return h * edge - (1 - edge) * 7;
+  let y = h * edge - (1 - edge) * 7;
+
+  // 물질장은 우묵한 웅덩이로 파냅니다. 가장자리는 완만하게 이어져야
+  // 포구에서 헤엄쳐 들어갈 때 벽에 막히지 않습니다.
+  const dr = Math.hypot(x - DIVE.x, z - DIVE.z);
+  y -= DIVE_DEPTH * (1 - smoothstep(0, DIVE.r + 8, dr));
+  return y;
 }
+
+// 해저 바닥 높이 = 그냥 지형 높이입니다 (지형을 파냈으므로 따로 계산할 게 없습니다)
+const seabedHeight = groundHeight;
 
 // ---------- 3. 땅 메시 ----------
 {
@@ -159,7 +183,7 @@ sea.geometry.rotateX(-Math.PI / 2);
   }
   sea.geometry.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
 }
-sea.position.y = -0.5;
+sea.position.y = SEA_Y;
 scene.add(sea);
 const seaBase = sea.geometry.attributes.position.array.slice();
 
@@ -1106,66 +1130,105 @@ scatter(16, ISLAND_R - 26, 2.5, (x, y, z) => {
   buildTree(x, y, z);
 });
 
-// ---------- 8-6. 해녀 물질 — 불턱과 바닷속 ----------
-// 불턱은 해녀들이 물질 전후에 옷을 갈아입고 불을 쬐며 쉬던 돌담 쉼터입니다.
-// 물질의 들고나는 문 역할을 합니다: 여기서 F를 누르면 바닷속으로 들어가고, 나올 때도 여기로 옵니다.
-//
-// 바닷속은 별도의 장면을 새로 만들지 않고, 섬에서 북쪽으로 떨어진 바다 밑에 해저를 깔아둡니다.
-// 물에 들어가면 루루를 그리로 옮기고 안개 색과 빛만 바꿔주면 딴 세상처럼 보입니다.
-const BULTEOK = { x: 0, z: 94 };          // 불턱 자리 (북쪽 해안)
-const DIVE = { x: 0, z: 118, r: 26 };     // 물질장 (불턱 앞바다)
-const SEABED_Y = -13;                     // 해저 깊이 — 바다 표면(y = -0.5)에서 12미터쯤 아래
+// ---------- 8-6. 해녀 물질 — 포구와 바닷속 ----------
+// 포구는 배를 대는 작은 선착장입니다. 물질의 들고나는 문 역할을 합니다:
+// 여기서 F를 누르면 바다로 들어가고, 나올 때도 여기로 올라옵니다.
+// 물가에 바짝 붙여 두어야 "여기서 바다로 들어간다"는 게 한눈에 보입니다.
+const BULTEOK = PORT;   // 예전 이름 — 코드 곳곳에서 쓰고 있어 그대로 둡니다
 
-// 해저 바닥 높이. 밋밋하지 않게 완만한 굴곡과 얕은 여울을 줍니다.
-function seabedHeight(x, z) {
-  const dx = x - DIVE.x, dz = z - DIVE.z;
-  return SEABED_Y
-    + Math.sin(dx * 0.13) * 0.8 + Math.cos(dz * 0.11) * 0.9
-    + Math.sin((dx + dz) * 0.05) * 1.4;
-}
-
-// 8-6a. 불턱 — 둥글게 두른 낮은 현무암 담과 가운데 불자리
-{
-  const y = groundHeight(BULTEOK.x, BULTEOK.z);
-  for (let i = 0; i < 22; i++) {
-    const a = (i / 22) * Math.PI * 2;
-    if (a > 4.0 && a < 5.2) continue;                    // 한쪽은 드나들 수 있게 터놓습니다
-    const rr = 2.4 + Math.random() * 0.2;
-    const bx = BULTEOK.x + Math.cos(a) * rr, bz = BULTEOK.z + Math.sin(a) * rr;
-    const by = groundHeight(bx, bz);
-    for (let L = 0; L < 2; L++) {
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.34, 0), L ? darkStoneMat : stoneMat);
-      rock.position.set(bx + (Math.random() - 0.5) * 0.2, by + 0.22 + L * 0.4, bz + (Math.random() - 0.5) * 0.2);
-      rock.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
-      rock.castShadow = true;
-      scene.add(rock);
-    }
-  }
-  // 가운데 불자리 — 잿빛 돌 위에 장작
-  const fire = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 0.16, 9), darkStoneMat);
-  fire.position.set(BULTEOK.x, y + 0.08, BULTEOK.z);
-  scene.add(fire);
-  for (let i = 0; i < 4; i++) {
-    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 5), citrusTrunkMat);
-    log.position.set(BULTEOK.x, y + 0.25, BULTEOK.z);
-    log.rotation.set(Math.PI / 2.4, (i / 4) * Math.PI * 2, 0);
-    log.castShadow = true;
-    scene.add(log);
-  }
-  // 테왁(해녀가 붙잡고 뜨는 노란 부표)과 망사리를 담벼락에 기대 놓습니다
-  const tewak = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10),
-    new THREE.MeshLambertMaterial({ color: 0xf2c14b }));
-  tewak.position.set(BULTEOK.x + 1.5, y + 0.42, BULTEOK.z - 1.2);
-  tewak.castShadow = true;
-  scene.add(tewak);
-  obstacles.push({ x: BULTEOK.x, z: BULTEOK.z, r: 0.9, topY: groundHeight(BULTEOK.x, BULTEOK.z) + 0.7 });   // 불자리는 낮아서 뛰어넘을 수 있습니다
-}
-
-// 8-6b. 바닷속 — 해저 바닥, 바위, 미역, 그리고 전복·소라
-const seabedMat = new THREE.MeshLambertMaterial({ color: 0xbfae86, flatShading: true });
+// 바닷속 재료들. 포구의 그물 더미에도 쓰므로 먼저 만들어 둡니다.
 const kelpMat = new THREE.MeshLambertMaterial({ color: 0x3f6b4a, side: THREE.DoubleSide });
 const abaloneMat = new THREE.MeshLambertMaterial({ color: 0x4a5f6b, flatShading: true });
 const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: true });
+
+// 8-6a. 포구 — 바다로 뻗은 돌 축대, 계류 기둥, 매어둔 테왁, 그리고 작은 나무배
+{
+  const y = groundHeight(PORT.x, PORT.z);
+  const deckMat = new THREE.MeshLambertMaterial({ color: 0x9a9689, flatShading: true });
+
+  // 바다 쪽으로 뻗어나간 돌 축대(부두). 물가에서 시작해 물 위로 걸쳐 있습니다.
+  const DECK_TOP = 0.55;                    // 축대 윗면 높이 (바다 표면 -0.5보다 조금 위)
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(5.0, 3.0, 10), deckMat);
+  deck.position.set(PORT.x, DECK_TOP - 1.5, PORT.z + 5.5);
+  deck.castShadow = true; deck.receiveShadow = true;
+  scene.add(deck);
+  // 축대 옆면을 두른 현무암 — 제주 포구의 거친 돌쌓기
+  for (let i = 0; i < 40; i++) {
+    const side = i % 2 ? 1 : -1;
+    const t = (i / 40) * 10;
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), i % 3 ? darkStoneMat : stoneMat);
+    rock.position.set(PORT.x + side * 2.5, DECK_TOP - 0.5 + Math.random() * 0.5, PORT.z + 0.6 + t);
+    rock.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    rock.castShadow = true;
+    scene.add(rock);
+  }
+  // 배 매는 기둥 네 개
+  [[-1.9, 2.0], [1.9, 2.0], [-1.9, 8.4], [1.9, 8.4]].forEach(([px, pz]) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 1.5, 7), citrusTrunkMat);
+    post.position.set(PORT.x + px, DECK_TOP + 0.75, PORT.z + pz);
+    post.castShadow = true;
+    scene.add(post);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 6), shopRopeMat);
+    cap.position.set(PORT.x + px, DECK_TOP + 1.5, PORT.z + pz);
+    scene.add(cap);
+  });
+  // 물에 띄워둔 테왁(해녀가 붙잡고 뜨는 주황 부표) — 물질하는 곳임을 알려주는 표식
+  [[-4.0, 7.0], [4.2, 9.0], [-3.0, 11.5], [4.6, 4.5]].forEach(([px, pz]) => {
+    const tewak = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 10),
+      new THREE.MeshLambertMaterial({ color: 0xf2a03c }));
+    tewak.position.set(PORT.x + px, SEA_Y + 0.2, PORT.z + pz);
+    tewak.scale.y = 0.8;
+    tewak.castShadow = true;
+    scene.add(tewak);
+  });
+  // 축대 옆에 매어둔 작은 나무배
+  {
+    const boat = new THREE.Group();
+    boat.position.set(PORT.x + 3.6, SEA_Y - 0.1, PORT.z + 6.0);
+    boat.rotation.y = 0.22;
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 3.8), citrusTrunkMat);
+    hull.castShadow = true;
+    boat.add(hull);
+    const inner = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.5, 3.3), shopDarkMat);
+    inner.position.y = 0.28;
+    boat.add(inner);
+    scene.add(boat);
+  }
+  // 축대 위에 쌓아둔 그물 더미
+  const netPile = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), kelpMat);
+  netPile.position.set(PORT.x - 1.4, DECK_TOP + 0.2, PORT.z + 2.4);
+  netPile.scale.y = 0.5;
+  netPile.castShadow = true;
+  scene.add(netPile);
+
+  // 「해녀 물질」 나무 푯말 — 들판 어디서든 눈에 띄어야 물질하러 올 수 있습니다
+  const signC = document.createElement('canvas');
+  signC.width = 256; signC.height = 96;
+  {
+    const g2 = signC.getContext('2d');
+    g2.fillStyle = '#c9a06a'; g2.fillRect(0, 0, 256, 96);
+    g2.strokeStyle = 'rgba(110,72,30,.5)'; g2.lineWidth = 3;
+    for (let ly = 12; ly < 96; ly += 20) { g2.beginPath(); g2.moveTo(0, ly); g2.lineTo(256, ly); g2.stroke(); }
+    g2.fillStyle = '#3b2410'; g2.textAlign = 'center';
+    g2.font = 'bold 40px "맑은 고딕", Malgun Gothic, sans-serif';
+    g2.fillText('포구 · 물질', 128, 62);
+  }
+  const signTex = new THREE.CanvasTexture(signC);
+  signTex.colorSpace = THREE.SRGBColorSpace;
+  const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.8, 6), citrusTrunkMat);
+  signPost.position.set(PORT.x - 3.6, y + 1.4, PORT.z - 1.4);
+  signPost.castShadow = true;
+  scene.add(signPost);
+  const signBoard = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.75, 0.1),
+    new THREE.MeshLambertMaterial({ map: signTex }));
+  signBoard.position.set(PORT.x - 3.6, y + 2.6, PORT.z - 1.4);
+  signBoard.rotation.y = 0.3;
+  signBoard.castShadow = true;
+  scene.add(signBoard);
+}
+
+// 8-6b. 바닷속 — 바위, 미역, 그리고 전복·소라
+// (해저 바닥은 따로 만들지 않습니다. 지형 함수가 이 자리를 이미 우묵하게 파냈습니다)
 
 // 채집물 한 종류의 설명. 값이 비쌀수록 드물게 놓습니다.
 const CATCH_KINDS = {
@@ -1177,20 +1240,6 @@ const catchSpots = [];        // { x, y, z, kind, picked }
 const catchMeshes = {};       // 종류별 InstancedMesh
 
 {
-  // 해저 바닥판 — 물질장을 넉넉히 덮는 원판을 굴곡지게 만듭니다
-  const floor = new THREE.CircleGeometry(DIVE.r + 10, 48, 0, Math.PI * 2);
-  floor.rotateX(-Math.PI / 2);
-  const fp = floor.attributes.position;
-  for (let i = 0; i < fp.count; i++) {
-    const px = fp.getX(i) + DIVE.x, pz = fp.getZ(i) + DIVE.z;
-    fp.setY(i, seabedHeight(px, pz));
-  }
-  floor.computeVertexNormals();
-  const floorMesh = new THREE.Mesh(floor, seabedMat);
-  floorMesh.position.set(DIVE.x, 0, DIVE.z);
-  floorMesh.receiveShadow = true;
-  scene.add(floorMesh);
-
   // 바위 무더기 — 전복이 붙어 살 자리이자 물속 지형지물
   const rockSpots = [];
   for (let i = 0; i < 70; i++) {
@@ -1206,20 +1255,24 @@ const catchMeshes = {};       // 종류별 InstancedMesh
   rockMesh.castShadow = true;
   rockMesh.receiveShadow = true;
 
-  // 미역 숲 — 물살에 흔들리도록 풀과 같은 바람 재질을 씁니다
+  // 미역 숲 — 물살에 흔들리도록 풀과 같은 바람 재질을 씁니다.
+  // 판 한 장만 세우면 옆에서 볼 때 종잇장처럼 납작해 보이므로, 십자로 두 장을 겹칩니다.
   const kelpSpots = [];
-  for (let i = 0; i < 420; i++) {
+  for (let i = 0; i < 380; i++) {
     const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * DIVE.r;
     const x = DIVE.x + Math.cos(a) * rr, z = DIVE.z + Math.sin(a) * rr;
-    kelpSpots.push([x, seabedHeight(x, z), z, 1.4 + Math.random() * 1.8]);
+    kelpSpots.push([x, seabedHeight(x, z), z, 1.4 + Math.random() * 1.8, Math.random() * Math.PI]);
   }
-  const blade = normalsUp(new THREE.PlaneGeometry(0.3, 1, 1, 4));
+  const blade = normalsUp(new THREE.PlaneGeometry(0.34, 1, 1, 4));
   blade.translate(0, 0.5, 0);
-  buildInstanced(blade, makeWindMaterial(0x37624a), kelpSpots, (s) => {
-    dummy.position.set(s[0], s[1], s[2]);
-    dummy.rotation.set(0, Math.random() * Math.PI, 0);
-    dummy.scale.set(1, s[3], 1);
-  });
+  const kelpWindMat = makeWindMaterial(0x37624a);
+  for (const turn of [0, Math.PI / 2]) {
+    buildInstanced(blade, kelpWindMat, kelpSpots, (s) => {
+      dummy.position.set(s[0], s[1], s[2]);
+      dummy.rotation.set(0, s[4] + turn, 0);
+      dummy.scale.set(1, s[3], 1);
+    });
+  }
 
   // 채집물 놓기 — 전복은 바위에, 소라와 미역은 모래바닥에
   for (const [kind, info] of Object.entries(CATCH_KINDS)) {
@@ -1435,6 +1488,10 @@ if (CAN_USE_IMAGES) {
   loadSheet('sleep',     'sleep.webp',      8,  299);          // 낮잠 (오래 가만히 있으면)
   loadSheet('harvest',   'harvest.webp',   10,  181);          // 감귤 따기 (F키로 딸 때, 한 번만 재생)
   loadSheet('pullSide',  'pull_side.webp', 10,  255);          // 끈 없이 상자를 몸으로 밀어 끌 때 (옆모습, 원본은 왼쪽을 봄)
+  // 해녀 물질 (캐릭터 시트에서 잘라낸 것 — 전부 옆모습, 원본은 왼쪽을 봄)
+  loadSheet('diveSwim',  'dive_swim.webp',  5,  224);          // 물속을 헤엄칠 때
+  loadSheet('divePick',  'dive_pick.webp',  6,  190);          // 전복·소라를 딸 때 (한 번만 재생)
+  loadSheet('diveUp',    'dive_up.webp',    5,  140);          // 수면으로 떠오를 때
 
   // 판은 1x1 로 만들고, 어느 그림을 쓰느냐에 따라 매 프레임 크기를 바꿉니다.
   // 아래쪽 끝을 기준점으로 옮겨두면 세로로 늘였다 줄여도 발이 땅에서 안 떨어집니다.
@@ -1637,6 +1694,7 @@ const state = {
   harvestT: -1,  // 0 이상이면 감귤 따는 애니메이션 재생 중 (초 단위로 증가)
   grabbing: false, // true면 상자를 직접 손으로 잡고 있는 중 (E키로 잡기/놓기)
   diving: false,   // true면 물질 중 (바닷속에 있음)
+  pickT: -1,       // 0 이상이면 전복 따는 동작 재생 중 (물속 전용)
 };
 lulu.position.set(state.x, groundHeight(state.x, state.z), state.z);
 camera.position.set(state.x, 8, state.z + 12);
@@ -1667,6 +1725,17 @@ function updateBasketBadge() {
 // 이 배지 내용은 그쪽 값들이 다 준비된 뒤(매 프레임 updateBasket 안에서) 갱신합니다.
 function updateRopeBadge() {
   if (!ropeBadge) return;
+  // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
+  if (state.diving) {
+    ropeBadge.textContent = '🤿 F로 채집 · Space로 떠오르기 · E로 뭍에 나가기';
+    return;
+  }
+  // 불턱 가까이 오면 물질하러 들어가는 법을 알려줍니다
+  if (typeof BULTEOK !== 'undefined' &&
+      Math.hypot(state.x - BULTEOK.x, state.z - BULTEOK.z) < BULTEOK_RANGE + 2) {
+    ropeBadge.textContent = '🤿 F를 누르면 바다로 물질하러 들어갑니다';
+    return;
+  }
   if (hasRope) {
     ropeBadge.textContent = '🪢 끈으로 편하게 끄는 중';
   } else if (state.grabbing) {
@@ -2211,15 +2280,15 @@ function updateDiveUI() {
 const LAND_FOG = { color: 0xd2e6ee, near: 150, far: 700, sun: 2.1 };
 function applyDiveLook() {
   if (state.diving) {
-    scene.fog.color.setHex(0x14586b);   // 짙은 물빛
+    scene.fog.color.setHex(0x0e4356);   // 짙은 물빛
     scene.fog.near = 1;
-    scene.fog.far = 44;                 // 멀리 못 보게 해서 물속 답답함을 냅니다
-    sun.intensity = 0.75;
-    hemi.intensity = 1.35;
+    scene.fog.far = 34;                 // 멀리 못 보게 해서 물속 답답함을 냅니다
+    sun.intensity = 0.45;               // 물속은 볕이 잘 안 듭니다
+    hemi.intensity = 0.75;
     // 하늘·구름·나비·성산일출봉을 감춥니다. 물속에서 이것들이 비치면
     // 물이 유리처럼 투명해 보여서 "잠수했다"는 느낌이 사라집니다.
     // 하늘을 그냥 끄면 그 자리가 시커먼 빈 공간으로 남으므로, 화면 바탕을 물빛으로 칠해둡니다.
-    scene.background = new THREE.Color(0x14586b);
+    scene.background = new THREE.Color(0x0e4356);
     sky.visible = false;
     for (const o of skyStuff) o.visible = false;
     for (const c of clouds) c.visible = false;
@@ -2276,9 +2345,10 @@ function leaveDive(reason) {
   breath = BREATH_MAX;
   breathLow = false;
   surfacing = 0;
+  state.pickT = -1;
   swimVel.x = 0; swimVel.z = 0;
   if (vignette) vignette.style.opacity = 0;
-  state.x = BULTEOK.x; state.z = BULTEOK.z + 3;
+  state.x = PORT.x; state.z = PORT.z - 1.5;      // 포구의 마른 땅 쪽으로 올라옵니다
   state.vy = 0;
   lulu.position.set(state.x, groundHeight(state.x, state.z), state.z);
   state.onGround = true;
@@ -2328,10 +2398,12 @@ function tryCollect() {
     spawnMoneyPopup(state.x, lulu.position.y + 1.2, state.z, '망사리가 가득 찼어요 · 뭍으로!');
     return;
   }
+  if (state.pickT >= 0) return;          // 이미 따는 중
   const i = nearestCatch();
   if (i < 0) return;
   const s = catchSpots[i];
   state.facing = Math.atan2(s.x - state.x, s.z - state.z);
+  state.pickT = 0;                       // 손 뻗어 떼어내는 동작 시작
   hideCatch(i);
   net.push(s.kind);
   playPickSound();
@@ -2346,7 +2418,12 @@ function tryCollect() {
 // 서서히 조여오게 만듭니다: 숨이 얼마 안 남으면 화면 가장자리가 어두워지고 몸이 무거워지고,
 // 다 떨어지면 루루가 스스로 수면을 향해 떠오른 다음 뭍으로 나옵니다.
 const BREATH_LOW = 0.3;        // 이 아래로 떨어지면 "숨이 차는" 구간
+const PICK_DURATION = 0.55;    // 전복 따는 동작이 재생되는 시간(초)
 function updateDiving(dt) {
+  if (state.pickT >= 0) {
+    state.pickT += dt;
+    if (state.pickT >= PICK_DURATION) state.pickT = -1;
+  }
   if (!state.diving) { if (vignette) vignette.style.opacity = 0; return; }
   const atSurface = lulu.position.y > SEA_Y - 1.2;
 
@@ -2375,7 +2452,7 @@ function updateDiving(dt) {
   breathLow = ratio < BREATH_LOW;
   // 숨이 줄수록 화면 가장자리가 조여오고 물빛이 어두워집니다
   if (vignette) vignette.style.opacity = breathLow ? (1 - ratio / BREATH_LOW) * 0.75 : 0;
-  scene.fog.far = 44 - (breathLow ? (1 - ratio / BREATH_LOW) * 20 : 0);
+  scene.fog.far = 34 - (breathLow ? (1 - ratio / BREATH_LOW) * 16 : 0);
   updateDiveUI();
 }
 
@@ -2439,7 +2516,7 @@ const WALK = 4.2, RUN = 8.0, GRAVITY = 22, JUMP = 8.9;
 const SWIM_ACCEL = 7.0;     // 물을 밀어내며 붙는 속도
 const SWIM_DRAG = 1.9;      // 손을 놨을 때 물이 잡아주는 정도 (작을수록 더 오래 미끄러짐)
 const SWIM_MAX = 3.4;       // 물속 최고 속도 (뭍 걷기 4.2보다 느림)
-const SWIM_UP = 9.0, WATER_SINK = 3.4, SEA_Y = -0.5;
+const SWIM_UP = 9.0, WATER_SINK = 3.4;   // SEA_Y는 지형 함수보다 먼저 필요해서 위(2번)에 있습니다
 const swimVel = { x: 0, z: 0 };   // 물속에서만 쓰는 좌우 관성
 const moveDir = new THREE.Vector3();
 
@@ -2644,7 +2721,23 @@ function updateSpriteLulu(groundY) {
   let sheet, cell;
   const t = performance.now() * 0.001;
 
-  if (state.harvestT >= 0) {
+  if (state.diving && SHEETS.diveSwim) {
+    // 물속에서는 해녀 차림 그림만 씁니다 (전부 옆모습이라 앞뒤 구분이 없습니다).
+    if (state.pickT >= 0) {
+      // 전복을 따는 중 — 손을 뻗어 떼어내는 동작이 한 방향으로 재생됩니다
+      sheet = SHEETS.divePick;
+      cell = Math.min(sheet.frames - 1, Math.floor((state.pickT / PICK_DURATION) * sheet.frames));
+    } else if (state.vy > 0.6 || surfacing > 0) {
+      // 물 위로 떠오르는 중
+      sheet = SHEETS.diveUp;
+      cell = pingpong(Math.floor(t * 7), sheet.frames);
+    } else {
+      // 헤엄치기 — 빨리 갈수록 팔다리가 빨리 움직입니다
+      sheet = SHEETS.diveSwim;
+      const sp = Math.hypot(swimVel.x, swimVel.z);
+      cell = Math.floor(t * (3 + sp * 2.4)) % sheet.frames;
+    }
+  } else if (state.harvestT >= 0) {
     // 감귤 따는 중. 뻗기→내리기→기뻐하기가 한 방향으로 재생되고, 끝나면 마지막(기뻐하는) 칸에 멈춥니다
     sheet = SHEETS.harvest;
     cell = Math.min(sheet.frames - 1, Math.floor((state.harvestT / HARVEST_DURATION) * sheet.frames));
@@ -2695,7 +2788,10 @@ function updateSpriteLulu(groundY) {
   const breath = 1 - hop * 0.12 + Math.sin(t * 2) * 0.008 * (1 - state.speed);
   // 옆모습일 때만 진행 방향에 맞춰 뒤집습니다. 정면·뒷모습은 어느 쪽으로 가든 그대로 둡니다
   // (정면으로 오면 좌우 성분이 0이라 뒤집기 값이 직전 것으로 남아 방향이 튀었습니다)
-  const mirror = (sheet === SHEETS.walkSide || sheet === SHEETS.pullSide) && spriteCard.userData.headingRight;
+  // 옆모습 그림들은 원본이 왼쪽을 보므로, 오른쪽으로 갈 때 좌우를 뒤집습니다.
+  // 해녀 그림 세 장도 전부 옆모습이라 같이 넣어줍니다.
+  const sideSheets = [SHEETS.walkSide, SHEETS.pullSide, SHEETS.diveSwim, SHEETS.divePick, SHEETS.diveUp];
+  const mirror = sideSheets.includes(sheet) && spriteCard.userData.headingRight;
   spriteCard.scale.set(mirror ? -Wp : Wp, Hp * breath, 1);
 
   // 발밑 그림자: 점프해서 뜨면 작아지고 옅어집니다
@@ -2733,8 +2829,12 @@ function animate() {
     camTarget.y + Math.sin(camPitch) * camDist,
     camTarget.z + Math.cos(camYaw) * hor
   );
-  const minY = groundHeight(camWanted.x, camWanted.z) + 1.2;
+  // 카메라가 땅을 뚫고 들어가지 않게 바닥보다 조금 위로 띄웁니다.
+  // 물속에서는 해저에 바짝 붙어야 하므로 여유를 훨씬 적게 둡니다.
+  const minY = groundHeight(camWanted.x, camWanted.z) + (state.diving ? 0.5 : 1.2);
   if (camWanted.y < minY) camWanted.y = minY;
+  // 물속에서 카메라가 수면 위로 튀어나오면 바다가 사라져 보입니다. 물 아래에 붙들어 둡니다.
+  if (state.diving && lulu.position.y < SEA_Y - 0.6) camWanted.y = Math.min(camWanted.y, SEA_Y - 0.4);
   camera.position.lerp(camWanted, 1 - Math.pow(0.0015, dt));
   camera.lookAt(camTarget);
 
