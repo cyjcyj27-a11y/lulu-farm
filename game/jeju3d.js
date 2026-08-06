@@ -12,6 +12,22 @@ const CAN_USE_IMAGES = location.protocol !== 'file:';
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 
 // ---------- 0. 기본 세팅 ----------
+// 섬 배치(나무·바위·밭·풀 위치)는 접속할 때마다 바뀌면 안 됩니다 — 항상 같은 우리 섬이어야죠.
+// 그래서 세계를 만드는 동안은 "씨앗 있는 난수"를 씁니다: 씨앗이 같으면 결과가 늘 같습니다.
+// 세계가 다 만들어지면(스크립트 맨 아래) 원래 난수로 되돌려서,
+// 경마 승패나 이장님 잡담 같은 게임 중의 우연은 진짜 랜덤으로 굴러갑니다.
+const trueRandom = Math.random;
+{
+  let seed = 20260807;   // 이 숫자를 바꾸면 완전히 새로운 섬이 나옵니다
+  Math.random = function () {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xd2e6ee, 150, 700);   // 멀수록 하늘색에 잠기게 (수평선을 부드럽게)
 
@@ -4818,6 +4834,9 @@ function updateSpriteLulu(groundY) {
 }
 
 // ---------- 13. 메인 루프 ----------
+// 세계 만들기가 끝났습니다 — 이제부터의 우연(경마 승패·잡담 고르기)은 진짜 랜덤으로
+Math.random = trueRandom;
+
 loadGame();   // 모든 것이 준비된 뒤에 저장을 불러와 이어합니다
 
 const clock = new THREE.Clock();
