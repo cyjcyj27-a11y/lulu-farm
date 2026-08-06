@@ -962,10 +962,91 @@ function buildDepot(x, z, rotY) {
 const depot = buildDepot(-8, 46, Math.PI);   // 상점과 똑같이 남쪽(-z)을 바라보게
 const DEPOT_RANGE = 6.5;   // 이 거리 안에서 F를 누르면 배송할 수 있습니다
 
+// 나무 줄기 색 — 헌집의 팻말·세간과 귤나무(8-3) 양쪽에서 쓰므로 먼저 만들어 둡니다
+const citrusTrunkMat = new THREE.MeshLambertMaterial({ color: 0x6f5540, flatShading: true });
+
+// ---------- 8-2d. 헌집 (사서 고치는 제주 돌집) ----------
+// 마당 동쪽에 버려진 돌집이 서 있습니다. 사서 세 번 고치면(벽→지붕→페인트) 내 집이 됩니다.
+// 집은 직접 그리신 그림을 판에 세워 쓰고, 수리 단계마다 그림만 바꿔 끼웁니다.
+//   old_house_0: 폐가 / 1: 벽 고침 / 2: 지붕 고침 / 3: 완성 (원본 그대로)
+const HOUSE = { x: 13, z: 46 };
+const HOUSE_RANGE = 5.5;
+const HOUSE_W = 8.5, HOUSE_H = 8.5 * 520 / 1110;   // 그림 비율 그대로
+let houseStage = -1;    // -1 = 아직 안 삼, 0~2 = 수리 중, 3 = 완성
+const houseTex = [];
+const house = (() => {
+  const g = new THREE.Group();
+  const y = groundHeight(HOUSE.x, HOUSE.z);
+  g.position.set(HOUSE.x, y, HOUSE.z);
+
+  let plane = null;
+  if (CAN_USE_IMAGES) {
+    for (let i = 0; i < 4; i++) houseTex.push(loadTexture(`../assets/farmcat/old_house_${i}.webp`));
+    plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(HOUSE_W, HOUSE_H),
+      new THREE.MeshLambertMaterial({ map: houseTex[0], transparent: true, alphaTest: 0.5 })
+    );
+    plane.position.y = HOUSE_H / 2;
+    plane.rotation.y = Math.PI;      // 마당(남쪽)을 바라보게
+    plane.castShadow = true;
+    g.add(plane);
+  }
+
+  // 앞마당의 버려진 세간 — 폐가 시절에만 보이고, 다 고치면 치워집니다
+  const junk = new THREE.Group();
+  [[-2.6, 1.6, 0.5], [2.2, 2.0, 0.4], [0.6, 2.6, 0.3]].forEach(([px, pz, s]) => {
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), darkStoneMat);
+    rock.position.set(px, s * 0.5, pz);
+    rock.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    rock.castShadow = true;
+    junk.add(rock);
+  });
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.12, 0.5), citrusTrunkMat);
+  plank.position.set(-1.2, 0.1, 2.4);
+  plank.rotation.y = 0.6;
+  junk.add(plank);
+  g.add(junk);
+
+  // 「팝니다」 팻말 — 사고 나면 사라집니다
+  const saleC = document.createElement('canvas');
+  saleC.width = 192; saleC.height = 96;
+  {
+    const c2 = saleC.getContext('2d');
+    c2.fillStyle = '#c9a06a'; c2.fillRect(0, 0, 192, 96);
+    c2.fillStyle = '#3b2410'; c2.textAlign = 'center';
+    c2.font = 'bold 40px "맑은 고딕", Malgun Gothic, sans-serif';
+    c2.fillText('팝니다', 96, 46);
+    c2.font = '500 28px "맑은 고딕", Malgun Gothic, sans-serif';
+    c2.fillText('50,000원', 96, 82);
+  }
+  const saleTex = new THREE.CanvasTexture(saleC);
+  saleTex.colorSpace = THREE.SRGBColorSpace;
+  const sale = new THREE.Group();
+  const salePost = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.6, 6), citrusTrunkMat);
+  salePost.position.set(-3.6, 0.8, 3.2);
+  sale.add(salePost);
+  const saleBoard = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.75, 0.08),
+    new THREE.MeshLambertMaterial({ map: saleTex }));
+  saleBoard.position.set(-3.6, 1.6, 3.2);
+  saleBoard.rotation.y = -0.2;
+  sale.add(saleBoard);
+  g.add(sale);
+
+  scene.add(g);
+  obstacles.push({ x: HOUSE.x, z: HOUSE.z, r: 3.4, topY: NO_JUMP });
+  return { group: g, plane, junk, sale };
+})();
+
+function applyHouseLook() {
+  if (house.plane) house.plane.material.map = houseTex[Math.max(0, houseStage)];
+  house.junk.visible = houseStage < 3;    // 다 고치면 마당의 잡동사니가 치워집니다
+  house.sale.visible = houseStage < 0;    // 사고 나면 팻말이 사라집니다
+}
+applyHouseLook();
+
 // 8-3. 감귤나무 (밭담 안에 줄지어 심는 귤밭)
 // 귤은 나무마다 따로 만들면 수백 개가 되어 느려지므로, 위치만 모아뒀다가
 // 마지막에 InstancedMesh(같은 모양을 한 번에 여러 개 그리는 방식)로 한꺼번에 그립니다.
-const citrusTrunkMat = new THREE.MeshLambertMaterial({ color: 0x6f5540, flatShading: true });
 const citrusLeafMat = new THREE.MeshLambertMaterial({ color: 0x336b33, flatShading: true });
 const fruitSpots = [];
 
@@ -1495,6 +1576,8 @@ if (CAN_USE_IMAGES) {
   loadSheet('diveSwim',  'dive_swim.webp',  5,  224);          // 물속을 헤엄칠 때
   loadSheet('divePick',  'dive_pick.webp',  6,  190);          // 전복·소라를 딸 때 (한 번만 재생)
   loadSheet('diveUp',    'dive_up.webp',    5,  140);          // 수면으로 떠오를 때
+  // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
+  loadSheet('fixHouse',  'fix_house.webp',  3,  167);
 
   // 판은 1x1 로 만들고, 어느 그림을 쓰느냐에 따라 매 프레임 크기를 바꿉니다.
   // 아래쪽 끝을 기준점으로 옮겨두면 세로로 늘였다 줄여도 발이 땅에서 안 떨어집니다.
@@ -1698,6 +1781,7 @@ const state = {
   grabbing: false, // true면 상자를 직접 손으로 잡고 있는 중 (E키로 잡기/놓기)
   diving: false,   // true면 물질 중 (바닷속에 있음)
   pickT: -1,       // 0 이상이면 전복 따는 동작 재생 중 (물속 전용)
+  fixT: -1,        // 0 이상이면 집 고치는 동작 재생 중
 };
 lulu.position.set(state.x, groundHeight(state.x, state.z), state.z);
 camera.position.set(state.x, 8, state.z + 12);
@@ -1743,6 +1827,12 @@ function updateRopeBadge() {
   if (typeof PORT !== 'undefined' &&
       Math.hypot(state.x - PORT.x, state.z - PORT.z) < BULTEOK_RANGE) {
     ropeBadge.textContent = `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다`;
+    return;
+  }
+  // 헌집 가까이 오면 지금 할 수 있는 일(구입/수리)을 알려줍니다
+  if (typeof HOUSE !== 'undefined' &&
+      Math.hypot(state.x - HOUSE.x, state.z - HOUSE.z) < HOUSE_RANGE + 3) {
+    ropeBadge.textContent = houseBadgeText();
     return;
   }
   if (hasRope) {
@@ -1979,16 +2069,18 @@ scene.add(basket);
 // 상자에 실제로 쌓이는 귤 — 딴 귤이 날아와 떨어지면 한 알씩 눈에 보이게 채워집니다.
 // 자리를 미리 아래층부터 순서대로 만들어두고, 담긴 개수만큼만 보이게 켜는 방식입니다.
 // (매번 새 귤을 만들지 않아서 가볍고, 상자의 자식이라 상자를 끌면 귤도 같이 따라갑니다)
-const BASKET_CAP = 36;          // 이만큼 담으면 가득 참 → 택배로 육지에 보낼 수 있는 상태
+let BASKET_CAP = 36;            // 이만큼 담으면 가득 참. 집을 다 고치면 창고가 생겨 48로 늘어납니다
 const filledFruits = [];        // { mesh, pop } — pop은 방금 담겨서 통 튀어오르는 정도(1→0)
 let basketCount = 0;
 {
-  const COLS = 4, ROWS = 3, LAYERS = 3;          // 4×3을 한 층으로 3층까지 = 36알
+  // 4×3을 한 층으로 4층까지 = 48자리를 미리 만들어 둡니다.
+  // 평소 정원은 36(3층)이고, 집을 다 고쳐 정원이 48로 늘면 4층째가 수북이 쌓입니다.
+  const COLS = 4, ROWS = 3, LAYERS = 4;
   const GAP = 0.21, RADIUS = 0.115;
   const packedGeo = new THREE.SphereGeometry(RADIUS, 8, 6);
-  // 맨 아래층은 바닥 바로 위, 맨 위층은 상자 아가리에 걸쳐서 소복이 얹힌 것처럼 보이게 합니다
+  // 맨 아래층은 바닥 바로 위, 3층째가 상자 아가리에 걸치고, 4층째(확장분)는 그 위에 수북이
   const yBottom = CRATE_T + RADIUS;
-  const yStep = (CRATE_H - yBottom) / (LAYERS - 1);
+  const yStep = (CRATE_H - yBottom) / 2;   // 층 간격은 예전 3층 기준 그대로
   for (let L = 0; L < LAYERS; L++) {
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -2468,16 +2560,88 @@ function updateDiving(dt) {
   updateDiveUI();
 }
 
+// ---------- 12-1f. 헌집 사서 고치기 ----------
+// 마당 동쪽 폐가 앞에서 F: 처음엔 사고(5만원), 그 다음부터는 한 단계씩 고칩니다.
+// 벽 고치기(망치질) → 지붕 고치기(톱질) → 페인트칠, 각 1만 5천원.
+// 다 고치면 창고가 생겨 귤 상자 정원이 36 → 48로 늘어납니다.
+const HOUSE_PRICE = 50000;
+const REPAIR_PRICE = 15000;
+const REPAIR_NAMES = ['🔨 벽 고치기', '🪚 지붕 고치기', '🖌 페인트칠'];
+const FIX_DURATION = 1.6;      // 고치는 동작이 재생되는 시간(초). 이 동안은 못 움직입니다
+
+function houseBadgeText() {
+  if (houseStage < 0) return `🏚 팝니다 — ${KEY_ACTION}으로 구입 (${HOUSE_PRICE.toLocaleString()}원)`;
+  if (houseStage < 3) return `🏚 ${REPAIR_NAMES[houseStage]} — ${KEY_ACTION} (${REPAIR_PRICE.toLocaleString()}원)`;
+  return '🏡 내 집! 창고 덕에 상자에 48알까지 담깁니다';
+}
+
+function tryFixHouse() {
+  const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
+  if (houseStage >= 3) {
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 다 고쳤어요. 좋은 집이네요!');
+    return;
+  }
+  const cost = houseStage < 0 ? HOUSE_PRICE : REPAIR_PRICE;
+  if (coins < cost) {
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${(cost - coins).toLocaleString()}원 부족`);
+    return;
+  }
+  if (houseStage < 0) {
+    coins -= cost;
+    houseStage = 0;
+    updateCoinBadge();
+    applyHouseLook();
+    playShipSound();
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🔑 내 집 마련! 이제 고쳐봅시다');
+    return;
+  }
+  // 수리 시작 — 동작이 끝나는 순간(updateLulu 쪽) 단계가 올라갑니다
+  coins -= cost;
+  updateCoinBadge();
+  state.fixT = 0;
+  state.facing = Math.atan2(HOUSE.x - state.x, HOUSE.z - state.z);   // 집을 바라보고 작업
+  state.idleTime = 0; state.sit = 0;
+  playHammerSound();
+}
+
+// 수리 동작이 끝나면 단계를 올립니다 (매 프레임 호출)
+function updateHouse(dt) {
+  if (state.fixT < 0) return;
+  state.fixT += dt;
+  if (state.fixT < FIX_DURATION) return;
+  state.fixT = -1;
+  houseStage++;
+  applyHouseLook();
+  const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
+  if (houseStage >= 3) {
+    BASKET_CAP = 48;             // 창고가 생겨 상자에 더 담을 수 있습니다
+    updateBasketBadge();
+    playShipSound();
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 완성! 창고가 생겨 상자가 48알로 커졌어요');
+  } else {
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${REPAIR_NAMES[houseStage - 1].slice(2)} 끝!`);
+  }
+}
+
+// 망치질 소리 — 탕, 탕, 탕 세 번
+function playHammerSound() {
+  for (let i = 0; i < 3; i++) {
+    setTimeout(() => blip(190, 90, 0.09, 0.22, 'square'), i * 420);
+  }
+}
+
 // F키 하나로 상황에 맞는 행동을 합니다:
-// 물속이면 채집, 뭍이면 귤 따기 → 상점 → 택배사 → 불턱 순으로 가까운 것을 씁니다.
+// 물속이면 채집, 뭍이면 귤 따기 → 상점 → 택배사 → 헌집 → 포구 순으로 가까운 것을 씁니다.
 function handleActionKey() {
-  if (state.harvestT >= 0) return;
+  if (state.harvestT >= 0 || state.fixT >= 0) return;
   if (state.diving) { tryCollect(); return; }
   if (nearestFruit() >= 0) { tryHarvest(); return; }
   const shopDist = Math.hypot(state.x - shop.group.position.x, state.z - shop.group.position.z);
   if (shopDist < SHOP_RANGE) { tryBuyRope(); return; }
   const depotDist = Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z);
   if (depotDist < DEPOT_RANGE) { tryShipBox(); return; }
+  const houseDist = Math.hypot(state.x - HOUSE.x, state.z - HOUSE.z);
+  if (houseDist < HOUSE_RANGE + 3) { tryFixHouse(); return; }
   const bulteokDist = Math.hypot(state.x - BULTEOK.x, state.z - BULTEOK.z);
   if (bulteokDist < BULTEOK_RANGE) enterDive();
 }
@@ -2546,7 +2710,7 @@ function updateLulu(dt) {
   // 이동은 방향키만 씁니다. W A S D는 시야 회전(updateCamera)이 가져갔습니다.
   // 폰에서는 화면 왼쪽 조이스틱(touchMove)이 같은 자리에 값을 보탭니다.
   let f = 0, r = 0;
-  if (state.harvestT < 0) {
+  if (state.harvestT < 0 && state.fixT < 0) {   // 귤 따기·집 고치기 중엔 못 움직입니다
     if (keys['ArrowUp']) f += 1;
     if (keys['ArrowDown']) f -= 1;
     if (keys['ArrowRight']) r += 1;
@@ -2749,6 +2913,11 @@ function updateSpriteLulu(groundY) {
       const sp = Math.hypot(swimVel.x, swimVel.z);
       cell = Math.floor(t * (3 + sp * 2.4)) % sheet.frames;
     }
+  } else if (state.fixT >= 0 && SHEETS.fixHouse) {
+    // 집 고치는 중 — 수리 단계에 맞는 연장을 든 그림 (0 망치, 1 톱, 2 붓).
+    // 살짝살짝 두드리는 느낌이 나게 그림판을 아주 조금 흔들어줍니다.
+    sheet = SHEETS.fixHouse;
+    cell = Math.min(2, Math.max(0, houseStage));
   } else if (state.harvestT >= 0) {
     // 감귤 따는 중. 뻗기→내리기→기뻐하기가 한 방향으로 재생되고, 끝나면 마지막(기뻐하는) 칸에 멈춥니다
     sheet = SHEETS.harvest;
@@ -2830,6 +2999,7 @@ function animate() {
   updateFlyingFruits(dt);
   updateFilledFruits(dt);
   updateDiving(dt);   // 물질 중이면 숨을 깎고, 다 떨어지면 뭍으로 올려보냅니다
+  updateHouse(dt);    // 집 고치는 동작이 끝나면 수리 단계를 올립니다
   updateHarvestTarget(dt, t);
   updatePopups(dt);
 
