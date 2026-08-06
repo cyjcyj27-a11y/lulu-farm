@@ -1612,6 +1612,8 @@ scene.add(spriteLulu);
 let spriteCard = null;                     // 그림이 붙은 판
 let spriteBlob = null;                     // 발밑 그림자
 const SPRITE_H = 1.5;                      // 화면에 보이는 루루 키(월드 단위)
+let mayorGroup = null, mayorCard = null;   // 이장님 (상점·택배사를 오가는 NPC)
+const MAYOR_H = 1.9;                       // 이장님 키 — 어른이라 루루보다 큼직합니다
 
 // assets/farmcat/ 스프라이트 시트. 한 장에 여러 칸이 가로로 이어붙어 있습니다.
 // 칸 높이는 전부 256이고 위아래 8px이 여백이라, 캐릭터는 240px, 발바닥은 아래에서 8px 지점.
@@ -1657,6 +1659,9 @@ if (CAN_USE_IMAGES) {
   loadSheet('diveUp',    'dive_up.webp',    5,  140);          // 수면으로 떠오를 때
   // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
   loadSheet('fixHouse',  'fix_house.webp',  3,  167);
+  // 이장님 (상점과 택배사를 오가는 NPC). 걷기 원본은 루루와 반대로 "오른쪽"을 봅니다
+  loadSheet('mayorIdle', 'mayor_idle.webp', 8,  194);
+  loadSheet('mayorWalk', 'mayor_walk.webp', 8,  202);
 
   // 판은 1x1 로 만들고, 어느 그림을 쓰느냐에 따라 매 프레임 크기를 바꿉니다.
   // 아래쪽 끝을 기준점으로 옮겨두면 세로로 늘였다 줄여도 발이 땅에서 안 떨어집니다.
@@ -1687,6 +1692,26 @@ if (CAN_USE_IMAGES) {
   );
   spriteBlob.rotation.x = -Math.PI / 2;
   scene.add(spriteBlob);
+
+  // ----- 이장님 그림판 (루루와 같은 방식의 서 있는 종이 인형) -----
+  const mGeo = new THREE.PlaneGeometry(1, 1);
+  mGeo.translate(0, 0.5, 0);
+  mayorCard = new THREE.Mesh(
+    mGeo,
+    new THREE.MeshBasicMaterial({ map: SHEETS.mayorIdle.tex, transparent: true, alphaTest: 0.08 })
+  );
+  mayorCard.userData.planeH = MAYOR_H * CELL_H / (CELL_H - CELL_PAD * 2);
+  mayorCard.position.y = -(CELL_PAD / CELL_H) * mayorCard.userData.planeH;
+  mayorGroup = new THREE.Group();
+  mayorGroup.add(mayorCard);
+  scene.add(mayorGroup);
+  const mBlob = new THREE.Mesh(
+    new THREE.CircleGeometry(0.55, 22),
+    new THREE.MeshBasicMaterial({ color: 0x1d2b17, transparent: true, opacity: 0.4, depthWrite: false })
+  );
+  mBlob.rotation.x = -Math.PI / 2;
+  mBlob.position.y = 0.06;
+  mayorGroup.add(mBlob);
 }
 
 // 어느 쪽 루루를 보여줄지.
@@ -2722,6 +2747,72 @@ function playHammerSound() {
   }
 }
 
+// ---------- 12-1f-2. 이장님 (상점 ↔ 택배사를 오가는 NPC) ----------
+// 이장님은 상점과 택배사 두 집 문앞을 오갑니다. 평소에는 느긋하게 왔다갔다 산책하고,
+// 루루가 어느 집 문앞으로 다가가면 장사하러 그쪽으로 걸어옵니다.
+const MAYOR_POSTS = {
+  shop:  { x: 6.0, z: 41.6 },     // 상점 문앞
+  depot: { x: -7.3, z: 42.2 },    // 택배사 문앞
+};
+const mayor = {
+  x: MAYOR_POSTS.shop.x, z: MAYOR_POSTS.shop.z,
+  post: 'shop',        // 지금 향하는 집
+  stroll: 9,           // 손님이 없을 때, 이 시간이 지나면 반대편으로 산책
+  headingRight: false,
+};
+const MAYOR_SPEED = 1.7;   // 뚱뚱한 어른의 느긋한 걸음
+
+function updateMayor(dt, t) {
+  if (!mayorGroup) return;
+  // 루루가 어느 집 가까이에 있으면 그쪽으로 (손님이 먼저입니다)
+  const nearShop = Math.hypot(state.x - MAYOR_POSTS.shop.x, state.z - MAYOR_POSTS.shop.z) < 6;
+  const nearDepot = Math.hypot(state.x - MAYOR_POSTS.depot.x, state.z - MAYOR_POSTS.depot.z) < 6;
+  if (nearShop) mayor.post = 'shop';
+  else if (nearDepot) mayor.post = 'depot';
+  else {
+    mayor.stroll -= dt;
+    if (mayor.stroll <= 0) {
+      mayor.post = mayor.post === 'shop' ? 'depot' : 'shop';
+      mayor.stroll = 8 + Math.random() * 10;
+    }
+  }
+
+  // 목표 지점으로 걷기
+  const goal = MAYOR_POSTS[mayor.post];
+  const dx = goal.x - mayor.x, dz = goal.z - mayor.z;
+  const d = Math.hypot(dx, dz);
+  const walking = d > 0.25;
+  if (walking) {
+    mayor.x += (dx / d) * MAYOR_SPEED * dt;
+    mayor.z += (dz / d) * MAYOR_SPEED * dt;
+  }
+
+  // 그림판 놓기 + 카메라 쪽으로 돌리기 (루루와 같은 방식)
+  const gy = groundHeight(mayor.x, mayor.z);
+  mayorGroup.position.set(mayor.x, gy, mayor.z);
+  mayorGroup.rotation.y = Math.atan2(camera.position.x - mayor.x, camera.position.z - mayor.z);
+
+  // 걷는 중이면 걷기 그림, 서 있으면 몸을 흔드는 그림
+  const sheet = walking ? SHEETS.mayorWalk : SHEETS.mayorIdle;
+  if (mayorCard.material.map !== sheet.tex) {
+    mayorCard.material.map = sheet.tex;
+    mayorCard.material.needsUpdate = true;
+  }
+  setCell(sheet, Math.floor(t * (walking ? 9 : 6)) % sheet.frames);
+
+  // 걷는 방향이 화면상 왼쪽인지 오른쪽인지 (걷기 원본은 오른쪽을 봅니다 — 루루와 반대)
+  if (walking) {
+    camera.getWorldDirection(camFwd);
+    const rightX = -camFwd.z, rightZ = camFwd.x;
+    const toRight = dx / d * rightX + dz / d * rightZ;
+    if (Math.abs(toRight) > 0.12) mayor.headingRight = toRight > 0;
+  }
+  const Hp = mayorCard.userData.planeH;
+  const Wp = Hp * sheet.frameW / CELL_H;
+  const mirrorM = walking && !mayor.headingRight;   // 왼쪽으로 갈 때 뒤집기
+  mayorCard.scale.set(mirrorM ? -Wp : Wp, Hp, 1);
+}
+
 // ---------- 12-1g. 당근 사서 조랑말 먹이기 ----------
 const carrotBadge = document.getElementById('carrotBadge');
 function updateCarrotBadge() {
@@ -3150,6 +3241,7 @@ function animate() {
   updateFilledFruits(dt);
   updateDiving(dt);   // 물질 중이면 숨을 깎고, 다 떨어지면 뭍으로 올려보냅니다
   updateHouse(dt);    // 집 고치는 동작이 끝나면 수리 단계를 올립니다
+  updateMayor(dt, t); // 이장님이 상점과 택배사 사이를 오갑니다
   updateHarvestTarget(dt, t);
   updatePopups(dt);
 
