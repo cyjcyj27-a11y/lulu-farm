@@ -113,6 +113,18 @@
   }
   #sceneFade.show { opacity: 1; }
 
+  /* ---- 경마 — 직접 뽑으신 경주 영상이 전체 화면으로 나옵니다 ---- */
+  #raceWrap {
+    display: none;
+    position: absolute; inset: 0; pointer-events: auto;
+    background: #000;
+    align-items: center; justify-content: center; flex-direction: column;
+  }
+  #raceVideo { max-width: 100%; max-height: 92%; }
+  #raceWrap .cap {
+    margin-top: 8px; font-size: 13px; color: #cfc8b8; opacity: .8;
+  }
+
   /* ---- 물질할 때만 나오는 숨 게이지 ---- */
   #breathBar {
     display: none;
@@ -351,6 +363,10 @@
     <div class="die">DIE</div>
   </div>
   <div id="sceneFade"></div>
+  <div id="raceWrap">
+    <video id="raceVideo" playsinline></video>
+    <div class="cap">화면을 누르면 건너뜁니다</div>
+  </div>
   <div id="breathBar"><div id="breathFill"></div></div>
 
   <div id="iconRow">
@@ -390,9 +406,9 @@
         <div class="shot">🤿<img alt="" data-src="../assets/farmcat/scene_dive.webp"></div>
         <div class="cap"><b>해녀 물질</b><span>숨이 붙어 있는 동안 전복·소라·미역을</span></div>
       </div>
-      <div class="job soon">
+      <div class="job">
         <div class="shot">🐴<img alt="" data-src="../assets/farmcat/scene_horse.webp"></div>
-        <div class="cap"><b>조랑말 경마</b><span>말을 먹여 키워 경마장에서 우승</span></div>
+        <div class="cap"><b>조랑말 경마</b><span>말을 먹여 키워 경마에서 우승 상금을</span></div>
       </div>
       <div class="job">
         <div class="shot">🏚<img alt="" data-src="../assets/farmcat/scene_house.webp"></div>
@@ -436,6 +452,6 @@
 
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=37"></script>
+<script src="jeju3d.js?v=39"></script>
 </body>
 </html>

@@ -1095,6 +1095,7 @@ function makeGableRoof(len, span, peak, mat) {
 const STABLE = { x: -79, z: 8 };   // 서쪽 벌판 (바다에 걸치지 않게 물가에서 한 발 물림)
 const STABLE_RANGE = 6.0;
 const FEED_RANGE = 3.0;   // 당근은 조랑말 앞까지 가까이 가야 먹일 수 있습니다
+const PONY_PRICE = 100000;   // 처음 조랑말은 공짜지만, 죽으면 새로 데려오는 데 이만큼 듭니다
 const STABLE_W = 9.0, STABLE_H = 9.0 * 684 / 1019;   // 그림 비율 그대로
 // 예전에는 그림 한 장을 세워 뒀는데, 옆에서 보면 종이처럼 얇았습니다.
 // 이제 돌벽·나무 기둥·초가지붕의 진짜 헛간을 짓고, 그 안에 조랑말도 통통하게 빚어 세웁니다.
@@ -2383,6 +2384,8 @@ if (CAN_USE_IMAGES) {
   loadSheet('divePick',  'dive_pick.webp',  6,  190);          // 전복·소라를 딸 때 (한 번만 재생)
   loadSheet('diveUp',    'dive_up.webp',    8,  165);          // 수면으로 떠오를 때 (직접 뽑으신 영상)
   loadSheet('diveDown',  'dive_down.webp',  8,  175);          // 아래로 잠수할 때 (직접 뽑으신 영상에서 변환)
+  loadSheet('ponyHappy', 'pony_happy.webp', 8,  128);          // 조랑말 — 웃는 평소 모습 (경마 1등 영상에서)
+  loadSheet('ponySad',   'pony_sad.webp',   8,  227);          // 조랑말 — 굶어서 우는 모습 (경마 꼴등 영상에서)
   // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
   loadSheet('fixHouse',  'fix_house.webp',  3,  167);
   // 이장님 (상점과 택배사를 오가는 NPC). 걷기 원본은 루루와 반대로 "오른쪽"을 봅니다
@@ -2746,10 +2749,17 @@ function updateRopeBadge() {
       : `🤿 해녀 산소통 — ${KEY_ACTION}으로 구입 (${TANK_PRICE.toLocaleString()}원, 숨 60초→3분)`;
     return;
   }
+  if (typeof RACE_SPOT !== 'undefined' &&
+      Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z) < RACE_RANGE) {
+    ropeBadge.textContent = ponyLove < RACE_MIN_LOVE
+      ? `🏇 경마 — 애정 ${RACE_MIN_LOVE} 이상부터 출전 (지금 ${ponyLove})`
+      : `🏇 경마 출전 ${RACE_FEE.toLocaleString()}원 · 1등 상금 ${RACE_PRIZE.toLocaleString()}원 · 승률 ${Math.round(raceWinChance() * 100)}% (${KEY_ACTION})`;
+    return;
+  }
   if (typeof STABLE !== 'undefined' &&
       Math.hypot(state.x - STABLE.x, state.z - STABLE.z) < STABLE_RANGE) {
     if (!ponyAlive) {
-      ropeBadge.textContent = '💔 조랑말이 굶어 죽었습니다… 마구간이 비었어요';
+      ropeBadge.textContent = `💔 마구간이 비었어요 — ${KEY_ACTION}으로 새 조랑말 데려오기 (${PONY_PRICE.toLocaleString()}원)`;
     } else if (carrots > 0) {
       ropeBadge.textContent = `🐴 ${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)` +
         (ponyFedToday() ? '' : ' · 오늘 아직 안 먹였어요');
@@ -3744,7 +3754,9 @@ function updatePony(t) {
   const sheet = ponyFedToday() ? SHEETS.ponyHappy : SHEETS.ponySad;
   if (!sheet) return;
   if (ponyCard.material.map !== sheet.tex) ponyCard.material.map = sheet.tex;
-  setCell(sheet, Math.floor(t * 8));
+  // 웃는 그림띠의 첫 칸에는 '1ST' 리본 조각이 남아 있어 건너뜁니다
+  const cellIdx = sheet === SHEETS.ponyHappy ? 1 + (Math.floor(t * 7) % 7) : Math.floor(t * 8) % sheet.frames;
+  setCell(sheet, cellIdx);
   const gy = groundHeight(STABLE.x, STABLE.z);
   ponyCard.position.set(STABLE.x + 0.2, gy, STABLE.z);
   // 루루 그림과 같은 종이 인형 방식 — 항상 카메라를 바라봅니다
@@ -3971,8 +3983,87 @@ function tryBuyCarrot() {
   spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `🥕 당근 구입! (${carrots}개)`);
 }
 
-// 당근을 이만큼 먹이면 경마장에 나갈 수 있습니다 (경마는 준비 중 — 영상이 오면 붙입니다)
-const RACE_LOVE = 100;
+// ---------- 12-1g-2. 조랑말 경마 ----------
+// 마구간 옆 팻말에서 참가비를 내면 경주가 열립니다. 직접 뽑으신 경주 영상이
+// 그대로 중계가 됩니다: 이기면 1등으로 웃는 영상, 지면 꼴등으로 우는 영상.
+// 승률은 애정(먹인 당근)만큼 올라갑니다 — 잘 먹인 말이 잘 뜁니다.
+const RACE_LOVE = 100;        // 애정이 이만큼이면 승률이 최고치에 닿습니다
+const RACE_MIN_LOVE = 10;     // 최소 이만큼은 정이 들어야 출전합니다
+const RACE_FEE = 20000;
+const RACE_PRIZE = 100000;
+const RACE_SPOT = { x: STABLE.x + 3.5, z: STABLE.z + 5.5 };
+const RACE_RANGE = 2.2;
+let racing = false;
+// 경마 팻말
+{
+  const y = groundHeight(RACE_SPOT.x, RACE_SPOT.z);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.6, 6), citrusTrunkMat);
+  post.position.set(RACE_SPOT.x, y + 1.3, RACE_SPOT.z);
+  post.castShadow = true;
+  scene.add(post);
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.75),
+    new THREE.MeshBasicMaterial({ map: makePriceSign('🏇 경마', RACE_FEE), side: THREE.DoubleSide }));
+  board.position.set(RACE_SPOT.x, y + 2.4, RACE_SPOT.z);
+  board.rotation.y = Math.PI / 2;
+  scene.add(board);
+}
+function raceWinChance() {
+  return Math.min(0.7, 0.1 + (ponyLove / RACE_LOVE) * 0.6);
+}
+function tryRace() {
+  const y = groundHeight(RACE_SPOT.x, RACE_SPOT.z) + 1.8;
+  if (racing) return;
+  if (!ponyAlive) {
+    spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, '💔 조랑말이 있어야 경마에 나갑니다');
+    return;
+  }
+  if (ponyLove < RACE_MIN_LOVE) {
+    spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z,
+      `🐴 애정이 ${RACE_MIN_LOVE}은 되어야 출전해요 (지금 ${ponyLove}) — 당근을 먹여주세요`);
+    return;
+  }
+  if (coins < RACE_FEE) {
+    spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, `${(RACE_FEE - coins).toLocaleString()}원 부족`);
+    return;
+  }
+  coins -= RACE_FEE;
+  updateCoinBadge();
+  const win = Math.random() < raceWinChance();
+  startRaceVideo(win);
+}
+function startRaceVideo(win) {
+  racing = true;
+  const wrap = document.getElementById('raceWrap');
+  const vid = document.getElementById('raceVideo');
+  if (!wrap || !vid) { racing = false; return; }
+  vid.src = win ? '../assets/farmcat/race_win.mp4' : '../assets/farmcat/race_lose.mp4';
+  wrap.style.display = 'flex';
+  vid.currentTime = 0;
+  const tryPlay = vid.play();
+  if (tryPlay && tryPlay.catch) tryPlay.catch(() => { vid.muted = true; vid.play().catch(() => {}); });
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    wrap.style.display = 'none';
+    vid.pause();
+    racing = false;
+    const py = groundHeight(state.x, state.z) + 2;
+    if (win) {
+      coins += RACE_PRIZE;
+      updateCoinBadge();
+      playShipSound();
+      spawnMoneyPopup(state.x, py, state.z, `🏆 1등! 상금 ${RACE_PRIZE.toLocaleString()}원을 받았어요`, 5);
+    } else {
+      spawnMoneyPopup(state.x, py, state.z, '😢 꼴등… 당근을 더 먹이면 더 잘 뜁니다', 5);
+    }
+    saveGame(true);
+  };
+  vid.onended = finish;
+  wrap.onpointerdown = finish;
+}
+
+// (예전 주석: 당근을 이만큼 먹이면 경마장에 나갈 수 있습니다)
 // 먹이는 순간 조랑말 입가에 나타나 냠냠 줄어드는 당근 (직접 그리신 그림)
 let carrotFx = null, carrotFxT = -1;
 const CARROT_FX_TIME = 1.0;
@@ -4007,7 +4098,21 @@ function updateCarrotFx(dt) {
 function tryFeedPony() {
   const y = groundHeight(STABLE.x, STABLE.z) + STABLE_H * 0.75;
   if (!ponyAlive) {
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, '💔 마구간이 비어 있습니다…');
+    // 빈 마구간에서 F — 새 조랑말을 데려옵니다
+    if (coins < PONY_PRICE) {
+      spawnMoneyPopup(STABLE.x, y, STABLE.z,
+        `💔 마구간이 비었어요 — 새 조랑말은 ${PONY_PRICE.toLocaleString()}원 (${(PONY_PRICE - coins).toLocaleString()}원 부족)`);
+      return;
+    }
+    coins -= PONY_PRICE;
+    ponyAlive = true;
+    ponyLove = 0;            // 새 친구와는 처음부터 정을 쌓아야 합니다
+    lastFedDay = dayCount;   // 데려온 날은 배불리 먹고 왔습니다
+    applyPonyAlive();
+    updateCoinBadge();
+    playShipSound();
+    saveGame(true);
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, '🐴 새 조랑말을 데려왔어요! 이번엔 매일 챙겨주세요', 5);
     return;
   }
   // 멀리서 던져 주는 게 아니라, 조랑말 앞까지 가서 손으로 먹입니다
@@ -4029,7 +4134,7 @@ function tryFeedPony() {
   state.idleTime = 0; state.sit = 0;
   if (carrotFx) { carrotFx.visible = true; carrotFxT = 0; }   // 당근 그림이 냠냠 사라집니다
   if (ponyLove >= RACE_LOVE) {
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, `🏇 애정 ${ponyLove}! 경마장에 나갈 수 있어요 (준비 중)`);
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, `🏇 애정 ${ponyLove}! 승률이 최고예요 — 옆 팻말에서 경마 출전!`);
   } else {
     spawnMoneyPopup(STABLE.x, y, STABLE.z, `🥕 냠냠! ❤️ ${ponyLove}/${RACE_LOVE}`);
   }
@@ -4084,6 +4189,8 @@ function handleActionKey() {
   }
   const houseDist = Math.hypot(state.x - HOUSE.x, state.z - HOUSE.z);
   if (houseDist < HOUSE_RANGE + 3) { tryFixHouse(); return; }
+  const raceDist = Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z);
+  if (raceDist < RACE_RANGE) { tryRace(); return; }
   const stableDist = Math.hypot(state.x - STABLE.x, state.z - STABLE.z);
   if (stableDist < STABLE_RANGE) { tryFeedPony(); return; }
   // 물질은 포구 축대 끝에서만 들어갈 수 있습니다
