@@ -3006,7 +3006,8 @@ function loadGame() {
   }
   updateCoinBadge(); updateCarrotBadge(); updateBasketBadge();
 }
-loadGame();   // 켜자마자 이어하기
+// (불러오기는 스크립트 맨 아래에서 합니다 — 여기서 부르면 아직 안 만들어진
+//  배지들을 건드려 게임 전체가 멈춥니다)
 
 const btnRestart = document.getElementById('btnRestart');
 const btnSave = document.getElementById('btnSave');
@@ -3170,6 +3171,30 @@ function tryBuyCarrot() {
 
 // 당근을 이만큼 먹이면 경마장에 나갈 수 있습니다 (경마는 준비 중 — 영상이 오면 붙입니다)
 const RACE_LOVE = 100;
+// 먹이는 순간 조랑말 입가에 나타나 냠냠 줄어드는 당근 (직접 그리신 그림)
+let carrotFx = null, carrotFxT = -1;
+const CARROT_FX_TIME = 1.0;
+if (CAN_USE_IMAGES) {
+  carrotFx = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.85, 0.68),
+    new THREE.MeshBasicMaterial({ map: loadTexture('../assets/farmcat/carrot.webp'),
+      transparent: true, alphaTest: 0.3, side: THREE.DoubleSide })
+  );
+  carrotFx.visible = false;
+  scene.add(carrotFx);
+}
+function updateCarrotFx(dt) {
+  if (carrotFxT < 0 || !carrotFx) return;
+  carrotFxT += dt;
+  const k = carrotFxT / CARROT_FX_TIME;
+  if (k >= 1) { carrotFx.visible = false; carrotFxT = -1; return; }
+  // 조랑말 입 앞에서 조금씩 작아지며(먹히며) 살짝 위아래로 흔들립니다
+  const gy = groundHeight(STABLE.x, STABLE.z);
+  carrotFx.position.set(STABLE.x + 1.2, gy + 2.05 + Math.sin(carrotFxT * 18) * 0.05, STABLE.z);   // 조랑말 입가
+  carrotFx.rotation.y = Math.atan2(camera.position.x - STABLE.x, camera.position.z - STABLE.z);
+  carrotFx.scale.setScalar(1 - k * 0.85);
+}
+
 function tryFeedPony() {
   const y = groundHeight(STABLE.x, STABLE.z) + STABLE_H * 0.75;
   if (carrots <= 0) {
@@ -3180,6 +3205,7 @@ function tryFeedPony() {
   ponyLove++;
   updateCarrotBadge();
   playDropSound();
+  if (carrotFx) { carrotFx.visible = true; carrotFxT = 0; }   // 당근 그림이 냠냠 사라집니다
   if (ponyLove >= RACE_LOVE) {
     spawnMoneyPopup(STABLE.x, y, STABLE.z, `🏇 애정 ${ponyLove}! 경마장에 나갈 수 있어요 (준비 중)`);
   } else {
@@ -3564,6 +3590,8 @@ function updateSpriteLulu(groundY) {
 }
 
 // ---------- 13. 메인 루프 ----------
+loadGame();   // 모든 것이 준비된 뒤에 저장을 불러와 이어합니다
+
 const clock = new THREE.Clock();
 const camTarget = new THREE.Vector3();
 const camWanted = new THREE.Vector3();
@@ -3581,6 +3609,7 @@ function animate() {
   updateDiving(dt);   // 물질 중이면 숨을 깎고, 다 떨어지면 뭍으로 올려보냅니다
   updateHouse(dt);    // 집 고치는 동작이 끝나면 수리 단계를 올립니다
   updateMayor(dt, t); // 이장님이 상점과 택배사 사이를 오갑니다
+  updateCarrotFx(dt); // 먹인 당근이 조랑말 입가에서 냠냠 사라집니다
   updateHarvestTarget(dt, t);
   updatePopups(dt);
 
