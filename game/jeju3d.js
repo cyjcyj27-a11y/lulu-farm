@@ -1294,14 +1294,15 @@ if (CAN_USE_IMAGES) {
   scene.add(spriteBlob);
 }
 
-// 어느 쪽 루루를 보여줄지 (T 키로 전환)
-let useSprite = CAN_USE_IMAGES;
+// 어느 쪽 루루를 보여줄지.
+// 예전에는 T키로 그림 루루와 3D 모형 루루를 오갈 수 있었지만, 그림 쪽이 훨씬 보기 좋아서
+// 전환 기능을 없앴습니다. 3D 모형은 그림 파일을 못 읽는 경우(파일을 그냥 더블클릭했을 때)의
+// 대비책으로만 남겨둡니다.
+const useSprite = CAN_USE_IMAGES;
 function applyLuluMode() {
   lulu.visible = !useSprite;
   spriteLulu.visible = useSprite;
   if (spriteBlob) spriteBlob.visible = useSprite;
-  const badge = document.getElementById('modeBadge');
-  if (badge) badge.textContent = useSprite ? '🐈 루루: 그림 (T로 전환)' : '🐈 루루: 3D 모형 (T로 전환)';
 }
 applyLuluMode();
 
@@ -1319,7 +1320,6 @@ const keys = {};
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
-  if (e.code === 'KeyT' && CAN_USE_IMAGES) { useSprite = !useSprite; applyLuluMode(); }
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 
@@ -1593,16 +1593,23 @@ addEventListener('visibilitychange', () => {
 // 창을 닫거나 다른 페이지로 넘어갈 때도 확실히 정리합니다
 addEventListener('pagehide', () => { bgm.pause(); });
 
-// M키로 배경음악을 껐다 켤 수 있습니다
+// 배경음악 켜고 끄기 — 키보드는 M, 폰은 배지를 손가락으로 누르면 됩니다.
+// (화면 안내표는 전부 pointer-events: none 이라 손가락 입력을 안 받습니다.
+//  이 배지만 auto로 되돌려 놔야 눌러도 반응합니다 — CSS의 .tappable 이 그 일을 합니다)
 const musicBadge = document.getElementById('musicBadge');
 function updateMusicBadge() {
-  if (musicBadge) musicBadge.textContent = bgm.muted ? '🔇 배경음악 꺼짐 (M)' : '🎵 배경음악 켜짐 (M)';
+  if (musicBadge) musicBadge.textContent = bgm.muted ? '🔇 배경음악 꺼짐' : '🎵 배경음악 켜짐';
 }
-addEventListener('keydown', (e) => {
-  if (e.code !== 'KeyM') return;
+function toggleMusic() {
   bgm.muted = !bgm.muted;
+  if (!bgm.muted) startBgm();   // 아직 한 번도 안 틀었으면 이참에 틀어줍니다
   updateMusicBadge();
-});
+}
+addEventListener('keydown', (e) => { if (e.code === 'KeyM') toggleMusic(); });
+if (musicBadge) {
+  musicBadge.classList.add('tappable');
+  musicBadge.addEventListener('pointerdown', (e) => { e.preventDefault(); toggleMusic(); });
+}
 updateMusicBadge();
 
 const harvestVec = new THREE.Vector3();

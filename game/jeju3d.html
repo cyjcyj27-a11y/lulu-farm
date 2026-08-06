@@ -35,10 +35,19 @@
     background: rgba(0,0,0,.45); border-radius: 999px;
     padding: 9px 16px; font-size: 13.5px;
   }
-  #modeBadge { bottom: 20px; }
-  #ropeBadge { bottom: 60px; }
-  #boxBadge { bottom: 100px; }
-  #musicBadge { bottom: 140px; }
+  #ropeBadge { bottom: 20px; }
+  #boxBadge { bottom: 60px; }
+  #musicBadge { bottom: 100px; }
+  /* 누를 수 있는 배지 — #ui 전체가 손가락 입력을 막고 있어서 이것만 다시 열어줍니다 */
+  .badge.tappable {
+    pointer-events: auto; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.3);
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .badge.tappable:active { background: rgba(255,190,80,.7); color: #2a1806; }
+  /* 손가락으로 누르는 것은 최소 44px은 되어야 빗나가지 않습니다 */
+  body.touch .badge.tappable { padding: 13px 18px; font-size: 13px; }
   /* 상자가 가득 차면 배지가 주황빛으로 바뀌어 배송할 때가 됐음을 알립니다 */
   #boxBadge.full { background: rgba(196, 96, 16, .85); color: #fff3d6; font-weight: 700; }
   #hint {
@@ -163,15 +172,13 @@
     <b>상점 이용</b> F (상점 근처에서)<br>
     <b>택배 부치기</b> F (택배사 근처에서)<br>
     <b>상자 잡기/놓기</b> E (가까이 가서)<br>
-    <b>루루 모습</b> T (그림 ↔ 3D 모형)<br>
-    <b>배경음악</b> M (켜기/끄기)
+    <b>배경음악</b> M (또는 배지 클릭)
   </div>
 
   <div id="coinBadge">🍊 0원</div>
-  <div class="badge" id="musicBadge">🎵 배경음악 켜짐 (M)</div>
+  <div class="badge" id="musicBadge">🎵 배경음악 켜짐</div>
   <div class="badge" id="boxBadge">📦 상자 0/36</div>
   <div class="badge" id="ropeBadge">📦 상자에 가까이 가면 E로 잡을 수 있어요</div>
-  <div class="badge" id="modeBadge">🐈 루루: 그림</div>
   <div id="hint">감귤나무 가까이서 F로 귤을 따면 상자에 쌓입니다 · 상자 가까이서 E로 잡아 끌고 가세요 · 상자가 차면 마당 왼쪽 <b>택배사</b>에서 F로 육지에 부치면 큰돈! · 10만원 모으면 상점에서 끈을 살 수 있어요</div>
 
   <!-- 시작 화면: 아무 데나 누르면 사라지면서 배경음악이 시작됩니다 -->
@@ -191,6 +198,7 @@
       <b class="mob">두 손가락</b><span class="mob">벌리고 오므리면 줌</span>
       <b class="mob">🍊 버튼</b><span class="mob">귤 따기 · 상점 · 택배</span>
       <b class="mob">📦 버튼</b><span class="mob">상자 잡기 / 놓기</span>
+      <b class="mob">🎵 배지</b><span class="mob">누르면 배경음악 꺼짐</span>
     </div>
     <div id="startGo">눌러서 시작</div>
   </div>
