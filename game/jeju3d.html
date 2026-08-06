@@ -35,9 +35,9 @@
     background: rgba(0,0,0,.45); border-radius: 999px;
     padding: 9px 16px; font-size: 13.5px;
   }
-  #ropeBadge { bottom: 20px; }
-  #boxBadge { bottom: 60px; }
-  #musicBadge { bottom: 100px; }
+  #ropeBadge { bottom: 66px; }
+  #boxBadge { left: auto; right: 14px; bottom: 14px; font-size: 11.5px; padding: 6px 11px; }
+
   /* 누를 수 있는 배지 — #ui 전체가 손가락 입력을 막고 있어서 이것만 다시 열어줍니다 */
   .badge.tappable {
     pointer-events: auto; cursor: pointer;
@@ -98,10 +98,24 @@
     content: '숨'; position: absolute; left: -26px; top: 1px;
     font-size: 12px; font-weight: 700;
   }
-  #netBadge { display: none; bottom: 220px; }
-  #carrotBadge { display: none; bottom: 180px; }
-  #mapBadge { bottom: 140px; }
+  #netBadge { display: none; left: auto; right: 14px; bottom: 50px; font-size: 11.5px; padding: 6px 11px; }
+  #carrotBadge { display: none; bottom: 110px; }
+
   #netBadge.full { background: rgba(196, 96, 16, .85); color: #fff3d6; font-weight: 700; }
+
+  /* ---- 왼쪽 아래 아이콘 줄 (다시하기·저장·종료·지도·음악) ---- */
+  #iconRow {
+    position: absolute; left: 16px; bottom: 16px;
+    display: flex; gap: 8px; pointer-events: auto;
+  }
+  .ibtn {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.35); background: rgba(0,0,0,.45);
+    color: #fff; font-size: 18px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .ibtn:active { background: rgba(255,190,80,.7); }
 
   /* ---- 전체 지도 (M키 / 🗺 배지) ---- */
   #mapWrap {
@@ -184,7 +198,9 @@
   .job .shot img {
     position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; display: block;
+    opacity: 0; transition: opacity .25s ease;   /* 뜨는 순간 톡 튀지 않게 */
   }
+  .job .shot img.on { opacity: 1; }
   .job .shot img:not([src]), .job .shot img[src=""] { display: none; }
   .job .cap { padding: 8px 11px 11px; text-align: left; }
   .job .cap b {
@@ -246,22 +262,22 @@
   }
   /* 오른쪽 아래 행동 버튼들 */
   #touchBtns {
-    position: absolute; right: 18px; bottom: 26px;
-    flex-wrap: wrap; justify-content: flex-end; gap: 12px;
-    width: 190px; pointer-events: auto;
+    position: absolute; right: 14px; bottom: 88px;
+    flex-wrap: nowrap; justify-content: flex-end; gap: 8px;
+    pointer-events: auto;
   }
   .tbtn {
-    width: 84px; height: 84px; border-radius: 50%;
+    width: 46px; height: 46px; border-radius: 50%;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: rgba(0,0,0,.42); border: 2px solid rgba(255,255,255,.5);
-    font-size: 13px; font-weight: 700; line-height: 1.25; text-align: center;
+    font-size: 8.5px; font-weight: 700; line-height: 1.15; text-align: center;
     user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
     touch-action: none;
   }
   /* 버튼 안의 글자·이모지는 손가락 입력을 받지 않게 합니다.
      그래야 어디를 눌러도 항상 버튼 자체가 눌린 것으로 처리됩니다. */
   .tbtn * { pointer-events: none; }
-  .tbtn .k { font-size: 22px; }
+  .tbtn .k { font-size: 17px; }
   .tbtn.on { background: rgba(255,190,80,.75); border-color: #fff; }
   /* 폰은 화면이 좁아서 조작 안내표와 아래쪽 설명은 접어둡니다 */
   body.touch #help, body.touch #hint { display: none; }
@@ -289,7 +305,7 @@
     <b>상호작용</b> F 하나로 전부 (따기·사기·택배·수리·먹이기·상자·물질)<br>
     <b>물속에서</b> F 채집 · Space 떠오르기 · 수면에서 F 나가기<br>
     <b>전체 지도</b> M (또는 🗺 배지)<br>
-    <b>배경음악</b> 🎵 배지 클릭
+    <b>왼쪽 아래</b> ↻ 다시 · 💾 저장 · ⏻ 종료 · 🗺 지도 · 🎵 음악
   </div>
 
   <div id="coinBadge">🍊 0원</div>
@@ -300,8 +316,13 @@
   <div id="vignette"></div>
   <div id="breathBar"><div id="breathFill"></div></div>
 
-  <div class="badge" id="mapBadge">🗺 지도 (M)</div>
-  <div class="badge" id="musicBadge">🎵 배경음악 켜짐</div>
+  <div id="iconRow">
+    <button class="ibtn" id="btnRestart" title="처음부터 다시">↻</button>
+    <button class="ibtn" id="btnSave" title="저장하기">💾</button>
+    <button class="ibtn" id="btnQuit" title="종료">⏻</button>
+    <button class="ibtn" id="mapBadge" title="지도 (M)">🗺</button>
+    <button class="ibtn" id="musicBadge" title="배경음악">🎵</button>
+  </div>
   <div class="badge" id="carrotBadge">🥕 당근 0개</div>
   <div class="badge" id="netBadge">🧺 망사리 0/24</div>
   <div class="badge" id="boxBadge">📦 상자 0/36</div>

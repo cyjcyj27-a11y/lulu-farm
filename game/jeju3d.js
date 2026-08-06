@@ -1070,6 +1070,74 @@ const stable = (() => {
   return { group: g };
 })();
 
+// 공구 — 헌집을 고치는 데 필요한 망치·톱·페인트. 이장님 상점 앞 공구대에서 팝니다.
+const tools = { hammer: false, saw: false, paint: false };
+const TOOL_PRICE = 5000;
+const TOOL_SPOT = { x: -0.6, z: 42.6 };
+const TOOL_RANGE = 2.2;
+{
+  const y = groundHeight(TOOL_SPOT.x, TOOL_SPOT.z);
+  const g = new THREE.Group();
+  g.position.set(TOOL_SPOT.x, y, TOOL_SPOT.z);
+  const table = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.7), shopWoodMat);
+  table.position.y = 0.62;
+  table.castShadow = true;
+  g.add(table);
+  [[-0.5, -0.25], [0.5, -0.25], [-0.5, 0.25], [0.5, 0.25]].forEach(([px, pz]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), shopWoodDarkMat);
+    leg.position.set(px, 0.31, pz);
+    g.add(leg);
+  });
+  // 망치 (자루 + 머리)
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 6), citrusTrunkMat);
+  handle.position.set(-0.4, 0.72, 0);
+  handle.rotation.z = 1.2;
+  g.add(handle);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.09),
+    new THREE.MeshLambertMaterial({ color: 0x6a6f74, flatShading: true }));
+  head.position.set(-0.22, 0.78, 0);
+  g.add(head);
+  // 톱 (날 + 손잡이)
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.008, 0.09),
+    new THREE.MeshLambertMaterial({ color: 0x9aa0a6 }));
+  blade.position.set(0.08, 0.69, 0.12);
+  g.add(blade);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.1), citrusTrunkMat);
+  grip.position.set(0.32, 0.7, 0.12);
+  g.add(grip);
+  // 페인트 통 (붓 꽂힌 초록 통 — 지붕 색)
+  const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.18, 10),
+    new THREE.MeshLambertMaterial({ color: 0x3f7d46, flatShading: true }));
+  bucket.position.set(0.45, 0.76, -0.15);
+  bucket.castShadow = true;
+  g.add(bucket);
+  const brush = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 5), citrusTrunkMat);
+  brush.position.set(0.45, 0.9, -0.15);
+  brush.rotation.z = 0.3;
+  g.add(brush);
+  scene.add(g);
+}
+
+function tryBuyTool() {
+  const y = groundHeight(TOOL_SPOT.x, TOOL_SPOT.z) + 1.4;
+  // 아직 없는 공구를 수리 순서대로 하나씩 팝니다 (망치 → 톱 → 페인트)
+  const next = STAGE_TOOLS.find((t) => !tools[t]);
+  if (!next) {
+    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, '공구를 다 갖췄어요!');
+    return;
+  }
+  if (coins < TOOL_PRICE) {
+    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, `${(TOOL_PRICE - coins).toLocaleString()}원 부족`);
+    return;
+  }
+  coins -= TOOL_PRICE;
+  tools[next] = true;
+  updateCoinBadge();
+  playPickSound();
+  const t = TOOL_INFO[next];
+  spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, `${t.icon} ${t.name} 구입!`);
+}
+
 let carrots = 0;      // 들고 있는 당근
 let ponyLove = 0;     // 조랑말과 쌓은 애정 (당근 하나에 1씩)
 let hasTank = false;  // 해녀 산소통 — 사면 숨이 26초에서 60초로 늘어납니다
@@ -1967,6 +2035,7 @@ const KEY_UP = IS_TOUCH ? '⤴ 버튼' : 'Space';
 
 function updateRopeBadge() {
   if (!ropeBadge) return;
+  ropeBadge.style.display = 'block';   // 아래 분기 중 하나가 걸리면 보입니다 (없으면 끝에서 숨김)
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
     ropeBadge.textContent = `🤿 ${KEY_ACTION} 채집 · ${KEY_UP} 떠오르기 · 수면에서 ${KEY_ACTION} 뭍에 나가기`;
@@ -1990,6 +2059,14 @@ function updateRopeBadge() {
     ropeBadge.textContent = `🥕 ${KEY_ACTION}으로 당근 구입 (${CARROT_PRICE.toLocaleString()}원)`;
     return;
   }
+  if (typeof TOOL_SPOT !== 'undefined' &&
+      Math.hypot(state.x - TOOL_SPOT.x, state.z - TOOL_SPOT.z) < TOOL_RANGE) {
+    const next = STAGE_TOOLS.find((t) => !tools[t]);
+    ropeBadge.textContent = next
+      ? `🧰 공구대 — ${KEY_ACTION}으로 ${TOOL_INFO[next].name} 구입 (${TOOL_PRICE.toLocaleString()}원)`
+      : '🧰 공구를 다 갖췄어요';
+    return;
+  }
   if (typeof TANK_SPOT !== 'undefined' &&
       Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z) < TANK_RANGE) {
     ropeBadge.textContent = hasTank
@@ -2004,16 +2081,13 @@ function updateRopeBadge() {
       : '🐴 조랑말이 배고파해요 — 이장님 상점에서 당근을 사오세요';
     return;
   }
-  if (hasRope) {
-    ropeBadge.textContent = '🪢 끈으로 편하게 끄는 중';
-  } else if (state.grabbing) {
-    ropeBadge.textContent = `🤝 상자를 잡고 끄는 중 (${KEY_GRAB}로 놓기)`;
-  } else {
-    const dist = Math.hypot(basketPos.x - state.x, basketPos.z - state.z);
-    ropeBadge.textContent = dist < GRAB_RANGE
-      ? `📦 ${KEY_GRAB}을 누르면 상자를 잡을 수 있어요`
-      : `📦 밀거나, 가까이 가서 ${KEY_GRAB}로 잡아 끌 수 있어요`;
+  if (state.grabbing) {
+    ropeBadge.style.display = 'block';
+    ropeBadge.textContent = `🤝 상자를 끄는 중 (${KEY_ACTION}로 놓기)`;
+    return;
   }
+  // 알려줄 것이 없으면 배지를 아예 숨깁니다 (화면을 어지럽히지 않게)
+  ropeBadge.style.display = 'none';
 }
 updateCoinBadge();
 
@@ -2109,7 +2183,7 @@ addEventListener('pagehide', () => { bgm.pause(); });
 //  이 배지만 auto로 되돌려 놔야 눌러도 반응합니다 — CSS의 .tappable 이 그 일을 합니다)
 const musicBadge = document.getElementById('musicBadge');
 function updateMusicBadge() {
-  if (musicBadge) musicBadge.textContent = bgm.muted ? '🔇 음악 꺼짐 (누르면 켬)' : '🎵 음악 켜짐 (누르면 끔)';
+  if (musicBadge) musicBadge.textContent = bgm.muted ? '🔇' : '🎵';
 }
 function toggleMusic() {
   bgm.muted = !bgm.muted;
@@ -2740,18 +2814,28 @@ function updateDiving(dt) {
 }
 
 // ---------- 12-1f. 헌집 사서 고치기 ----------
-// 마당 동쪽 폐가 앞에서 F: 처음엔 사고(5만원), 그 다음부터는 한 단계씩 고칩니다.
-// 벽 고치기(망치질) → 지붕 고치기(톱질) → 페인트칠, 각 1만 5천원.
-// 다 고치면 창고가 생겨 귤 상자 정원이 36 → 48로 늘어납니다.
+// 폐가를 50,000원에 산 뒤, 이장님 상점에서 산 공구를 들고 와서 직접 고칩니다.
+// 단계마다 다른 공구가 필요하고(벽=망치, 지붕=톱, 칠=페인트), F를 누를 때마다
+// 한 번씩 두드립니다. 여섯 번 두드리면 그 단계가 끝나고 집이 눈에 띄게 좋아집니다.
 const HOUSE_PRICE = 50000;
-const REPAIR_PRICE = 15000;
-const REPAIR_NAMES = ['🔨 벽 고치기', '🪚 지붕 고치기', '🖌 페인트칠'];
-const FIX_DURATION = 1.6;      // 고치는 동작이 재생되는 시간(초). 이 동안은 못 움직입니다
+const SWINGS_PER_STAGE = 6;    // 한 단계를 끝내는 데 드는 망치질(톱질·붓질) 횟수
+const FIX_DURATION = 0.9;      // 한 번 휘두르는 동작 시간(초)
+let fixSwings = 0;             // 지금 단계에서 몇 번 두드렸나
+const STAGE_TOOLS = ['hammer', 'saw', 'paint'];
+const TOOL_INFO = {
+  hammer: { name: '망치', icon: '🔨', work: '벽 고치기' },
+  saw:    { name: '톱',   icon: '🪚', work: '지붕 고치기' },
+  paint:  { name: '페인트', icon: '🖌', work: '페인트칠' },
+};
 
 function houseBadgeText() {
   if (houseStage < 0) return `🏚 팝니다 — ${KEY_ACTION}으로 구입 (${HOUSE_PRICE.toLocaleString()}원)`;
-  if (houseStage < 3) return `🏚 ${REPAIR_NAMES[houseStage]} — ${KEY_ACTION} (${REPAIR_PRICE.toLocaleString()}원)`;
-  return '🏡 내 집! 창고 덕에 상자에 48알까지 담깁니다';
+  if (houseStage >= 3) return '🏡 내 집! 창고 덕에 상자에 48알까지 담깁니다';
+  const t = TOOL_INFO[STAGE_TOOLS[houseStage]];
+  if (!tools[STAGE_TOOLS[houseStage]]) {
+    return `🏚 ${t.work}에는 ${t.name}이 필요해요 — 이장님 상점에서 (${TOOL_PRICE.toLocaleString()}원)`;
+  }
+  return `${t.icon} ${t.work} ${fixSwings}/${SWINGS_PER_STAGE} — ${KEY_ACTION}으로 계속`;
 }
 
 function tryFixHouse() {
@@ -2760,45 +2844,58 @@ function tryFixHouse() {
     spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 다 고쳤어요. 좋은 집이네요!');
     return;
   }
-  const cost = houseStage < 0 ? HOUSE_PRICE : REPAIR_PRICE;
-  if (coins < cost) {
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${(cost - coins).toLocaleString()}원 부족`);
-    return;
-  }
   if (houseStage < 0) {
-    coins -= cost;
+    if (coins < HOUSE_PRICE) {
+      spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${(HOUSE_PRICE - coins).toLocaleString()}원 부족`);
+      return;
+    }
+    coins -= HOUSE_PRICE;
     houseStage = 0;
+    fixSwings = 0;
     updateCoinBadge();
     applyHouseLook();
     playShipSound();
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🔑 내 집 마련! 이제 고쳐봅시다');
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🔑 내 집 마련! 공구를 사서 고쳐봅시다');
     return;
   }
-  // 수리 시작 — 동작이 끝나는 순간(updateLulu 쪽) 단계가 올라갑니다
-  coins -= cost;
-  updateCoinBadge();
+  // 이 단계에 맞는 공구가 있어야 두드릴 수 있습니다
+  const tool = STAGE_TOOLS[houseStage];
+  if (!tools[tool]) {
+    const t = TOOL_INFO[tool];
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${t.icon} ${t.name}이 필요해요 — 이장님 상점에서`);
+    return;
+  }
+  // 한 번 두드리기 — 동작이 끝나는 순간(updateHouse) 횟수가 올라갑니다
   state.fixT = 0;
-  state.facing = Math.atan2(HOUSE.x - state.x, HOUSE.z - state.z);   // 집을 바라보고 작업
+  state.facing = Math.atan2(HOUSE.x - state.x, HOUSE.z - state.z);
   state.idleTime = 0; state.sit = 0;
   playHammerSound();
 }
 
-// 수리 동작이 끝나면 단계를 올립니다 (매 프레임 호출)
+// 휘두르는 동작이 끝날 때마다 한 번으로 칩니다 (매 프레임 호출)
 function updateHouse(dt) {
   if (state.fixT < 0) return;
   state.fixT += dt;
   if (state.fixT < FIX_DURATION) return;
   state.fixT = -1;
+  fixSwings++;
+  const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
+  if (fixSwings < SWINGS_PER_STAGE) {
+    const t = TOOL_INFO[STAGE_TOOLS[houseStage]];
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${t.icon} ${t.work} ${fixSwings}/${SWINGS_PER_STAGE}`);
+    return;
+  }
+  // 단계 완성!
+  fixSwings = 0;
   houseStage++;
   applyHouseLook();
-  const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
   if (houseStage >= 3) {
-    BASKET_CAP = 48;             // 창고가 생겨 상자에 더 담을 수 있습니다
+    BASKET_CAP = 48;
     updateBasketBadge();
     playShipSound();
     spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 완성! 창고가 생겨 상자가 48알로 커졌어요');
   } else {
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${REPAIR_NAMES[houseStage - 1].slice(2)} 끝!`);
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${TOOL_INFO[STAGE_TOOLS[houseStage - 1]].work} 끝!`);
   }
 }
 
@@ -2874,6 +2971,61 @@ function updateMayor(dt, t) {
   const mirrorM = walking && !mayor.headingRight;   // 왼쪽으로 갈 때 뒤집기
   mayorCard.scale.set(mirrorM ? -Wp : Wp, Hp, 1);
 }
+
+// ---------- 12-1f-2b. 저장 · 처음부터 · 종료 ----------
+// 진행 상황을 브라우저 안(localStorage)에 남깁니다. 게임을 켜면 자동으로 이어집니다.
+// (딴 귤·채집물 위치까지는 저장하지 않습니다 — 자원은 켤 때마다 새로 차 있습니다)
+const SAVE_KEY = 'lulu_jeju_save';
+function saveGame(quiet) {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      coins, carrots, ponyLove, hasTank, houseStage, fixSwings,
+      tools, basketCount, cap: BASKET_CAP, x: state.x, z: state.z,
+    }));
+    if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '💾 저장했어요');
+  } catch (e) { /* 시크릿 창 등에서는 저장이 막힐 수 있습니다 */ }
+}
+function loadGame() {
+  let d;
+  try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return; }
+  if (!d) return;
+  coins = d.coins || 0;
+  carrots = d.carrots || 0;
+  ponyLove = d.ponyLove || 0;
+  hasTank = !!d.hasTank;
+  if (hasTank) BREATH_MAX = TANK_BREATH;
+  houseStage = (d.houseStage === undefined) ? -1 : d.houseStage;
+  fixSwings = d.fixSwings || 0;
+  if (d.tools) Object.assign(tools, d.tools);
+  BASKET_CAP = d.cap || 36;
+  applyHouseLook();
+  for (let i = 0; i < (d.basketCount || 0); i++) addFruitToBasket();
+  if (typeof d.x === 'number') {
+    state.x = d.x; state.z = d.z;
+    lulu.position.set(state.x, groundHeight(state.x, state.z), state.z);
+  }
+  updateCoinBadge(); updateCarrotBadge(); updateBasketBadge();
+}
+loadGame();   // 켜자마자 이어하기
+
+const btnRestart = document.getElementById('btnRestart');
+const btnSave = document.getElementById('btnSave');
+const btnQuit = document.getElementById('btnQuit');
+if (btnSave) btnSave.addEventListener('pointerdown', (e) => { e.preventDefault(); saveGame(); });
+if (btnRestart) btnRestart.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (confirm('처음부터 다시 시작할까요? 저장한 진행이 지워집니다.')) {
+    try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
+    location.reload();
+  }
+});
+if (btnQuit) btnQuit.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  saveGame(true);            // 나가기 전에 조용히 저장해 둡니다
+  window.close();            // 브라우저가 허락하면 탭이 닫힙니다
+  setTimeout(() => spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z,
+    '저장했어요 — 탭을 닫으시면 됩니다'), 150);
+});
 
 // ---------- 12-1f-3. 전체 지도 (M키 / 🗺 배지) ----------
 // 지도는 따로 그림을 만들지 않고, 게임이 쓰는 지형 높이 함수(groundHeight)를 그대로
@@ -3054,6 +3206,8 @@ function handleActionKey() {
   if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
   const tankDist = Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z);
   if (tankDist < TANK_RANGE) { tryBuyTank(); return; }
+  const toolDist = Math.hypot(state.x - TOOL_SPOT.x, state.z - TOOL_SPOT.z);
+  if (toolDist < TOOL_RANGE) { tryBuyTool(); return; }
   const depotDist = Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z);
   if (depotDist < DEPOT_RANGE) { tryShipBox(); return; }
   const houseDist = Math.hypot(state.x - HOUSE.x, state.z - HOUSE.z);
@@ -3069,13 +3223,13 @@ function handleActionKey() {
 // (예전의 E키 전용 함수는 상호작용 통일로 handleActionKey에 합쳐졌습니다)
 addEventListener('keydown', (e) => { if (e.code === 'KeyF') handleActionKey(); });
 
-// 시작 화면의 일거리 그림 — 아직 안 그린 것은 파일이 없으므로, 있을 때만 붙입니다.
-// (없는 그림을 그냥 붙이면 깨진 그림 아이콘이 나와서 오히려 보기 싫습니다)
+// 시작 화면의 일거리 그림 — 바로 불러와서, 뜨는 순간 부드럽게 나타나게 합니다.
+// (예전에는 "파일이 있는지 먼저 재보고" 붙여서 두 번 기다렸고, 그 사이 이모지 화면이
+//  먼저 보였다가 그림이 뒤늦게 튀어나왔습니다. 이제 한 번에 불러옵니다)
 for (const img of document.querySelectorAll('#startJobs img[data-src]')) {
-  const src = img.getAttribute('data-src');
-  const probe = new Image();
-  probe.onload = () => { img.src = src; };   // 파일이 있으면 그때 붙입니다
-  probe.src = src;
+  img.onload = () => img.classList.add('on');      // 다 받아지면 스르륵 나타남
+  img.onerror = () => img.remove();                // 파일이 없으면 이모지가 그대로 자리를 지킴
+  img.src = img.getAttribute('data-src');
 }
 
 // 시작 화면: 누르면 사라지면서 소리와 배경음악이 깨어납니다.
