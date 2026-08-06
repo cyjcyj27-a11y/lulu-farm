@@ -2339,6 +2339,8 @@ const SPRITE_H = 1.5;                      // 화면에 보이는 루루 키(월
 let mayorGroup = null, mayorCard = null;   // 이장님 (상점·택배사를 오가는 NPC)
 let ponyCard = null;                       // 조랑말 (웃는 평소 / 우는 배고픔 — 경마 영상에서 오려낸 그림)
 const PONY_H = 2.05;                       // 조랑말 키 (미터)
+let halmangCard = null;                    // 해녀 할망 (포구 옆에 앉아 있는 흰 고양이 할머니)
+const HALMANG_H = 1.7;
 const MAYOR_H = 1.9;                       // 이장님 키 — 어른이라 루루보다 큼직합니다
 
 // assets/farmcat/ 스프라이트 시트. 한 장에 여러 칸이 가로로 이어붙어 있습니다.
@@ -2386,6 +2388,7 @@ if (CAN_USE_IMAGES) {
   loadSheet('diveDown',  'dive_down.webp',  8,  175);          // 아래로 잠수할 때 (직접 뽑으신 영상에서 변환)
   loadSheet('ponyHappy', 'pony_happy.webp', 8,  128);          // 조랑말 — 웃는 평소 모습 (경마 1등 영상에서)
   loadSheet('ponySad',   'pony_sad.webp',   8,  227);          // 조랑말 — 굶어서 우는 모습 (경마 꼴등 영상에서)
+  loadSheet('halmang',   'halmang.webp',    8,  185);          // 해녀 할망 — 포구 옆에 앉아 같은 말만 되뇌입니다
   // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
   loadSheet('fixHouse',  'fix_house.webp',  3,  167);
   // 이장님 (상점과 택배사를 오가는 NPC). 걷기 원본은 루루와 반대로 "오른쪽"을 봅니다
@@ -2434,6 +2437,18 @@ if (CAN_USE_IMAGES) {
   mayorGroup = new THREE.Group();
   mayorGroup.add(mayorCard);
   scene.add(mayorGroup);
+
+  // ----- 해녀 할망 그림판 — 포구 옆에 앉아 있습니다 -----
+  if (SHEETS.halmang) {
+    const hGeo = new THREE.PlaneGeometry(1, 1);
+    hGeo.translate(0, 0.5, 0);
+    halmangCard = new THREE.Mesh(
+      hGeo,
+      new THREE.MeshBasicMaterial({ map: SHEETS.halmang.tex, transparent: true, alphaTest: 0.08 })
+    );
+    halmangCard.userData.planeH = HALMANG_H * CELL_H / (CELL_H - CELL_PAD * 2);
+    scene.add(halmangCard);
+  }
 
   // ----- 조랑말 그림판 — 마구간 안에 서 있습니다 (그림띠가 있을 때만) -----
   if (SHEETS.ponyHappy) {
@@ -2705,6 +2720,12 @@ function updateRopeBadge() {
     ropeBadge.textContent = missing === 0
       ? '🏡 아늑한 내 집 — 문 쪽으로 걸어가면 밖으로 나갑니다'
       : '🏚 텅 빈 집 — 상점 안에서 가구를 사서 꾸며보세요 (문 쪽으로 가면 밖으로)';
+    return;
+  }
+  // 해녀 할망 — 포구 안내보다 먼저 (할망 곁에 서 있을 때)
+  if (typeof HALMANG_SPOT !== 'undefined' &&
+      Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < HALMANG_RANGE) {
+    ropeBadge.textContent = `👵 해녀 할망과 이야기 (${KEY_ACTION})`;
     return;
   }
   // 포구 가까이 오면 물질하러 들어가는 법을 알려줍니다 (망사리가 없으면 그것부터)
@@ -3845,6 +3866,26 @@ function mayorTalkLines() {
   return idle[Math.floor(Math.random() * idle.length)];
 }
 
+// 해녀 할망 — 물질 나가는 포구 옆에 앉아, 언제 말을 걸어도 같은 말만 되뇌입니다.
+// 물질하다 숨이 다하면 나오는 바로 그 말입니다. 새겨들읍시다.
+const HALMANG_SPOT = { x: -4.4, z: 93 };
+const HALMANG_RANGE = 2.4;
+obstacles.push({ x: HALMANG_SPOT.x, z: HALMANG_SPOT.z, r: 0.9, topY: NO_JUMP });
+function halmangTalk() {
+  startTalk('해녀 할망', ['……욕심내민, 바당이 데려간다.']);
+}
+// 매 프레임 — 항상 카메라를 바라보고 앉아 있습니다
+function updateHalmang() {
+  if (!halmangCard) return;
+  const gy = groundHeight(HALMANG_SPOT.x, HALMANG_SPOT.z);
+  halmangCard.position.set(HALMANG_SPOT.x, gy, HALMANG_SPOT.z);
+  halmangCard.rotation.y = Math.atan2(camera.position.x - HALMANG_SPOT.x, camera.position.z - HALMANG_SPOT.z);
+  const sheet = SHEETS.halmang;
+  setCell(sheet, Math.floor(performance.now() * 0.004) % sheet.frames);
+  const Hp = halmangCard.userData.planeH;
+  halmangCard.scale.set(Hp * sheet.frameW / CELL_H, Hp, 1);
+}
+
 // 돌하르방 — 상점 앞을 지키는 안내석. 처음 온 사람에게 섬 사는 법을 알려줍니다
 const TUTOR_SPOT = { x: 2.2, z: 45.4 };
 const TUTOR_RANGE = 2.6;
@@ -4281,6 +4322,10 @@ function handleActionKey() {
   }
   if (Math.hypot(state.x - TUTOR_SPOT.x, state.z - TUTOR_SPOT.z) < TUTOR_RANGE) {
     tutorTalk();
+    return;
+  }
+  if (Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < HALMANG_RANGE) {
+    halmangTalk();
     return;
   }
   const carrotDist = Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z);
@@ -4738,6 +4783,7 @@ function animate() {
   updateDoors();      // 문 앞에 서면 집·상점 안팎을 드나듭니다
   updateDayNight(dt); // 해가 뜨고 지고, 아침마다 하루가 바뀝니다
   updatePony(t);      // 조랑말 — 오늘 먹였으면 웃고, 굶었으면 웁니다
+  updateHalmang();    // 해녀 할망 — 포구 옆에 앉아 있습니다
   updateHouse(dt);    // 집 고치는 동작이 끝나면 수리 단계를 올립니다
   updateMayor(dt, t); // 이장님이 상점과 택배사 사이를 오갑니다
   updateCarrotFx(dt); // 먹인 당근이 조랑말 입가에서 냠냠 사라집니다
