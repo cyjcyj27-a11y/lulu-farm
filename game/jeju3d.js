@@ -5153,6 +5153,35 @@ const clock = new THREE.Clock();
 const camTarget = new THREE.Vector3();
 const camWanted = new THREE.Vector3();
 
+// 카메라와 루루 사이를 나무·바위·건물이 가리면, 카메라를 그 앞까지 당겨옵니다.
+// (바위 뒤로 카메라가 들어가 루루가 안 보이던 문제)
+function pullCameraIn(target, wanted) {
+  const dx = wanted.x - target.x, dz = wanted.z - target.z;
+  const segLen = Math.hypot(dx, dz);
+  if (segLen < 0.001) return;
+  const ux = dx / segLen, uz = dz / segLen;
+  let maxT = segLen;
+  for (const o of obstacles) {
+    if (o.topY < 3) continue;                 // 돌담처럼 낮은 것은 카메라가 넘겨다봅니다
+    const rr = o.r + 1.2;                     // 나뭇잎·바위 덩치만큼 여유
+    const ox = o.x - target.x, oz = o.z - target.z;
+    const proj = ox * ux + oz * uz;           // 시선 선 위에 투영한 거리
+    if (proj < 0.5 || proj > maxT) continue;  // 루루 뒤쪽이거나 카메라보다 멀면 무시
+    const perp2 = ox * ox + oz * oz - proj * proj;
+    if (perp2 < rr * rr) {
+      const cut = proj - Math.sqrt(rr * rr - perp2);
+      if (cut < maxT) maxT = Math.max(1.6, cut);   // 최소 1.6m는 유지
+    }
+  }
+  if (maxT < segLen) {
+    const k = maxT / segLen;
+    wanted.x = target.x + dx * k;
+    wanted.z = target.z + dz * k;
+    // 가까워진 만큼 높이도 살짝 낮춰 루루 눈높이에 가깝게
+    wanted.y = target.y + (wanted.y - target.y) * Math.max(k, 0.55);
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta());
@@ -5183,6 +5212,7 @@ function animate() {
     camTarget.y + Math.sin(camPitch) * camDist,
     camTarget.z + Math.cos(camYaw) * hor
   );
+  if (!state.diving) pullCameraIn(camTarget, camWanted);   // 나무·바위·건물에 가리면 앞으로 당김
   // 카메라가 땅을 뚫고 들어가지 않게 바닥보다 조금 위로 띄웁니다.
   // 물속에서는 해저에 바짝 붙어야 하므로 여유를 훨씬 적게 둡니다.
   const minY = groundHeight(camWanted.x, camWanted.z) + (state.diving ? 0.5 : 1.2);
