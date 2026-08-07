@@ -1394,7 +1394,7 @@ function tryBuyTank() {
     return;
   }
   if (coins < TANK_PRICE) {
-    spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, `${(TANK_PRICE - coins).toLocaleString()}원 부족`);
+    spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, `${formatWon((TANK_PRICE - coins))} 부족`);
     return;
   }
   coins -= TANK_PRICE;
@@ -2144,6 +2144,32 @@ function updateNet(dt, t) {
   netObj.rotation.y = state.facing;
 }
 
+// 돈을 우리가 말하는 대로 적습니다 — 4,000,000원이 아니라 4백만원.
+// 0이 여섯 개 늘어서면 얼마인지 한눈에 안 들어옵니다.
+function formatWon(n) {
+  n = Math.round(n);
+  if (n === 0) return '0원';
+  const sign = n < 0 ? '-' : '';
+  n = Math.abs(n);
+  const parts = [];
+  const eok = Math.floor(n / 100000000);          // 억
+  let rest = n % 100000000;
+  if (eok) parts.push(eok.toLocaleString() + '억');
+  const man = Math.floor(rest / 10000);           // 만
+  rest = rest % 10000;
+  if (man) {
+    // 딱 떨어질 때만 '천만·백만'으로 읽고, 어중간하면 '4,500만'처럼 만 단위로 적습니다
+    if (man % 1000 === 0) parts.push((man / 1000) + '천만');
+    else if (man < 1000 && man % 100 === 0) parts.push((man / 100) + '백만');
+    else parts.push(man.toLocaleString() + '만');
+  }
+  if (rest) {
+    if (rest % 1000 === 0) parts.push((rest / 1000) + '천');
+    else parts.push(rest.toLocaleString());
+  }
+  return sign + parts.join('') + '원';
+}
+
 // ---------- 8-2h-4. 상점 안 진열대 (가격표 달고, F로 구입) ----------
 // 상점 문으로 들어오면 당근·산소통·망사리·가구가 가격표와 함께 진열되어 있습니다.
 // 물건 앞에 서서 F(🐾)를 누르면 삽니다.
@@ -2158,7 +2184,7 @@ function makePriceSign(name, price) {
   g.fillText(name, 96, 40);
   g.fillStyle = '#b3541e';
   g.font = 'bold 30px "맑은 고딕", Malgun Gothic, sans-serif';
-  g.fillText(price.toLocaleString() + '원', 96, 78);
+  g.fillText(formatWon(price), 96, 78);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -2360,7 +2386,7 @@ function buyReno(rg) {
   const colors = rg.type === 'floor' ? FLOOR_COLORS : rg.type === 'wall' ? WALL_COLORS : PAINT_COLORS;
   openColorPicker(`${rg.name}\n색을 고르세요`, colors, (c) => {
     if (coins < price) {
-      spawnMoneyPopup(state.x, py, state.z, `${(price - coins).toLocaleString()}원 부족`);
+      spawnMoneyPopup(state.x, py, state.z, `${formatWon((price - coins))} 부족`);
       return;
     }
     coins -= price;
@@ -2400,7 +2426,7 @@ function buyShopGood(good) {
 }
 function doBuyShopGood(good, price, px, py, pz) {
   if (coins < price) {
-    spawnMoneyPopup(px, py, pz, `${(price - coins).toLocaleString()}원 부족`);
+    spawnMoneyPopup(px, py, pz, `${formatWon((price - coins))} 부족`);
     return;
   }
   coins -= price;
@@ -3520,7 +3546,7 @@ const coinBadge = document.getElementById('coinBadge');
 const ropeBadge = document.getElementById('ropeBadge');
 const boxBadge = document.getElementById('boxBadge');
 function updateCoinBadge() {
-  if (coinBadge) coinBadge.textContent = `💵 ${coins.toLocaleString()}원`;
+  if (coinBadge) coinBadge.textContent = `💵 ${formatWon(coins)}`;
 }
 // 상자에 귤이 몇 개 담겼는지 (가득 차면 색이 바뀌어 배송할 때가 됐음을 알립니다)
 // basketCount·BASKET_CAP은 아래 12-1b에서 만들어지지만, 이 함수는 그 뒤에야 불리므로 괜찮습니다.
@@ -3532,8 +3558,8 @@ function updateBasketBadge() {
   if (!dragging) return;
   const full = basketCount >= BASKET_CAP;
   boxBadge.textContent = full
-    ? `📦 상자 가득! ${basketCount}/${BASKET_CAP}\n택배사의 이장님께 (한 박스 10,000원)`
-    : `📦 상자 ${basketCount}/${BASKET_CAP}\n가득 채우면 10,000원`;
+    ? `📦 상자 가득! ${basketCount}/${BASKET_CAP}\n택배사의 이장님께 (한 박스 ${formatWon(BOX_PRICE)})`
+    : `📦 상자 ${basketCount}/${BASKET_CAP}\n가득 채우면 ${formatWon(BOX_PRICE)}`;
   boxBadge.classList.toggle('full', full);
 }
 // 상자(basketPos)와 잡기 범위(GRAB_RANGE)는 아래 12-1b에서 정의되므로,
@@ -3566,7 +3592,7 @@ function updateRopeBadge() {
     if (rg) {
       ropeBadge.textContent = (rg.type === 'paint' && tools.paint)
         ? '페인트 보유 중\n집 앞에서 칠하세요'
-        : `${rg.name}\n${shopPrice(rg.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION}으로 색 고르기)`;
+        : `${rg.name}\n${formatWon(shopPrice(rg.price))}${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION}으로 색 고르기)`;
       return;
     }
     const good = nearestShopGood();
@@ -3577,7 +3603,7 @@ function updateRopeBadge() {
         (FURNITURE[good.key] && furnitureOwned[good.key]);
       ropeBadge.textContent = owned
         ? `${good.name}\n보유 중`
-        : `${good.name} ${shopPrice(good.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''}\n${KEY_ACTION}으로 구입`;
+        : `${good.name} ${formatWon(shopPrice(good.price))}${dayEvent === 'market' ? ' (장날 반값!)' : ''}\n${KEY_ACTION}으로 구입`;
     } else {
       ropeBadge.textContent = '상점 안\n물건 앞에 서면 살 수 있어요 (문 쪽으로 가면 밖으로)';
     }
@@ -3611,7 +3637,7 @@ function updateRopeBadge() {
           (isNight() ? '\n야간물질은 값을 2배로 쳐줘요\n대신 숨이 빨리 차요' : '')
         : (hasNet
           ? '망사리를 두고 왔어요\n메고 와야 물질할 수 있어요'
-          : `망사리가 있어야 물질합니다\n상점 안에서 ${NET_PRICE.toLocaleString()}원`);
+          : `망사리가 있어야 물질합니다\n상점 안에서 ${formatWon(NET_PRICE)}`);
     }
     return;
   }
@@ -3646,7 +3672,7 @@ function updateRopeBadge() {
     const mayorHere = Math.hypot(mayor.x - MAYOR_POSTS.depot.x, mayor.z - MAYOR_POSTS.depot.z) < 2.5;
     ropeBadge.textContent = mayorHere
       ? (basketCount >= BASKET_CAP
-        ? `${KEY_ACTION}으로 귤 박스 부치기 (10,000원)\n이장님이 계세요`
+        ? `${KEY_ACTION}으로 귤 박스 부치기 (${formatWon(BOX_PRICE)})\n이장님이 계세요`
         : `택배사\n상자를 가득 채워 오면 이장님이 사 줍니다 (${basketCount}/${BASKET_CAP})`)
       : '이장님이 오고 계세요\n문 앞에서 잠깐 기다려주세요';
     return;
@@ -3654,27 +3680,27 @@ function updateRopeBadge() {
   // 당근 바구니·산소통·마구간 안내
   if (typeof CARROT_SPOT !== 'undefined' &&
       Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z) < CARROT_RANGE) {
-    ropeBadge.textContent = `${KEY_ACTION}으로 당근 구입 (${CARROT_PRICE.toLocaleString()}원)`;
+    ropeBadge.textContent = `${KEY_ACTION}으로 당근 구입 (${formatWon(CARROT_PRICE)})`;
     return;
   }
   if (typeof TANK_SPOT !== 'undefined' &&
       Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z) < TANK_RANGE) {
     ropeBadge.textContent = hasTank
       ? '산소통 보유 중\n숨 3분'
-      : `해녀 산소통\n${KEY_ACTION}으로 구입 (${TANK_PRICE.toLocaleString()}원, 숨 60초→3분)`;
+      : `해녀 산소통\n${KEY_ACTION}으로 구입 (${formatWon(TANK_PRICE)}, 숨 60초→3분)`;
     return;
   }
   if (typeof RACE_SPOT !== 'undefined' &&
       Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z) < RACE_RANGE) {
     ropeBadge.textContent = ponyLove < RACE_MIN_LOVE
       ? `경마\n애정 ${RACE_MIN_LOVE} 이상부터 출전 (지금 ${ponyLove})`
-      : `경마 출전 ${RACE_FEE.toLocaleString()}원 · 1등 상금 ${racePrize().toLocaleString()}원(당근 먹인 만큼 커짐) · 승률 ${Math.round(raceWinChance() * 100)}% (${KEY_ACTION})`;
+      : `경마 출전 ${formatWon(RACE_FEE)} · 1등 상금 ${formatWon(racePrize())}(당근 먹인 만큼 커짐) · 승률 ${Math.round(raceWinChance() * 100)}% (${KEY_ACTION})`;
     return;
   }
   if (typeof STABLE !== 'undefined' &&
       Math.hypot(state.x - STABLE.x, state.z - STABLE.z) < STABLE_RANGE) {
     if (!ponyAlive) {
-      ropeBadge.textContent = `마구간이 비었어요\n${KEY_ACTION}으로 새 조랑말 데려오기 (${PONY_PRICE.toLocaleString()}원)`;
+      ropeBadge.textContent = `마구간이 비었어요\n${KEY_ACTION}으로 새 조랑말 데려오기 (${formatWon(PONY_PRICE)})`;
     } else if (carrots > 0) {
       ropeBadge.textContent = `${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)` +
         (ponyFedToday() ? '' : '\n오늘 아직 안 먹였어요');
@@ -4199,7 +4225,7 @@ function tryShipBox() {
   }
   if (basketCount < BASKET_CAP) {
     spawnMoneyPopup(dp.x, popupY, dp.z,
-      `상자를 가득 채워서 오게 (${basketCount}/${BASKET_CAP})\n한 박스 ${BOX_PRICE.toLocaleString()}원`);
+      `상자를 가득 채워서 오게 (${basketCount}/${BASKET_CAP})\n한 박스 ${formatWon(BOX_PRICE)}`);
     return;
   }
   // 이장님이 아직 오는 중이면 정산할 사람이 없습니다
@@ -4213,7 +4239,7 @@ function tryShipBox() {
   emptyBasket();                 // 트럭에 실었으니 상자는 다시 비워집니다
   updateCoinBadge();
   playShipSound();
-  spawnMoneyPopup(dp.x, popupY, dp.z, `이장님이 귤 한 박스를 사셨어요! +${BOX_PRICE.toLocaleString()}원`);
+  spawnMoneyPopup(dp.x, popupY, dp.z, `이장님이 귤 한 박스를 사셨어요! +${formatWon(BOX_PRICE)}`);
   checkAchievements();
 }
 
@@ -4379,7 +4405,7 @@ function leaveDive(reason) {
     playShipSound();
     const list = Object.entries(tally).map(([k, n]) => `${CATCH_KINDS[k].name} ${n}`).join(' · ');
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
-      `${list} → +${pay.toLocaleString()}원` +
+      `${list} → +${formatWon(pay)}` +
       (nightSold ? ' (야간물질 2배!)' : '') +
       (dayEvent === 'haul' ? ' (물반 고기반!)' : ''));
     checkAchievements();
@@ -4713,7 +4739,7 @@ function houseBadgeText() {
   if (endingState >= 2) return '곧 카페가 들어선다는 내 집… · 문 앞에 서면 안으로';
   if (houseStage >= 3) return '내 집! 창고(30알) · 문 앞에 서면 안으로 들어갑니다';
   if (!tools.paint) {
-    return `외벽 페인트칠을 하려면 공구대에서 페인트를 사 오세요 (${PAINT_PRICE.toLocaleString()}원 · 색 고르기)`;
+    return `외벽 페인트칠을 하려면 공구대에서 페인트를 사 오세요 (${formatWon(PAINT_PRICE)} · 색 고르기)`;
   }
   return `페인트칠 ${fixSwings}/${SWINGS_PER_STAGE}\n${KEY_ACTION}으로 계속 · 문 앞에 서면 안으로`;
 }
@@ -4907,9 +4933,9 @@ const ENDING_SAD = [
   '"여기, 무허가 건물인 거 아시죠? 제가 이 땅 주인입니다."',
   '"비워주세요. 여기다 카페를 지을 겁니다. …오션뷰 카페요."',
   '그리고 그 뒤에\n낯익은 밀짚모자가 서 있었다.',
-  '이 집을 4,000만 원에 판 사람. …이장님이었다.',
+  '이 집을 4천만원에 판 사람. …이장님이었다.',
   '"미안하게 됐네. 카페 개업하면… 음료는 한 잔 서비스함세."',
-  '4,000만 원에 사서, 1억을 들여 고치고 꾸민 내 집이… 루루는 눈앞이 캄캄해졌다. ㅠㅠ',
+  '4천만원에 사서, 1억을 들여 고치고 꾸민 내 집이… 루루는 눈앞이 캄캄해졌다. ㅠㅠ',
   '서울에는, 내가 살 수 있는 집이 없었다.',
   '…제주에도, 내 집은 없었다.',
   '끝',
@@ -5115,7 +5141,7 @@ let introSeen = false;
 const INTRO_LINES = [
   '루루는 제주에서 태어난 고양이가 아니다.\n원래는 서울에서 살았다.',
   '스무 살의 루루가 눈여겨본 서울의 작은 아파트는 5억이었다.\n"10년만 열심히 모으면, 대출 끼고 살 수 있을 거야."',
-  '10년을 쉬지 않고 일하고, 아끼고, 모았다.\n서른 살이 된 루루의 전 재산은\n4,000만 원.',
+  '10년을 쉬지 않고 일하고, 아끼고, 모았다.\n서른 살이 된 루루의 전 재산은\n4천만원.',
   '그사이 그 아파트는 20억이 되어 있었다.\n집값은 월급보다, 저축보다, 꿈보다 훨씬 빨랐다.',
   '루루는 꿈을 접었다.\n그리고 마지막 희망을 품고\n마을 이장이 소개해 준 제주 외딴 마을의 빈집 하나를, 전 재산을 털어 샀다.',
   '집은 비가 새고, 전기는 끊겼고, 잡초는 허리까지 자라 있었다.\n하지만 루루는 웃었다.',
@@ -5129,7 +5155,7 @@ const TUTOR_RANGE = 2.6;
 let tutorialSeen = false;
 const TUTOR_LINES = [
   '안녕하세요! 저는 이 섬을 지키는 돌하르방입니다. 섬에서 사는 법을 알려드릴게요.',
-  '귤나무 앞에서 (F)를 누르면 귤을 딸 수 있어요. 상자를 가득 채워 택배사에 가져가면 한 박스 10,000원에 팔립니다.',
+  '귤나무 앞에서 (F)를 누르면 귤을 딸 수 있어요. 상자를 가득 채워 택배사에 가져가면 한 박스 1만원에 팔립니다.',
   '상점 문 앞에 서면 안으로 들어갑니다. 당근을 사서 말에게 매일 한 개씩 먹여주세요\n굶기면 위험해요!',
   '물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가세요. 물속에서는 ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄이에요. 숨이 다하면 죽을 위험이 있어요!',
   '남쪽 언덕의 돌집이 루루의 집입니다. 문 앞에 서면 들어가지고, 가구를 사서 꾸밀 수도 있어요.',
@@ -5224,8 +5250,8 @@ function openBag() {
   if (houseWallColor !== 0) spent += 6000000;
   bookList.innerHTML =
     `<div class="bookHead">🎒 자산</div>` +
-    `<div class="bagMoney">💵 ${coins.toLocaleString()}원</div>` +
-    `<div class="bookTip" style="margin-bottom:10px">🏠 집꾸미기 ${spent.toLocaleString()} / 100,000,000원<br>` +
+    `<div class="bagMoney">💵 ${formatWon(coins)}</div>` +
+    `<div class="bookTip" style="margin-bottom:10px">🏠 집꾸미기 ${formatWon(spent)} / ${formatWon(100000000)}<br>` +
     (spent >= 100000000 ? '꿈을 이뤘어요!' : '1억을 채우면 꿈의 집 완성') + `</div>` +
     `<div class="bagGrid">` + items.map((it) =>
       `<div class="bagItem${it.owned ? '' : ' off'}">` +
@@ -5276,7 +5302,7 @@ function openColorPicker(title, colors, onPick, price) {
   const refreshBtn = () => {
     buyBtn.disabled = !selected;
     buyBtn.textContent = selected
-      ? `${selected.name} · ${price.toLocaleString()}원\n눌러서 구입`
+      ? `${selected.name} · ${formatWon(price)}\n눌러서 구입`
       : '먼저 색을 골라주세요';
   };
   for (const c of colors) {
@@ -5326,7 +5352,7 @@ function openBuyDialog(emoji, name, price, onBuy) {
   pickGrid.appendChild(prev);
   const buyBtn = document.createElement('button');
   buyBtn.className = 'buyBtn';
-  buyBtn.textContent = `${price.toLocaleString()}원\n눌러서 구입`;
+  buyBtn.textContent = `${formatWon(price)}\n눌러서 구입`;
   buyBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation();
     pickWrap.style.display = 'none';
@@ -5593,7 +5619,7 @@ function updateCarrotBadge() {
 function tryBuyCarrot() {
   const y = groundHeight(CARROT_SPOT.x, CARROT_SPOT.z) + 1.3;
   if (coins < CARROT_PRICE) {
-    spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `${(CARROT_PRICE - coins).toLocaleString()}원 부족`);
+    spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `${formatWon((CARROT_PRICE - coins))} 부족`);
     return;
   }
   coins -= CARROT_PRICE;
@@ -5651,7 +5677,7 @@ function tryRace() {
     return;
   }
   if (coins < RACE_FEE) {
-    spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, `${(RACE_FEE - coins).toLocaleString()}원 부족`);
+    spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, `${formatWon((RACE_FEE - coins))} 부족`);
     return;
   }
   coins -= RACE_FEE;
@@ -5684,7 +5710,7 @@ function startRaceVideo(win) {
       stat.raceWins++;
       updateCoinBadge();
       playShipSound();
-      spawnMoneyPopup(state.x, py, state.z, `1등! 상금 ${prize.toLocaleString()}원을 받았어요`, 5);
+      spawnMoneyPopup(state.x, py, state.z, `1등! 상금 ${formatWon(prize)}을 받았어요`, 5);
       checkAchievements();
     } else {
       spawnMoneyPopup(state.x, py, state.z, '꼴등… 당근을 더 먹이면 더 잘 뜁니다', 5);
@@ -5740,7 +5766,7 @@ function tryFeedPony() {
     // 빈 마구간에서 F — 새 조랑말을 데려옵니다
     if (coins < PONY_PRICE) {
       spawnMoneyPopup(STABLE.x, y, STABLE.z,
-        `마구간이 비었어요\n새 조랑말은 ${PONY_PRICE.toLocaleString()}원 (${(PONY_PRICE - coins).toLocaleString()}원 부족)`);
+        `마구간이 비었어요\n새 조랑말은 ${formatWon(PONY_PRICE)} (${formatWon((PONY_PRICE - coins))} 부족)`);
       return;
     }
     coins -= PONY_PRICE;
@@ -5879,7 +5905,7 @@ function handleActionKey() {
       const py = groundHeight(DIVE_ENTRY.x, DIVE_ENTRY.z) + 2.2;
       spawnMoneyPopup(DIVE_ENTRY.x, py, DIVE_ENTRY.z,
         hasNet ? '망사리를 두고 왔어요\n메고 와야 물질할 수 있어요'
-               : `망사리가 있어야 물질할 수 있어요\n상점 안에서 ${NET_PRICE.toLocaleString()}원`);
+               : `망사리가 있어야 물질할 수 있어요\n상점 안에서 ${formatWon(NET_PRICE)}`);
       return;
     }
     enterDive();
