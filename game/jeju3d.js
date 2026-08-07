@@ -2378,7 +2378,10 @@ const catchMeshes = {};       // 종류별 InstancedMesh
   for (let i = 0; i < 380; i++) {
     const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * DIVE.r;
     const x = DIVE.x + Math.cos(a) * rr, z = DIVE.z + Math.sin(a) * rr;
-    kelpSpots.push([x, seabedHeight(x, z), z, 1.4 + Math.random() * 1.8, Math.random() * Math.PI]);
+    const h = 1.4 + Math.random() * 1.8, ry = Math.random() * Math.PI;
+    // 축대 끝 앞 얕은 구역은 비웁니다 — 바위처럼 미역도 여기서는 수면 위로 삐져나옵니다
+    if (x > -5 && x < 5 && z < 108) continue;
+    kelpSpots.push([x, seabedHeight(x, z), z, h, ry]);
   }
   const blade = normalsUp(new THREE.PlaneGeometry(0.34, 1, 1, 4));
   blade.translate(0, 0.5, 0);
@@ -2402,9 +2405,12 @@ const catchMeshes = {};       // 종류별 InstancedMesh
         z = r.z + Math.sin(a) * r.s * 0.8;
         y = r.y + r.s * 0.45;
       } else {
-        const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * (DIVE.r - 2);
-        x = DIVE.x + Math.cos(a) * rr;
-        z = DIVE.z + Math.sin(a) * rr;
+        // 축대 끝 앞 얕은 구역에 걸리면 자리를 다시 뽑습니다 (채집물 개수는 지켜야 하므로)
+        do {
+          const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * (DIVE.r - 2);
+          x = DIVE.x + Math.cos(a) * rr;
+          z = DIVE.z + Math.sin(a) * rr;
+        } while (x > -5 && x < 5 && z < 108);
         y = seabedHeight(x, z) + 0.12;
       }
       catchSpots.push({ x, y, z, kind, picked: false });
