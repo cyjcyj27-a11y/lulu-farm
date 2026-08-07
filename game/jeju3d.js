@@ -114,6 +114,9 @@ function bump(x, z, cx, cz, amp, size) {
 // 포구는 물가에 바짝 붙은 마른 땅에 둡니다. (0,92)는 물가에서 1.2미터 위,
 // 여기서 두 걸음만 나가면 바로 물이라 "여기서 바다로 들어간다"는 게 한눈에 보입니다.
 const PORT = { x: 0, z: 92 };
+// 루루의 집터 — 남쪽 비탈을 완만하게 다져 평평한 터를 만듭니다.
+// (지형 함수보다 먼저 정해둬야 집터를 다진 지형을 만들 수 있습니다. 집 좌표도 여기서 나옵니다)
+const HOUSE_SITE = { x: 64, z: -58, flatR: 10, blendR: 20, h: 6.5 };
 // 물질장은 물가(z≈93)에서 충분히 떨어뜨려야 합니다. 가장자리가 뭍에 닿으면
 // 마른 땅 위에서도 잠수 상태로 서 있게 됩니다.
 const DIVE = { x: 0, z: 118, r: 20 };    // 물질장 (포구 앞바다)
@@ -148,6 +151,14 @@ function groundHeight(x, z) {
   // 포구에서 헤엄쳐 들어갈 때 벽에 막히지 않습니다.
   const dr = Math.hypot(x - DIVE.x, z - DIVE.z);
   y -= DIVE_DEPTH * (1 - smoothstep(0, DIVE.r + 8, dr));
+
+  // 루루의 집터 — 비탈을 다져 평평하게. 안쪽은 완전 평지, 바깥쪽은 언덕과 부드럽게 이어집니다.
+  // (집이 경사면에 반쯤 떠 보이던 것을 지형 쪽에서 해결)
+  const hs = Math.hypot(x - HOUSE_SITE.x, z - HOUSE_SITE.z);
+  if (hs < HOUSE_SITE.blendR) {
+    const t = smoothstep(HOUSE_SITE.flatR, HOUSE_SITE.blendR, hs);
+    y = HOUSE_SITE.h * (1 - t) + y * t;
+  }
   return y;
 }
 
@@ -997,11 +1008,14 @@ const citrusTrunkMat = new THREE.MeshLambertMaterial({ color: 0x6f5540, flatShad
 // 사서 세 번 고치면(벽→지붕→페인트) 내 집이 됩니다.
 // 집은 직접 그리신 그림을 판에 세워 쓰고, 수리 단계마다 그림만 바꿔 끼웁니다.
 //   old_house_0: 폐가 / 1: 벽 고침 / 2: 지붕 고침 / 3: 완성 (원본 그대로)
-const HOUSE = { x: 64, z: -66 };   // 절벽에서 한 발 물려 내륙 쪽으로, 귤밭 돌담(동쪽 x≈53)과도 간격을 둠.
-                                   // 집 뒤(남쪽 바다 쪽)에는 야자수 심을 자리를 남겨뒀습니다.
+const HOUSE = { x: HOUSE_SITE.x, z: HOUSE_SITE.z };   // 평평하게 다진 집터 한가운데.
+// 바다에서 물러난 자리 + 귤밭 돌담(동쪽 x≈53)과 간격. 집 뒤(남쪽)는 야자수 자리입니다.
 const HOUSE_RANGE = 5.5;
 const HOUSE_W = 8.5, HOUSE_H = 8.5 * 520 / 1110;   // 그림 비율 그대로
 let houseStage = 0;    // 루루가 처음부터 살고 있는 집입니다. 0~2 = 수리 중(허름함), 3 = 완성
+let roofUpgraded = false;    // 상점의 "새 지붕"을 샀는가 — 사기 전엔 낡아 거뭇한 지붕입니다
+let hasHouseDoor = false;    // 「대문」을 샀는가 — 사기 전엔 문간이 뻥 뚫려 있습니다
+let hasHouseWindow = false;  // 「창문」을 샀는가 — 사기 전엔 시커먼 구멍 두 개뿐입니다
 const house = (() => {
   const g = new THREE.Group();
   // 절벽 비탈 위의 집 — 발밑 네 귀퉁이 땅높이 중 "가장 높은 곳"에 바닥을 맞추고,
@@ -1037,13 +1051,16 @@ const house = (() => {
   wallMesh.castShadow = true;
   g.add(wallMesh);
 
-  // 반듯한 새 지붕 (수리 2단계부터)
-  const roofFine = makeGableRoof(W + 1.3, D + 0.9, 1.5, shopThatchMat);
+  // 지붕 재질 둘 — 기본은 세월에 거뭇해진 낡은 짚, 상점의 "새 지붕"을 사면 환한 새 짚빛
+  const roofOldMat = new THREE.MeshLambertMaterial({ color: 0x5f5340, flatShading: true });
+  const roofNewMat = new THREE.MeshLambertMaterial({ color: 0xdcbd6a, flatShading: true });
+  // 반듯한 지붕 골조 (수리 2단계부터)
+  const roofFine = makeGableRoof(W + 1.3, D + 0.9, 1.5, roofOldMat);
   roofFine.position.y = WALL;
   g.add(roofFine);
   // 주저앉은 옛 지붕 — 살짝 기울고, 마루가 처지고, 군데군데 뚫려 있습니다
   const roofBad = new THREE.Group();
-  const rb = makeGableRoof(W + 1.3, D + 0.9, 1.15, shopThatchMat);
+  const rb = makeGableRoof(W + 1.3, D + 0.9, 1.15, roofOldMat);
   rb.rotation.z = 0.055;                       // 한쪽으로 살짝 주저앉음
   rb.position.y = -0.12;
   roofBad.add(rb);
@@ -1057,37 +1074,49 @@ const house = (() => {
   roofBad.position.y = WALL;
   g.add(roofBad);
 
-  // 문 — 북쪽(+z, 마을 쪽) 한가운데. 허름할 때는 삐딱하게 걸려 있습니다
-  const doorBad = new THREE.Mesh(new THREE.BoxGeometry(1.25, 2.0, 0.1), shopWoodDarkMat);
-  doorBad.position.set(0, 0.95, D / 2 + 0.06);
-  doorBad.rotation.z = 0.09;
-  g.add(doorBad);
+  // 문간 — 처음엔 문짝이 없어 시커멓게 뻥 뚫려 있습니다. 상점에서 「대문」을 사면 문짝이 달립니다.
+  const doorway = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.05, 0.06),
+    new THREE.MeshLambertMaterial({ color: 0x15110c }));
+  doorway.position.set(0, 1.0, D / 2 + 0.03);
+  g.add(doorway);
   const doorFine = new THREE.Mesh(new THREE.BoxGeometry(1.25, 2.05, 0.1), shopWoodMat);
   doorFine.position.set(0, 1.02, D / 2 + 0.06);
   g.add(doorFine);
-  // 문 위 처마 그늘 띠 — 문이 벽에 묻히지 않게
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), shopWoodDarkMat);
+  knob.position.set(0.42, 1.0, D / 2 + 0.13);
+  doorFine.userData.knob = knob;
+  g.add(knob);
+  // 문 위 처마 그늘 띠 — 문간이 벽에 묻히지 않게
   const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.16, 0.2), shopWoodDarkMat);
   lintel.position.set(0, 2.14, D / 2 + 0.08);
   g.add(lintel);
 
-  // 창 두 짝 — 나무 틀 + 유리. 완성되면 틀이 밝은 칠로 바뀝니다
+  // 창 두 짝 — 처음엔 창도 없이 시커먼 구멍만. 상점에서 「창문」을 사면 틀·유리·창살이 달립니다.
+  const winHoles = [];
+  const winGroup = new THREE.Group();
   const winFrames = [];
   [-2.35, 2.35].forEach((wx) => {
+    const hole = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.95, 0.05),
+      new THREE.MeshLambertMaterial({ color: 0x15110c }));
+    hole.position.set(wx, 1.45, D / 2 + 0.03);
+    g.add(hole);
+    winHoles.push(hole);
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.1, 0.12), shopWoodDarkMat);
     frame.position.set(wx, 1.45, D / 2 + 0.05);
-    g.add(frame);
+    winGroup.add(frame);
     winFrames.push(frame);
     const glass = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.85, 0.1), truckGlassMat);
     glass.position.set(wx, 1.45, D / 2 + 0.08);
-    g.add(glass);
+    winGroup.add(glass);
     // 창살 十자
     const barV = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.85, 0.12), shopWoodDarkMat);
     barV.position.set(wx, 1.45, D / 2 + 0.09);
-    g.add(barV);
+    winGroup.add(barV);
     const barH = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.07, 0.12), shopWoodDarkMat);
     barH.position.set(wx, 1.45, D / 2 + 0.09);
-    g.add(barH);
+    winGroup.add(barH);
   });
+  g.add(winGroup);
 
   // 문 앞 돌계단 — 기단 위의 문과 마당 땅 사이를 잇습니다
   {
@@ -1143,7 +1172,10 @@ const house = (() => {
 
   scene.add(g);
   obstacles.push({ x: HOUSE.x, z: HOUSE.z, r: 3.4, topY: NO_JUMP });
-  return { group: g, wallMesh, wallDarkMat, roofFine, roofBad, doorFine, doorBad, winFrames, junk, sale };
+  // 지붕 널빤지들(구멍 제외)을 모아둡니다 — "새 지붕"을 사면 이것들만 환한 재질로 바뀝니다
+  const roofMeshes = [...roofFine.children, ...rb.children].filter((o) => o.isMesh);
+  return { group: g, wallMesh, wallDarkMat, roofFine, roofBad, roofMeshes, roofOldMat, roofNewMat,
+           doorway, doorFine, winGroup, winHoles, winFrames, junk, sale };
 })();
 // (예전의 "그림판 + 뒤채 몸통" 조합은 뺐습니다 — 옆·뒤에서 보면 그림 위로 뒤채 지붕이
 //  뚫고 나와 보였고, 비탈에서 뒤채가 공중에 떠 보였습니다. 이제 위의 진짜 돌집 하나입니다)
@@ -1151,11 +1183,17 @@ const house = (() => {
 function applyHouseLook() {
   const s = houseStage;
   house.wallMesh.material = s >= 1 ? shopStoneMat : house.wallDarkMat;   // 1단계: 벽 고침
-  house.roofFine.visible = s >= 2;                                       // 2단계: 새 지붕
+  house.roofFine.visible = s >= 2;                                       // 2단계: 지붕 골조를 반듯하게
   house.roofBad.visible = s < 2;
-  house.doorFine.visible = s >= 3;                                       // 3단계: 칠한 문·창틀
-  house.doorBad.visible = s < 3;
-  for (const f of house.winFrames) f.material = s >= 3 ? shopWoodMat : shopWoodDarkMat;
+  // 상점의 "새 지붕"을 샀으면 짚이 환한 새 빛깔로 (골조 수리와 별개의 치장입니다)
+  const rm = roofUpgraded ? house.roofNewMat : house.roofOldMat;
+  for (const m of house.roofMeshes) m.material = rm;
+  // 대문·창문은 상점에서 사야 달립니다 — 사기 전엔 시커먼 구멍
+  house.doorFine.visible = hasHouseDoor;
+  house.doorFine.userData.knob.visible = hasHouseDoor;
+  house.winGroup.visible = hasHouseWindow;
+  for (const h of house.winHoles) h.visible = !hasHouseWindow;
+  for (const f of house.winFrames) f.material = s >= 3 ? shopWoodMat : shopWoodDarkMat;   // 3단계: 칠한 창틀
   house.junk.visible = s < 3;             // 다 고치면 마당의 잡동사니가 치워집니다
   house.sale.visible = s < 0;             // 처음부터 루루의 집이라 팻말은 안 보입니다
 }
@@ -1508,25 +1546,29 @@ buildRoom(SHOP_ROOM, 0x9a7748, 0xd3b97e);                    // 상점 안 — �
 // ---------- 8-2h-2. 가구 (상점에서 사서 집을 꾸밉니다) ----------
 // 처음엔 집이 텅 비어서 맨땅에서 잡니다. 상점 안에서 가구를 사면 집 안에 놓입니다.
 const FURN_ORDER = ['bed', 'chair', 'table', 'closet', 'rug', 'lamp', 'plant', 'shelf', 'painting', 'window', 'tv', 'kitchen',
-                    'island', 'palm', 'lawn', 'stones', 'gardenlight'];
+                    'island', 'roof', 'door', 'palm', 'lawn', 'stones', 'gardenlight'];
 // 마당 조경 아이템 — 방 안이 아니라 집 앞마당(실제 지형 위)에 심습니다
 const YARD_KEYS = new Set(['palm', 'lawn', 'stones', 'gardenlight']);
-// 집공사 총액은 딱 1억 원입니다: 실내 가구·소품 6,600만 + 마당 조경 2,400만 + 바닥 400만 + 벽지 600만.
+// 집 자체에 다는 것들 — 방에 놓는 물건이 아니라 집의 겉모습을 바꿉니다 (처음엔 지붕은 낡고, 문·창문은 아예 없음)
+const HOUSE_PART_KEYS = new Set(['roof', 'door', 'window']);
+// 집공사 총액은 딱 1억 원입니다: 실내 가구·소품 5,200만 + 지붕·문·창문 1,500만 + 마당 조경 2,400만 + 바닥 400만 + 벽지 600만.
 // 서울의 20억 아파트 대신, 제주에서 1억으로 완성하는 내 집 — 루루의 꿈의 가격표입니다.
 const FURNITURE = {
   bed:      { name: '침대',        price: 6000000 },
   chair:    { name: '의자',        price: 2000000 },
   table:    { name: '식탁',        price: 4000000 },
-  closet:   { name: '옷장',        price: 7000000 },
+  closet:   { name: '옷장',        price: 6000000 },
   rug:      { name: '러그',        price: 1500000 },
-  lamp:     { name: '스탠드 조명', price: 3000000 },
+  lamp:     { name: '스탠드 조명', price: 2500000 },
   plant:    { name: '화분',        price: 500000 },
-  shelf:    { name: '책장',        price: 4000000 },
-  painting: { name: '벽걸이 그림', price: 3500000 },
-  window:   { name: '창문',        price: 8000000 },
-  tv:       { name: '텔레비전',    price: 10000000 },
-  kitchen:  { name: '부엌 찬장',   price: 12000000 },
+  shelf:    { name: '책장',        price: 3000000 },
+  painting: { name: '벽걸이 그림', price: 3000000 },
+  window:   { name: '창문',        price: 6000000 },
+  tv:       { name: '텔레비전',    price: 8000000 },
+  kitchen:  { name: '부엌 찬장',   price: 10000000 },
   island:   { name: '아일랜드 식탁', price: 4500000 },
+  roof:     { name: '새 지붕',     price: 5000000 },   // 낡아 거뭇한 지붕이 환한 새 짚빛으로
+  door:     { name: '대문',        price: 4000000 },   // 처음엔 문짝 없이 뻥 뚫려 있습니다
   palm:        { name: '야자수',    price: 8000000 },
   lawn:        { name: '잔디밭',    price: 6000000 },
   stones:      { name: '조경석',    price: 4000000 },
@@ -1826,12 +1868,39 @@ function makeGardenLightMesh() {
   g.add(glow);
   return g;
 }
+// 상점 진열용 모형 — 새 지붕(견본 지붕 조각)과 대문(문짝)
+function makeRoofItemMesh() {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color: 0xdcbd6a, flatShading: true });
+  const r = makeGableRoof(1.6, 1.2, 0.5, mat);
+  r.position.y = 0.55;
+  g.add(r);
+  [-0.6, 0.6].forEach((x) => {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.55, 6), shopWoodDarkMat);
+    p.position.set(x, 0.28, 0);
+    g.add(p);
+  });
+  return g;
+}
+function makeDoorItemMesh() {
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.62, 0.05), shopWoodDarkMat);
+  frame.position.set(0, 0.78, -0.03);
+  g.add(frame);
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.5, 0.08), shopWoodMat);
+  plank.position.y = 0.75;
+  g.add(plank);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), shopWoodDarkMat);
+  knob.position.set(0.28, 0.72, 0.08);
+  g.add(knob);
+  return g;
+}
 const FURN_BUILDERS = {
   bed: makeBedMesh, chair: makeChairMesh, table: makeTableMesh, closet: makeClosetMesh,
   rug: makeRugMesh, lamp: makeLampMesh, plant: makePlantMesh, shelf: makeShelfMesh,
   painting: makePaintingMesh, window: makeWindowMesh, tv: makeTvMesh, kitchen: makeKitchenMesh,
-  island: makeIslandMesh, palm: makePalmMesh, lawn: makeLawnMesh, stones: makeStonesMesh,
-  gardenlight: makeGardenLightMesh,
+  island: makeIslandMesh, roof: makeRoofItemMesh, door: makeDoorItemMesh,
+  palm: makePalmMesh, lawn: makeLawnMesh, stones: makeStonesMesh, gardenlight: makeGardenLightMesh,
 };
 
 // 집 안에 실제로 놓이는 가구 — 사기 전에는 숨겨져 있습니다
@@ -1860,6 +1929,7 @@ const furnitureMeshes = {};
     gardenlight: [HOUSE.x + 2.6, HOUSE.z + 4.0, 0],        // 문 앞 돌계단 옆 마당 조명
   };
   for (const k of FURN_ORDER) {
+    if (k === 'roof' || k === 'door') continue;   // 지붕·대문은 물건이 아니라 집 자체를 바꿉니다 (applyHouseLook)
     const g = FURN_BUILDERS[k]();
     const ys = yardSpots[k];
     if (ys) {
@@ -1875,7 +1945,14 @@ const furnitureMeshes = {};
   }
 }
 function applyFurniture() {
-  for (const k of FURN_ORDER) furnitureMeshes[k].visible = furnitureOwned[k];
+  for (const k of FURN_ORDER) {
+    if (furnitureMeshes[k]) furnitureMeshes[k].visible = furnitureOwned[k];
+  }
+  // 지붕·대문·창문은 놓는 물건이 아니라 집 자체의 모습을 바꿉니다
+  roofUpgraded = !!furnitureOwned.roof;
+  hasHouseDoor = !!furnitureOwned.door;
+  hasHouseWindow = !!furnitureOwned.window;
+  applyHouseLook();
 }
 
 // ---------- 8-2h-3. 망사리 (물질 필수품 — 등에 메고 다니는 실물) ----------
@@ -2004,6 +2081,10 @@ const SHOP_GOODS = [
     x: SHOP_ROOM.cx + 4.2, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
   { key: 'island',   name: '아일랜드 식탁', emoji: '🍽', get price() { return FURNITURE.island.price; },
     x: SHOP_ROOM.cx + 2.6, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
+  { key: 'roof',     name: '새 지붕',     emoji: '🛖', get price() { return FURNITURE.roof.price; },
+    x: SHOP_ROOM.cx + 1.2, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
+  { key: 'door',     name: '대문',        emoji: '🚪', get price() { return FURNITURE.door.price; },
+    x: SHOP_ROOM.cx - 0.4, z: SHOP_ROOM.cz - 3.4 },
   // ----- 남쪽 벽(문 서쪽) — 마당 조경 코너 -----
   { key: 'palm',        name: '야자수',    emoji: '🌴', get price() { return FURNITURE.palm.price; },
     x: SHOP_ROOM.cx - 5.2, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
@@ -2170,8 +2251,11 @@ function buyShopGood(good) {
     furnitureOwned[good.key] = true;
     applyFurniture();
     playShipSound();
-    spawnMoneyPopup(px, py, pz, YARD_KEYS.has(good.key)
-      ? `🌴 ${good.name} 구입! 집 마당에 심어뒀어요`
+    spawnMoneyPopup(px, py, pz,
+      good.key === 'roof'   ? '🛖 새 지붕 구입! 지붕이 환한 새 짚빛이 됐어요'
+      : good.key === 'door' ? '🚪 대문 구입! 뚫려 있던 문간에 문짝을 달았어요'
+      : good.key === 'window' ? '🪟 창문 구입! 시커먼 구멍에 창을 달았어요'
+      : YARD_KEYS.has(good.key) ? `🌴 ${good.name} 구입! 집 마당에 심어뒀어요`
       : `🛋 ${good.name} 구입! 집 안에 놓아뒀어요`);
   }
 }
@@ -3247,12 +3331,16 @@ const coinBadge = document.getElementById('coinBadge');
 const ropeBadge = document.getElementById('ropeBadge');
 const boxBadge = document.getElementById('boxBadge');
 function updateCoinBadge() {
-  if (coinBadge) coinBadge.textContent = `🍊 ${coins.toLocaleString()}원`;
+  if (coinBadge) coinBadge.textContent = `💰 ${coins.toLocaleString()}원`;
 }
 // 상자에 귤이 몇 개 담겼는지 (가득 차면 색이 바뀌어 배송할 때가 됐음을 알립니다)
 // basketCount·BASKET_CAP은 아래 12-1b에서 만들어지지만, 이 함수는 그 뒤에야 불리므로 괜찮습니다.
+// 상자를 끌고 다닐 때만 보입니다 — 평소에는 화면 구석을 차지하지 않게.
 function updateBasketBadge() {
   if (!boxBadge) return;
+  const dragging = hasRope || state.grabbing;
+  boxBadge.style.display = dragging ? 'block' : 'none';
+  if (!dragging) return;
   const full = basketCount >= BASKET_CAP;
   boxBadge.textContent = full
     ? `📦 상자 가득! ${basketCount}/${BASKET_CAP} — 택배사의 이장님께 (한 박스 10,000원)`
