@@ -997,7 +997,8 @@ const citrusTrunkMat = new THREE.MeshLambertMaterial({ color: 0x6f5540, flatShad
 // 사서 세 번 고치면(벽→지붕→페인트) 내 집이 됩니다.
 // 집은 직접 그리신 그림을 판에 세워 쓰고, 수리 단계마다 그림만 바꿔 끼웁니다.
 //   old_house_0: 폐가 / 1: 벽 고침 / 2: 지붕 고침 / 3: 완성 (원본 그대로)
-const HOUSE = { x: 58, z: -72 };
+const HOUSE = { x: 64, z: -66 };   // 절벽에서 한 발 물려 내륙 쪽으로, 귤밭 돌담(동쪽 x≈53)과도 간격을 둠.
+                                   // 집 뒤(남쪽 바다 쪽)에는 야자수 심을 자리를 남겨뒀습니다.
 const HOUSE_RANGE = 5.5;
 const HOUSE_W = 8.5, HOUSE_H = 8.5 * 520 / 1110;   // 그림 비율 그대로
 let houseStage = 0;    // 루루가 처음부터 살고 있는 집입니다. 0~2 = 수리 중(허름함), 3 = 완성
@@ -1506,22 +1507,30 @@ buildRoom(SHOP_ROOM, 0x9a7748, 0xd3b97e);                    // 상점 안 — �
 
 // ---------- 8-2h-2. 가구 (상점에서 사서 집을 꾸밉니다) ----------
 // 처음엔 집이 텅 비어서 맨땅에서 잡니다. 상점 안에서 가구를 사면 집 안에 놓입니다.
-const FURN_ORDER = ['bed', 'chair', 'table', 'closet', 'rug', 'lamp', 'plant', 'shelf', 'painting', 'window', 'tv', 'kitchen'];
-// 집공사 총액은 딱 1억 원입니다: 가구·소품 9,000만 + 바닥 400만 + 벽지 600만.
+const FURN_ORDER = ['bed', 'chair', 'table', 'closet', 'rug', 'lamp', 'plant', 'shelf', 'painting', 'window', 'tv', 'kitchen',
+                    'island', 'palm', 'lawn', 'stones', 'gardenlight'];
+// 마당 조경 아이템 — 방 안이 아니라 집 앞마당(실제 지형 위)에 심습니다
+const YARD_KEYS = new Set(['palm', 'lawn', 'stones', 'gardenlight']);
+// 집공사 총액은 딱 1억 원입니다: 실내 가구·소품 6,600만 + 마당 조경 2,400만 + 바닥 400만 + 벽지 600만.
 // 서울의 20억 아파트 대신, 제주에서 1억으로 완성하는 내 집 — 루루의 꿈의 가격표입니다.
 const FURNITURE = {
-  bed:      { name: '침대',        price: 8000000 },
-  chair:    { name: '의자',        price: 3000000 },
-  table:    { name: '식탁',        price: 6000000 },
-  closet:   { name: '옷장',        price: 10000000 },
-  rug:      { name: '러그',        price: 2000000 },
-  lamp:     { name: '스탠드 조명', price: 4000000 },
-  plant:    { name: '화분',        price: 1000000 },
-  shelf:    { name: '책장',        price: 7000000 },
-  painting: { name: '벽걸이 그림', price: 5000000 },
-  window:   { name: '창문',        price: 12000000 },
-  tv:       { name: '텔레비전',    price: 15000000 },
-  kitchen:  { name: '부엌 찬장',   price: 17000000 },
+  bed:      { name: '침대',        price: 6000000 },
+  chair:    { name: '의자',        price: 2000000 },
+  table:    { name: '식탁',        price: 4000000 },
+  closet:   { name: '옷장',        price: 7000000 },
+  rug:      { name: '러그',        price: 1500000 },
+  lamp:     { name: '스탠드 조명', price: 3000000 },
+  plant:    { name: '화분',        price: 500000 },
+  shelf:    { name: '책장',        price: 4000000 },
+  painting: { name: '벽걸이 그림', price: 3500000 },
+  window:   { name: '창문',        price: 8000000 },
+  tv:       { name: '텔레비전',    price: 10000000 },
+  kitchen:  { name: '부엌 찬장',   price: 12000000 },
+  island:   { name: '아일랜드 식탁', price: 4500000 },
+  palm:        { name: '야자수',    price: 8000000 },
+  lawn:        { name: '잔디밭',    price: 6000000 },
+  stones:      { name: '조경석',    price: 4000000 },
+  gardenlight: { name: '마당 조명', price: 6000000 },
 };
 function emptyFurnOwned() {
   const o = {};
@@ -1720,10 +1729,109 @@ function makeKitchenMesh() {
   });
   return g;
 }
+// ----- 아일랜드 식탁 (부엌 앞에 놓는 조리대 겸 식탁) -----
+function makeIslandMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.72, 0.7), furnWoodMat);
+  body.position.y = 0.36;
+  g.add(body);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.07, 0.9),
+    new THREE.MeshLambertMaterial({ color: 0xd8cdb8, flatShading: true }));
+  top.position.y = 0.76;
+  g.add(top);
+  [-0.45, 0.45].forEach((x) => {                          // 앞에 걸린 등받이 없는 의자 둘
+    const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.42, 8), furnDarkMat);
+    stool.position.set(x, 0.21, 0.62);
+    g.add(stool);
+  });
+  const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6),
+    new THREE.MeshLambertMaterial({ color: 0xc9762e, flatShading: true }));
+  bowl.position.set(0.3, 0.85, 0);
+  bowl.scale.y = 0.55;
+  g.add(bowl);
+  return g;
+}
+// ----- 마당 조경 — 야자수·잔디밭·조경석·마당 조명 (집 밖 지형 위에 놓입니다) -----
+function makePalmMesh() {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.18, 2.8, 7), furnWoodMat);
+  trunk.position.set(0.08, 1.4, 0);
+  trunk.rotation.z = -0.1;
+  trunk.castShadow = true;
+  g.add(trunk);
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x3f8a4a, flatShading: true });
+  for (let i = 0; i < 6; i++) {
+    const arm = new THREE.Group();
+    arm.rotation.y = (i / 6) * Math.PI * 2;
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.8, 4), leafMat);
+    leaf.position.x = 0.8;
+    leaf.rotation.z = Math.PI / 2 + 0.55;   // 바깥으로 뻗으며 살짝 처진 잎
+    leaf.scale.z = 0.35;
+    leaf.castShadow = true;
+    arm.add(leaf);
+    arm.position.y = 2.85;
+    g.add(arm);
+  }
+  const nutMat = new THREE.MeshLambertMaterial({ color: 0x6b4a26, flatShading: true });
+  [[0.2, 0.1], [-0.12, 0.18], [0, -0.2]].forEach(([x, z]) => {
+    const nut = new THREE.Mesh(new THREE.SphereGeometry(0.12, 7, 6), nutMat);
+    nut.position.set(x, 2.7, z);
+    g.add(nut);
+  });
+  return g;
+}
+function makeLawnMesh() {
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(2.1, 20),
+    new THREE.MeshLambertMaterial({ color: 0x69b04a }));
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.y = 0.05;
+  g.add(pad);
+  const flowerMat = new THREE.MeshLambertMaterial({ color: 0xfff3d6 });
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    const f = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), flowerMat);
+    f.position.set(Math.cos(a) * (0.6 + (i % 3) * 0.4), 0.1, Math.sin(a) * (0.6 + (i % 3) * 0.4));
+    g.add(f);
+  }
+  return g;
+}
+function makeStonesMesh() {
+  const g = new THREE.Group();
+  const stoneMat2 = new THREE.MeshLambertMaterial({ color: 0xb9b4a8, flatShading: true });
+  [[0, 0, 0.55, 0.4], [0.75, 0.25, 0.36, 1.9], [-0.62, 0.3, 0.42, 3.1]].forEach(([px, pz, s, r]) => {
+    const st = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), stoneMat2);
+    st.position.set(px, s * 0.55, pz);
+    st.rotation.set(r, r * 1.3, r * 0.7);
+    st.castShadow = true;
+    g.add(st);
+  });
+  return g;
+}
+function makeGardenLightMesh() {
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.0, 7), furnDarkMat);
+  post.position.y = 1.0;
+  post.castShadow = true;
+  g.add(post);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 9, 7),
+    new THREE.MeshBasicMaterial({ color: 0xffdca0 }));   // 스스로 빛나는 갓
+  head.position.y = 2.08;
+  g.add(head);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.16, 8), furnDarkMat);
+  cap.position.y = 2.26;
+  g.add(cap);
+  const glow = new THREE.PointLight(0xffdca0, 0.9, 9);
+  glow.position.y = 2.08;
+  g.add(glow);
+  return g;
+}
 const FURN_BUILDERS = {
   bed: makeBedMesh, chair: makeChairMesh, table: makeTableMesh, closet: makeClosetMesh,
   rug: makeRugMesh, lamp: makeLampMesh, plant: makePlantMesh, shelf: makeShelfMesh,
   painting: makePaintingMesh, window: makeWindowMesh, tv: makeTvMesh, kitchen: makeKitchenMesh,
+  island: makeIslandMesh, palm: makePalmMesh, lawn: makeLawnMesh, stones: makeStonesMesh,
+  gardenlight: makeGardenLightMesh,
 };
 
 // 집 안에 실제로 놓이는 가구 — 사기 전에는 숨겨져 있습니다
@@ -1742,11 +1850,25 @@ const furnitureMeshes = {};
     window:   [ROOM.cx + 1.0, ROOM.cz - 4.4, 0],           // 북쪽 벽 창문
     tv:       [ROOM.cx + 4.9, ROOM.cz + 0.8, -Math.PI / 2],// 동쪽 벽을 등지고
     kitchen:  [ROOM.cx - 4.5, ROOM.cz - 3.9, 0],           // 북서쪽 부엌 자리
+    island:   [ROOM.cx - 3.0, ROOM.cz - 2.2, 0],           // 부엌 찬장 앞의 조리대 겸 식탁
+  };
+  // 마당 조경은 방이 아니라 집 바깥 실제 지형 위에 심습니다
+  const yardSpots = {
+    palm:        [HOUSE.x - 1.5, HOUSE.z - 5.4, 0.5],      // 집 뒤(남쪽 바다 쪽) 야자수
+    lawn:        [HOUSE.x + 4.6, HOUSE.z + 5.2, 0],        // 앞마당 잔디밭
+    stones:      [HOUSE.x - 4.6, HOUSE.z + 5.8, 0.9],      // 앞마당 조경석
+    gardenlight: [HOUSE.x + 2.6, HOUSE.z + 4.0, 0],        // 문 앞 돌계단 옆 마당 조명
   };
   for (const k of FURN_ORDER) {
     const g = FURN_BUILDERS[k]();
-    g.position.set(spots[k][0], ROOM.y, spots[k][1]);
-    g.rotation.y = spots[k][2];
+    const ys = yardSpots[k];
+    if (ys) {
+      g.position.set(ys[0], groundHeight(ys[0], ys[1]), ys[1]);
+      g.rotation.y = ys[2];
+    } else {
+      g.position.set(spots[k][0], ROOM.y, spots[k][1]);
+      g.rotation.y = spots[k][2];
+    }
     g.visible = false;
     scene.add(g);
     furnitureMeshes[k] = g;
@@ -1880,6 +2002,17 @@ const SHOP_GOODS = [
     x: SHOP_ROOM.cx + 5.5, z: SHOP_ROOM.cz + 3.5, rot: -Math.PI / 2 },
   { key: 'kitchen',  name: '부엌 찬장',   emoji: '🍳', get price() { return FURNITURE.kitchen.price; },
     x: SHOP_ROOM.cx + 4.2, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
+  { key: 'island',   name: '아일랜드 식탁', emoji: '🍽', get price() { return FURNITURE.island.price; },
+    x: SHOP_ROOM.cx + 2.6, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
+  // ----- 남쪽 벽(문 서쪽) — 마당 조경 코너 -----
+  { key: 'palm',        name: '야자수',    emoji: '🌴', get price() { return FURNITURE.palm.price; },
+    x: SHOP_ROOM.cx - 5.2, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+  { key: 'lawn',        name: '잔디밭',    emoji: '🌱', get price() { return FURNITURE.lawn.price; },
+    x: SHOP_ROOM.cx - 3.8, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+  { key: 'stones',      name: '조경석',    emoji: '🪨', get price() { return FURNITURE.stones.price; },
+    x: SHOP_ROOM.cx - 2.4, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+  { key: 'gardenlight', name: '마당 조명', emoji: '🏮', get price() { return FURNITURE.gardenlight.price; },
+    x: SHOP_ROOM.cx - 1.0, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
 ];
 
 // 진열: 받침대 + 물건 + 가격표
@@ -2037,7 +2170,9 @@ function buyShopGood(good) {
     furnitureOwned[good.key] = true;
     applyFurniture();
     playShipSound();
-    spawnMoneyPopup(px, py, pz, `🛋 ${good.name} 구입! 집 안에 놓아뒀어요`);
+    spawnMoneyPopup(px, py, pz, YARD_KEYS.has(good.key)
+      ? `🌴 ${good.name} 구입! 집 마당에 심어뒀어요`
+      : `🛋 ${good.name} 구입! 집 안에 놓아뒀어요`);
   }
 }
 // 지금 서 있는 자리에서 살 수 있는 물건 (없으면 null)
