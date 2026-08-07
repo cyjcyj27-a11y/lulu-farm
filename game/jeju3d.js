@@ -1402,7 +1402,7 @@ function tryBuyTank() {
   BREATH_MAX = TANK_BREATH;   // 지금 물질 중이 아니어도, 다음 잠수부터 바로 적용됩니다
   updateCoinBadge();
   playShipSound();
-  spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, '🤿 산소통 구입! 숨이 3분으로 늘었어요');
+  spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, '산소통 구입! 숨이 3분으로 늘었어요');
 }
 // 당근 바구니 — 상점 정면 서쪽에 놓인 판매대입니다. 상점(끈)과 자리를 나눠 씁니다.
 const CARROT_SPOT = { x: 3.2, z: 42.6 };
@@ -1486,7 +1486,7 @@ function buildRoom(R, floorColor, wallColor) {
   sg.strokeStyle = '#c9a86a'; sg.lineWidth = 5; sg.strokeRect(2, 2, 252, 60);
   sg.fillStyle = '#f6edd8'; sg.textAlign = 'center';
   sg.font = 'bold 32px "맑은 고딕", Malgun Gothic, sans-serif';
-  sg.fillText('🚪 나가는 곳', 128, 43);
+  sg.fillText('나가는 곳', 128, 43);
   const signTex = new THREE.CanvasTexture(signC);
   signTex.colorSpace = THREE.SRGBColorSpace;
   const doorSign = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.42),
@@ -2118,12 +2118,12 @@ function dropNet() {
   netObj.position.set(fx, groundHeight(fx, fz), fz);
   netObj.rotation.y = state.facing;
   playDropSound();
-  spawnMoneyPopup(fx, groundHeight(fx, fz) + 1.2, fz, '🧺 망사리를 내려놨어요');
+  spawnMoneyPopup(fx, groundHeight(fx, fz) + 1.2, fz, '망사리를 내려놨어요');
 }
 function pickUpNet() {
   netCarried = true;
   playPickSound();
-  spawnMoneyPopup(state.x, groundHeight(state.x, state.z) + 1.4, state.z, '🧺 망사리를 챙겼어요');
+  spawnMoneyPopup(state.x, groundHeight(state.x, state.z) + 1.4, state.z, '망사리를 챙겼어요');
 }
 // 메고 있는 동안 루루 등(허리께)에 딱 붙어 다닙니다 (매 프레임 호출)
 const netFollow = new THREE.Vector3();
@@ -2353,12 +2353,12 @@ function buyReno(rg) {
   const price = shopPrice(rg.price);   // 장날이면 반값!
   // 페인트는 한 통이면 충분합니다 (이미 있으면 다시 안 삽니다)
   if (rg.type === 'paint' && tools.paint) {
-    spawnMoneyPopup(state.x, py, state.z, '이미 페인트가 있어요 — 집 앞에서 칠하세요');
+    spawnMoneyPopup(state.x, py, state.z, '이미 페인트가 있어요\n집 앞에서 칠하세요');
     return;
   }
   // 색 고르기 창을 띄우고, 색을 고른 뒤 가격 단추를 눌러야 결제됩니다
   const colors = rg.type === 'floor' ? FLOOR_COLORS : rg.type === 'wall' ? WALL_COLORS : PAINT_COLORS;
-  openColorPicker(`🎨 ${rg.name} — 색을 고르세요`, colors, (c) => {
+  openColorPicker(`${rg.name}\n색을 고르세요`, colors, (c) => {
     if (coins < price) {
       spawnMoneyPopup(state.x, py, state.z, `${(price - coins).toLocaleString()}원 부족`);
       return;
@@ -2371,7 +2371,7 @@ function buyReno(rg) {
     playShipSound();
     spawnMoneyPopup(state.x, py, state.z, rg.type === 'paint'
       ? `${c.name} 페인트 구입! 집 앞에서 칠해보세요`
-      : `🎨 ${c.name} ${rg.name} 시공 완료! 집이 바뀌었어요`);
+      : `${c.name} ${rg.name} 시공 완료! 집이 바뀌었어요`);
     saveGame(true);
   }, price);
 }
@@ -2392,7 +2392,7 @@ function buyShopGood(good) {
   }
   // 텔레비전은 올려놓을 티비다이가 먼저 있어야 합니다
   if (good.key === 'tv' && !furnitureOwned.tvstand) {
-    spawnMoneyPopup(px, py, pz, '📺 티비다이가 먼저 있어야 놓을 수 있어요 (매장 가운데 진열)');
+    spawnMoneyPopup(px, py, pz, '티비다이가 먼저 있어야 놓을 수 있어요 (매장 가운데 진열)');
     return;
   }
   const price = shopPrice(good.price);   // 장날이면 반값!
@@ -2409,29 +2409,29 @@ function doBuyShopGood(good, price, px, py, pz) {
     carrots++;
     updateCarrotBadge();
     playPickSound();
-    spawnMoneyPopup(px, py, pz, `🥕 당근 구입! (${carrots}개)`);
+    spawnMoneyPopup(px, py, pz, `당근 구입! (${carrots}개)`);
   } else if (good.key === 'tank') {
     hasTank = true;
     BREATH_MAX = TANK_BREATH;
     playShipSound();
-    spawnMoneyPopup(px, py, pz, '🤿 산소통 구입! 숨이 3분으로 늘었어요');
+    spawnMoneyPopup(px, py, pz, '산소통 구입! 숨이 3분으로 늘었어요');
   } else if (good.key === 'net') {
     hasNet = true;
     netCarried = true;
     netObj.visible = true;
     netObj.position.set(px, SHOP_ROOM.y + 1, pz);
     playShipSound();
-    spawnMoneyPopup(px, py, pz, '🧺 망사리 구입! 등에 메고 포구로 가면 물질할 수 있어요');
+    spawnMoneyPopup(px, py, pz, '망사리 구입! 등에 메고 포구로 가면 물질할 수 있어요');
   } else {
     furnitureOwned[good.key] = true;
     applyFurniture();
     playShipSound();
     spawnMoneyPopup(px, py, pz,
-      good.key === 'roof'   ? '🛖 새 지붕 구입! 지붕이 환한 새 짚빛이 됐어요'
-      : good.key === 'door' ? '🚪 대문 구입! 뚫려 있던 문간에 문짝을 달았어요'
-      : good.key === 'window' ? '🪟 창문 구입! 시커먼 구멍에 창을 달았어요'
-      : YARD_KEYS.has(good.key) ? `🌴 ${good.name} 구입! 집 마당에 심어뒀어요`
-      : `🛋 ${good.name} 구입! 집 안에 놓아뒀어요`);
+      good.key === 'roof'   ? '새 지붕 구입! 지붕이 환한 새 짚빛이 됐어요'
+      : good.key === 'door' ? '대문 구입! 뚫려 있던 문간에 문짝을 달았어요'
+      : good.key === 'window' ? '창문 구입! 시커먼 구멍에 창을 달았어요'
+      : YARD_KEYS.has(good.key) ? `${good.name} 구입! 집 마당에 심어뒀어요`
+      : `${good.name} 구입! 집 안에 놓아뒀어요`);
   }
 }
 // 지금 서 있는 자리에서 살 수 있는 물건 (없으면 null)
@@ -2503,7 +2503,7 @@ function updateDoors() {
   if (Math.hypot(state.x - HOUSE.x, state.z - (HOUSE.z + 3.6)) < 1.2) {
     const empty = !FURN_ORDER.some((k) => furnitureOwned[k]);
     teleportInto(ROOM, 'inside',
-      empty ? '🏚 텅 빈 집… 맨땅이라도 몸 누일 곳은 되네요' : '🏡 내 집에 왔어요');
+      empty ? '텅 빈 집… 맨땅이라도 몸 누일 곳은 되네요' : '내 집에 왔어요');
     return;
   }
   // (상점은 자동 입장이 아닙니다 — 이장님이 문 앞에 와서 열어줘야 F로 들어갑니다)
@@ -2517,10 +2517,10 @@ function mayorAtShop() {
 function tryEnterShop() {
   const y = groundHeight(SHOP_DOOR.x, SHOP_DOOR.z) + 2.2;
   if (!mayorAtShop()) {
-    spawnMoneyPopup(SHOP_DOOR.x, y, SHOP_DOOR.z, '이장님이 오고 계세요 — 잠깐만요');
+    spawnMoneyPopup(SHOP_DOOR.x, y, SHOP_DOOR.z, '이장님이 오고 계세요\n잠깐만요');
     return;
   }
-  teleportInto(SHOP_ROOM, 'inShop', '🏪 어서 오세요! 물건 앞에서 사면 됩니다');
+  teleportInto(SHOP_ROOM, 'inShop', '어서 오세요! 물건 앞에서 사면 됩니다');
 }
 
 // 8-3. 감귤나무 (밭담 안에 줄지어 심는 귤밭)
@@ -2788,7 +2788,7 @@ const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: t
     g2.strokeStyle = '#8a6038'; g2.lineWidth = 8; g2.strokeRect(4, 4, 312, 102);
     g2.fillStyle = '#2b1a0c'; g2.textAlign = 'center';
     g2.font = '900 44px "맑은 고딕", Malgun Gothic, sans-serif';
-    g2.fillText('🤿 해녀물질', 160, 70);
+    g2.fillText('해녀물질', 160, 70);
   }
   const signTex = new THREE.CanvasTexture(signC);
   signTex.colorSpace = THREE.SRGBColorSpace;
@@ -3520,7 +3520,7 @@ const coinBadge = document.getElementById('coinBadge');
 const ropeBadge = document.getElementById('ropeBadge');
 const boxBadge = document.getElementById('boxBadge');
 function updateCoinBadge() {
-  if (coinBadge) coinBadge.textContent = `💵 ${coins.toLocaleString()}원`;
+  if (coinBadge) coinBadge.textContent = `${coins.toLocaleString()}원`;
 }
 // 상자에 귤이 몇 개 담겼는지 (가득 차면 색이 바뀌어 배송할 때가 됐음을 알립니다)
 // basketCount·BASKET_CAP은 아래 12-1b에서 만들어지지만, 이 함수는 그 뒤에야 불리므로 괜찮습니다.
@@ -3532,17 +3532,17 @@ function updateBasketBadge() {
   if (!dragging) return;
   const full = basketCount >= BASKET_CAP;
   boxBadge.textContent = full
-    ? `📦 상자 가득! ${basketCount}/${BASKET_CAP} — 택배사의 이장님께 (한 박스 10,000원)`
-    : `📦 상자 ${basketCount}/${BASKET_CAP} — 가득 채우면 10,000원`;
+    ? `상자 가득! ${basketCount}/${BASKET_CAP}\n택배사의 이장님께 (한 박스 10,000원)`
+    : `상자 ${basketCount}/${BASKET_CAP}\n가득 채우면 10,000원`;
   boxBadge.classList.toggle('full', full);
 }
 // 상자(basketPos)와 잡기 범위(GRAB_RANGE)는 아래 12-1b에서 정의되므로,
 // 이 배지 내용은 그쪽 값들이 다 준비된 뒤(매 프레임 updateBasket 안에서) 갱신합니다.
 // 안내 문구에 쓸 조작 이름. 폰에는 키보드가 없으므로 화면 버튼 이름으로 바꿔 말해줍니다.
 // (예전에는 폰에서도 "F를 누르세요"라고만 해서, 누를 F가 없어 물질하러 못 들어갔습니다)
-const KEY_ACTION = IS_TOUCH ? '🐾 버튼' : 'F';
+const KEY_ACTION = IS_TOUCH ? '행동 버튼' : 'F';
 const KEY_GRAB = KEY_ACTION;   // 상호작용 키를 하나로 통일했습니다
-const KEY_UP = IS_TOUCH ? '⤴ 버튼' : 'Space';
+const KEY_UP = IS_TOUCH ? '점프 버튼' : 'Space';
 
 function updateRopeBadge() {
   if (!ropeBadge) return;
@@ -3556,8 +3556,8 @@ function updateRopeBadge() {
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
     ropeBadge.textContent = IS_TOUCH
-      ? '🤿 🐾 채집 · ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄 · 수면에서 🐾 나가기'
-      : '🤿 F 채집 · ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄 · 수면에서 F 나가기';
+      ? '행동 버튼으로 채집\n조이스틱 위로 떠오르고 아래로 잠수'
+      : 'F로 채집\n↑ 떠오르기 ↓ 잠수 ←→ 헤엄 수면에서 F로 나가기';
     return;
   }
   // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
@@ -3565,8 +3565,8 @@ function updateRopeBadge() {
     const rg = nearestReno();
     if (rg) {
       ropeBadge.textContent = (rg.type === 'paint' && tools.paint)
-        ? '🖌 페인트 보유 중 — 집 앞에서 칠하세요'
-        : `🎨 ${rg.name} — ${shopPrice(rg.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION}으로 색 고르기)`;
+        ? '페인트 보유 중\n집 앞에서 칠하세요'
+        : `${rg.name}\n${shopPrice(rg.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION}으로 색 고르기)`;
       return;
     }
     const good = nearestShopGood();
@@ -3576,10 +3576,10 @@ function updateRopeBadge() {
         (good.key === 'net' && hasNet) ||
         (FURNITURE[good.key] && furnitureOwned[good.key]);
       ropeBadge.textContent = owned
-        ? `${good.emoji} ${good.name} — 보유 중`
-        : `${good.emoji} ${good.name} ${shopPrice(good.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''} — ${KEY_ACTION}으로 구입`;
+        ? `${good.name}\n보유 중`
+        : `${good.name} ${shopPrice(good.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''}\n${KEY_ACTION}으로 구입`;
     } else {
-      ropeBadge.textContent = '🏪 상점 안 — 물건 앞에 서면 살 수 있어요 (문 쪽으로 가면 밖으로)';
+      ropeBadge.textContent = '상점 안\n물건 앞에 서면 살 수 있어요 (문 쪽으로 가면 밖으로)';
     }
     return;
   }
@@ -3587,14 +3587,14 @@ function updateRopeBadge() {
   if (state.inside) {
     const missing = FURN_ORDER.filter((k) => !furnitureOwned[k]).length;
     ropeBadge.textContent = missing === 0
-      ? '🏡 아늑한 내 집 — 문 쪽으로 걸어가면 밖으로 나갑니다'
-      : '🏚 텅 빈 집 — 상점 안에서 가구를 사서 꾸며보세요 (문 쪽으로 가면 밖으로)';
+      ? '아늑한 내 집\n문 쪽으로 걸어가면 밖으로 나갑니다'
+      : '텅 빈 집\n상점 안에서 가구를 사서 꾸며보세요 (문 쪽으로 가면 밖으로)';
     return;
   }
   // 해녀 할망 — 포구 안내보다 먼저 (할망 곁에 서 있을 때)
   if (typeof HALMANG_SPOT !== 'undefined' &&
       Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < HALMANG_RANGE) {
-    ropeBadge.textContent = `👵 해녀 할망과 이야기 (${KEY_ACTION})`;
+    ropeBadge.textContent = `해녀 할망과 이야기 (${KEY_ACTION})`;
     return;
   }
   // 포구 가까이 오면 물질하러 들어가는 법을 알려줍니다 (망사리가 없으면 그것부터)
@@ -3602,16 +3602,16 @@ function updateRopeBadge() {
       Math.hypot(state.x - PORT.x, state.z - PORT.z) < BULTEOK_RANGE + 5) {
     const nearEnd = Math.hypot(state.x - DIVE_ENTRY.x, state.z - DIVE_ENTRY.z) < DIVE_ENTRY_RANGE;
     if (dayEvent === 'storm') {
-      ropeBadge.textContent = '🌀 태풍이 몰아쳐요 — 오늘은 물질을 쉽니다';
+      ropeBadge.textContent = '태풍이 몰아쳐요\n오늘은 물질을 쉽니다';
     } else if (!nearEnd) {
-      ropeBadge.textContent = '🤿 축대 끝까지 걸어나가면 물질하러 들어갈 수 있어요';
+      ropeBadge.textContent = '축대 끝까지 걸어나가면 물질하러 들어갈 수 있어요';
     } else {
       ropeBadge.textContent = netCarried
-        ? `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다` +
-          (isNight() ? '\n야간물질은 값을 2배로 쳐줘요! 대신 숨이 빨리 차요' : '')
+        ? `${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다` +
+          (isNight() ? '야간물질은 값을 2배로 쳐줘요! 대신 숨이 빨리 차요' : '')
         : (hasNet
-          ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
-          : `🧺 망사리가 있어야 물질합니다 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
+          ? '망사리를 두고 왔어요\n메고 와야 물질할 수 있어요'
+          : `망사리가 있어야 물질합니다\n상점 안에서 ${NET_PRICE.toLocaleString()}원`);
     }
     return;
   }
@@ -3625,19 +3625,19 @@ function updateRopeBadge() {
   if (typeof SHOP_DOOR !== 'undefined' &&
       Math.hypot(state.x - SHOP_DOOR.x, state.z - SHOP_DOOR.z) < SHOP_DOOR_RANGE) {
     ropeBadge.textContent = mayorAtShop()
-      ? `🏪 ${KEY_ACTION}으로 상점에 들어가기 — 이장님이 문을 열어줍니다`
-      : '🏪 이장님이 오고 계세요 — 문 앞에서 잠깐 기다려주세요';
+      ? `${KEY_ACTION}으로 상점에 들어가기\n이장님이 문을 열어줍니다`
+      : '이장님이 오고 계세요\n문 앞에서 잠깐 기다려주세요';
     return;
   }
   // 이장님·돌하르방 안내 (이장님 바로 곁에서는 이야기가 우선입니다)
   if (typeof mayor !== 'undefined' && mayorGroup &&
       Math.hypot(state.x - mayor.x, state.z - mayor.z) < MAYOR_TALK_RANGE) {
-    ropeBadge.textContent = `🧢 이장님과 이야기 (${KEY_ACTION})`;
+    ropeBadge.textContent = `이장님과 이야기 (${KEY_ACTION})`;
     return;
   }
   if (typeof TUTOR_SPOT !== 'undefined' &&
       Math.hypot(state.x - TUTOR_SPOT.x, state.z - TUTOR_SPOT.z) < TUTOR_RANGE) {
-    ropeBadge.textContent = `🗿 돌하르방과 이야기 (${KEY_ACTION})`;
+    ropeBadge.textContent = `돌하르방과 이야기 (${KEY_ACTION})`;
     return;
   }
   // 택배사 앞 안내 — 이장님이 계셔야 정산이 됩니다
@@ -3646,46 +3646,46 @@ function updateRopeBadge() {
     const mayorHere = Math.hypot(mayor.x - MAYOR_POSTS.depot.x, mayor.z - MAYOR_POSTS.depot.z) < 2.5;
     ropeBadge.textContent = mayorHere
       ? (basketCount >= BASKET_CAP
-        ? `🚚 ${KEY_ACTION}으로 귤 박스 부치기 (10,000원) — 이장님이 계세요`
-        : `🚚 택배사 — 상자를 가득 채워 오면 이장님이 사 줍니다 (${basketCount}/${BASKET_CAP})`)
-      : '🚚 이장님이 오고 계세요 — 문 앞에서 잠깐 기다려주세요';
+        ? `${KEY_ACTION}으로 귤 박스 부치기 (10,000원)\n이장님이 계세요`
+        : `택배사\n상자를 가득 채워 오면 이장님이 사 줍니다 (${basketCount}/${BASKET_CAP})`)
+      : '이장님이 오고 계세요\n문 앞에서 잠깐 기다려주세요';
     return;
   }
   // 당근 바구니·산소통·마구간 안내
   if (typeof CARROT_SPOT !== 'undefined' &&
       Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z) < CARROT_RANGE) {
-    ropeBadge.textContent = `🥕 ${KEY_ACTION}으로 당근 구입 (${CARROT_PRICE.toLocaleString()}원)`;
+    ropeBadge.textContent = `${KEY_ACTION}으로 당근 구입 (${CARROT_PRICE.toLocaleString()}원)`;
     return;
   }
   if (typeof TANK_SPOT !== 'undefined' &&
       Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z) < TANK_RANGE) {
     ropeBadge.textContent = hasTank
-      ? '🤿 산소통 보유 중 — 숨 3분'
-      : `🤿 해녀 산소통 — ${KEY_ACTION}으로 구입 (${TANK_PRICE.toLocaleString()}원, 숨 60초→3분)`;
+      ? '산소통 보유 중\n숨 3분'
+      : `해녀 산소통\n${KEY_ACTION}으로 구입 (${TANK_PRICE.toLocaleString()}원, 숨 60초→3분)`;
     return;
   }
   if (typeof RACE_SPOT !== 'undefined' &&
       Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z) < RACE_RANGE) {
     ropeBadge.textContent = ponyLove < RACE_MIN_LOVE
-      ? `🏇 경마 — 애정 ${RACE_MIN_LOVE} 이상부터 출전 (지금 ${ponyLove})`
-      : `🏇 경마 출전 ${RACE_FEE.toLocaleString()}원 · 1등 상금 ${racePrize().toLocaleString()}원(당근 먹인 만큼 커짐) · 승률 ${Math.round(raceWinChance() * 100)}% (${KEY_ACTION})`;
+      ? `경마\n애정 ${RACE_MIN_LOVE} 이상부터 출전 (지금 ${ponyLove})`
+      : `경마 출전 ${RACE_FEE.toLocaleString()}원 · 1등 상금 ${racePrize().toLocaleString()}원(당근 먹인 만큼 커짐) · 승률 ${Math.round(raceWinChance() * 100)}% (${KEY_ACTION})`;
     return;
   }
   if (typeof STABLE !== 'undefined' &&
       Math.hypot(state.x - STABLE.x, state.z - STABLE.z) < STABLE_RANGE) {
     if (!ponyAlive) {
-      ropeBadge.textContent = `💔 마구간이 비었어요 — ${KEY_ACTION}으로 새 조랑말 데려오기 (${PONY_PRICE.toLocaleString()}원)`;
+      ropeBadge.textContent = `마구간이 비었어요\n${KEY_ACTION}으로 새 조랑말 데려오기 (${PONY_PRICE.toLocaleString()}원)`;
     } else if (carrots > 0) {
-      ropeBadge.textContent = `🐴 ${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)` +
-        (ponyFedToday() ? '' : ' · 오늘 아직 안 먹였어요');
+      ropeBadge.textContent = `${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)` +
+        (ponyFedToday() ? '' : '· 오늘 아직 안 먹였어요');
     } else {
-      ropeBadge.textContent = '🐴 조랑말한테 당근을 주세요 — 당근은 이장님 상점에서';
+      ropeBadge.textContent = '조랑말한테 당근을 주세요\n당근은 이장님 상점에서';
     }
     return;
   }
   if (state.grabbing) {
     ropeBadge.style.display = 'block';
-    ropeBadge.textContent = `🤝 상자를 끄는 중 (${KEY_ACTION}로 놓기)`;
+    ropeBadge.textContent = `상자를 끄는 중 (${KEY_ACTION}로 놓기)`;
     return;
   }
   // 알려줄 것이 없으면 배지를 아예 숨깁니다 (화면을 어지럽히지 않게)
@@ -4146,13 +4146,13 @@ function updateFlyingFruits(dt) {
           addFruitToBasket();
           stat.gold++;
           playShipSound();
-          spawnMoneyPopup(p.x, p.y + 1.1, p.z, '✨ 황금향! 귤 3알 몫으로 담았어요', 3);
+          spawnMoneyPopup(p.x, p.y + 1.1, p.z, '황금향! 귤 3알 몫으로 담았어요', 3);
         } else {
           spawnMoneyPopup(p.x, p.y + 0.9, p.z, '🍊 +1');   // 한 알 담겼습니다 (돈은 박스로 팔 때 한꺼번에)
         }
       }
       if (basketCount >= BASKET_CAP) {
-        spawnMoneyPopup(p.x, p.y + 1.1, p.z, '📦 상자가 가득 찼어요!');
+        spawnMoneyPopup(p.x, p.y + 1.1, p.z, '상자가 가득 찼어요!');
       }
     }
   }
@@ -4199,13 +4199,13 @@ function tryShipBox() {
   }
   if (basketCount < BASKET_CAP) {
     spawnMoneyPopup(dp.x, popupY, dp.z,
-      `상자를 가득 채워서 오게 (${basketCount}/${BASKET_CAP}) — 한 박스 ${BOX_PRICE.toLocaleString()}원`);
+      `상자를 가득 채워서 오게 (${basketCount}/${BASKET_CAP})\n한 박스 ${BOX_PRICE.toLocaleString()}원`);
     return;
   }
   // 이장님이 아직 오는 중이면 정산할 사람이 없습니다
   const mayorHere = Math.hypot(mayor.x - MAYOR_POSTS.depot.x, mayor.z - MAYOR_POSTS.depot.z) < 2.5;
   if (!mayorHere) {
-    spawnMoneyPopup(dp.x, popupY, dp.z, '이장님이 오고 계세요 — 잠깐만요');
+    spawnMoneyPopup(dp.x, popupY, dp.z, '이장님이 오고 계세요\n잠깐만요');
     return;
   }
   coins += BOX_PRICE;
@@ -4213,7 +4213,7 @@ function tryShipBox() {
   emptyBasket();                 // 트럭에 실었으니 상자는 다시 비워집니다
   updateCoinBadge();
   playShipSound();
-  spawnMoneyPopup(dp.x, popupY, dp.z, `🚚 이장님이 귤 한 박스를 사셨어요! +${BOX_PRICE.toLocaleString()}원`);
+  spawnMoneyPopup(dp.x, popupY, dp.z, `이장님이 귤 한 박스를 사셨어요! +${BOX_PRICE.toLocaleString()}원`);
   checkAchievements();
 }
 
@@ -4251,7 +4251,7 @@ function updateDiveUI() {
   }
   if (netBadge) {
     netBadge.style.display = state.diving || net.length ? 'block' : 'none';
-    netBadge.textContent = `🧺 망사리 ${net.length}/${NET_CAP}`;
+    netBadge.textContent = `망사리 ${net.length}/${NET_CAP}`;
     netBadge.classList.toggle('full', net.length >= NET_CAP);
   }
 }
@@ -4316,7 +4316,7 @@ function enterDive() {
   applyDiveLook();
   updateDiveUI();
   // 야간물질 안내는 포구 배지가 이미 해줍니다 — 입수 알림은 하나로 통일
-  spawnMoneyPopup(state.x, SEA_Y + 1.5, state.z, '🤿 물질 시작! 숨 조심하세요');
+  spawnMoneyPopup(state.x, SEA_Y + 1.5, state.z, '물질 시작! 숨 조심하세요');
 }
 
 // 뭍으로 나오면서 딴 것을 전부 팝니다.
@@ -4365,11 +4365,11 @@ function leaveDive(reason) {
     if (deathOverlay) setTimeout(() => deathOverlay.classList.remove('show'), 2800);
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
       lostCoins > 0
-        ? '💸 의식을 잃은 사이 누군가 집에 들어와 돈을 다 훔쳐갔습니다'
-        : '😵 정신을 잃고 떠밀려 왔어요', 5.5);
+        ? '의식을 잃은 사이 누군가 집에 들어와 돈을 다 훔쳐갔습니다'
+        : '정신을 잃고 떠밀려 왔어요', 5.5);
     if (lost > 0) {
       setTimeout(() => spawnMoneyPopup(BULTEOK.x, py + 0.9, BULTEOK.z,
-        `🧺 망사리에 담았던 ${lost}개도 바다에 흘렸습니다`, 5), 2600);
+        `망사리에 담았던 ${lost}개도 바다에 흘렸습니다`, 5), 2600);
     }
   } else if (caught > 0) {
     if (dayEvent === 'haul') pay = Math.round(pay * 1.5);   // 물반 고기반 — 오늘은 1.5배!
@@ -4380,8 +4380,8 @@ function leaveDive(reason) {
     const list = Object.entries(tally).map(([k, n]) => `${CATCH_KINDS[k].name} ${n}`).join(' · ');
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
       `${list} → +${pay.toLocaleString()}원` +
-      (nightSold ? ' (야간물질 2배!)' : '') +
-      (dayEvent === 'haul' ? ' (물반 고기반!)' : ''));
+      (nightSold ? '(야간물질 2배!)' : '') +
+      (dayEvent === 'haul' ? '(물반 고기반!)' : ''));
     checkAchievements();
   } else {
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, '뭍으로 나왔어요');
@@ -4710,23 +4710,23 @@ const FIX_DURATION = 0.9;      // 한 번 휘두르는 동작 시간(초)
 let fixSwings = 0;             // 붓질 몇 번 했나
 
 function houseBadgeText() {
-  if (endingState >= 2) return '🏚 곧 카페가 들어선다는 내 집… · 문 앞에 서면 안으로';
-  if (houseStage >= 3) return '🏡 내 집! 창고(30알) · 문 앞에 서면 안으로 들어갑니다';
+  if (endingState >= 2) return '곧 카페가 들어선다는 내 집… · 문 앞에 서면 안으로';
+  if (houseStage >= 3) return '내 집! 창고(30알) · 문 앞에 서면 안으로 들어갑니다';
   if (!tools.paint) {
-    return `🏚 외벽 페인트칠을 하려면 공구대에서 페인트를 사 오세요 (${PAINT_PRICE.toLocaleString()}원 · 색 고르기)`;
+    return `외벽 페인트칠을 하려면 공구대에서 페인트를 사 오세요 (${PAINT_PRICE.toLocaleString()}원 · 색 고르기)`;
   }
-  return `🖌 페인트칠 ${fixSwings}/${SWINGS_PER_STAGE} — ${KEY_ACTION}으로 계속 · 문 앞에 서면 안으로`;
+  return `페인트칠 ${fixSwings}/${SWINGS_PER_STAGE}\n${KEY_ACTION}으로 계속 · 문 앞에 서면 안으로`;
 }
 
 function tryFixHouse() {
   const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
   if (houseStage >= 3) {
     spawnMoneyPopup(HOUSE.x, py, HOUSE.z,
-      endingState >= 2 ? '🏚 …이 집도 곧 카페가 된다고 한다' : '🏡 다 고쳤어요. 좋은 집이네요!');
+      endingState >= 2 ? '…이 집도 곧 카페가 된다고 한다' : '다 고쳤어요. 좋은 집이네요!');
     return;
   }
   if (!tools.paint) {
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🖌 페인트가 필요해요 — 상점 안 인테리어 코너에서 색을 골라 사 오세요');
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '페인트가 필요해요\n상점 안 인테리어 코너에서 색을 골라 사 오세요');
     return;
   }
   // 붓질 한 번 — 동작이 끝나는 순간(updateHouse) 횟수가 올라갑니다
@@ -4745,7 +4745,7 @@ function updateHouse(dt) {
   fixSwings++;
   const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
   if (fixSwings < SWINGS_PER_STAGE) {
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `🖌 페인트칠 ${fixSwings}/${SWINGS_PER_STAGE}`);
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `페인트칠 ${fixSwings}/${SWINGS_PER_STAGE}`);
     return;
   }
   // 칠 완성!
@@ -4755,7 +4755,7 @@ function updateHouse(dt) {
   BASKET_CAP = 30;
   updateBasketBadge();
   playShipSound();
-  spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 페인트칠 끝! 창고가 생겨 상자가 30알로 커졌어요');
+  spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '페인트칠 끝! 창고가 생겨 상자가 30알로 커졌어요');
 }
 
 // 망치질 소리 — 탕, 탕, 탕 세 번
@@ -4860,12 +4860,12 @@ function morningNotice() {
     ponyDeaths++;
     applyPonyAlive();
     saveGame(true);
-    spawnMoneyPopup(px, py, pz, '💔 조랑말이 굶어 죽었습니다…', 8);
+    spawnMoneyPopup(px, py, pz, '조랑말이 굶어 죽었습니다…', 8);
     return;
   }
-  if (h >= 6) spawnMoneyPopup(px, py, pz, '🚨 오늘도 말먹이를 주지 않으면 말이 죽어요', 7);
-  else if (h >= 3) spawnMoneyPopup(px, py, pz, '⚠️ 말이 배고파서 죽을지도 몰라요', 7);
-  else spawnMoneyPopup(px, py, pz, '🌅 아침이에요 — 매일 아침 말에게 당근을 주세요', 6);
+  if (h >= 6) spawnMoneyPopup(px, py, pz, '오늘도 말먹이를 주지 않으면 말이 죽어요', 7);
+  else if (h >= 3) spawnMoneyPopup(px, py, pz, '말이 배고파서 죽을지도 몰라요', 7);
+  else spawnMoneyPopup(px, py, pz, '아침이에요\n매일 아침 말에게 당근을 주세요', 6);
 }
 
 // ----- 오늘의 사건 — 아침마다 그날만의 일이 벌어집니다 (접속할 이유!) -----
@@ -4878,10 +4878,10 @@ function rollDayEvent() {
 function dayEventNotice() {
   if (!dayEvent) return;
   const msg = {
-    storm:  '🌀 태풍이 와요! 오늘은 물질을 쉽니다',
-    gold:   '✨ 황금향이 열리는 날! 황금향 하나는 귤 3알 몫으로 담깁니다',
-    haul:   '🌊 물반 고기반! 오늘 물질 채집물은 1.5배 값',
-    market: '🎪 오늘은 장날! 상점 물건이 전부 반값',
+    storm:  '태풍이 와요! 오늘은 물질을 쉽니다',
+    gold:   '황금향이 열리는 날! 황금향 하나는 귤 3알 몫으로 담깁니다',
+    haul:   '물반 고기반! 오늘 물질 채집물은 1.5배 값',
+    market: '오늘은 장날! 상점 물건이 전부 반값',
   }[dayEvent];
   spawnMoneyPopup(state.x, lulu.position.y + 3.0, state.z, msg, 7);
 }
@@ -4900,19 +4900,19 @@ function dreamDone() {
 const ENDING_HAPPY = [
   '집 수리가 끝났다. 가구가 들어오고, 벽지와 바닥도 새로 갈았다.',
   '이장님도, 해녀 할망도 구경을 왔다. "허, 제주에서 제일가는 집이구먼!"',
-  '서울에서는 이룰 수 없던 꿈을, 루루는 제주에서 이뤘다. 🏡 — 꿈 달성! —',
+  '서울에서는 이룰 수 없던 꿈을, 루루는 제주에서 이뤘다. \n꿈 달성!',
 ];
 const ENDING_SAD = [
   '어느 아침, 낯선 고양이가 서류 가방을 들고 찾아왔다.',
   '"여기, 무허가 건물인 거 아시죠? 제가 이 땅 주인입니다."',
   '"비워주세요. 여기다 카페를 지을 겁니다. …오션뷰 카페요."',
-  '그리고 그 뒤에 — 낯익은 밀짚모자가 서 있었다.',
+  '그리고 그 뒤에\n낯익은 밀짚모자가 서 있었다.',
   '이 집을 4,000만 원에 판 사람. …이장님이었다.',
   '"미안하게 됐네. 카페 개업하면… 음료는 한 잔 서비스함세."',
   '4,000만 원에 사서, 1억을 들여 고치고 꾸민 내 집이… 루루는 눈앞이 캄캄해졌다. ㅠㅠ',
   '서울에는, 내가 살 수 있는 집이 없었다.',
   '…제주에도, 내 집은 없었다.',
-  '— 끝 —',
+  '끝',
 ];
 // 아침마다 엔딩 차례가 됐는지 확인합니다. 엔딩이 나오는 아침에는 다른 알림을 쉽니다.
 function checkEndingMorning() {
@@ -5041,11 +5041,11 @@ function mayorTalkLines() {
   ];
   if (basketCount >= BASKET_CAP) return [
     '오, 귤이 실하네! 상자가 가득이야.',
-    '택배사 앞으로 가져오게 — 한 박스 만 원, 후하게 쳐줌세.',
+    '택배사 앞으로 가져오게\n한 박스 만 원, 후하게 쳐줌세.',
   ];
   if (!ponyFedToday()) return [
     '오늘 말한테 당근은 줬는가?',
-    '아침마다 한 개씩 — 그게 말 키우는 법이라네.',
+    '아침마다 한 개씩\n그게 말 키우는 법이라네.',
   ];
   if (isNight()) return [
     '밤바람이 차다, 얼른 들어가게.',
@@ -5103,7 +5103,7 @@ function updateHalmang() {
     Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < 3.2;
   if (near && !halmangNear) {
     spawnMoneyPopup(HALMANG_SPOT.x, gy + HALMANG_H + 0.5, HALMANG_SPOT.z,
-      isNight() ? '👵 "까불다 이어도 가주."' : '👵 "욕심내민, 바당이 데려간다."', 4, 'big');
+      isNight() ? '"까불다 이어도 가주."' : '"욕심내민, 바당이 데려간다."', 4, 'big');
   }
   halmangNear = near;
 }
@@ -5115,12 +5115,12 @@ let introSeen = false;
 const INTRO_LINES = [
   '루루는 제주에서 태어난 고양이가 아니다.\n원래는 서울에서 살았다.',
   '스무 살의 루루가 눈여겨본 서울의 작은 아파트는 5억이었다.\n"10년만 열심히 모으면, 대출 끼고 살 수 있을 거야."',
-  '10년을 쉬지 않고 일하고, 아끼고, 모았다.\n서른 살이 된 루루의 전 재산은 — 4,000만 원.',
+  '10년을 쉬지 않고 일하고, 아끼고, 모았다.\n서른 살이 된 루루의 전 재산은\n4,000만 원.',
   '그사이 그 아파트는 20억이 되어 있었다.\n집값은 월급보다, 저축보다, 꿈보다 훨씬 빨랐다.',
-  '루루는 꿈을 접었다.\n그리고 마지막 희망을 품고 — 마을 이장이 소개해 준 제주 외딴 마을의 빈집 하나를, 전 재산을 털어 샀다.',
+  '루루는 꿈을 접었다.\n그리고 마지막 희망을 품고\n마을 이장이 소개해 준 제주 외딴 마을의 빈집 하나를, 전 재산을 털어 샀다.',
   '집은 비가 새고, 전기는 끊겼고, 잡초는 허리까지 자라 있었다.\n하지만 루루는 웃었다.',
   '"적어도… 여긴 내 집이다."',
-  '서른 살, 루루의 두 번째 인생이 시작된다.\n언젠가 이 낡은 집을 제주 최고의 집으로 만드는 것 — 그것이 루루의 새로운 꿈이다. 🍊',
+  '서른 살, 루루의 두 번째 인생이 시작된다.\n언젠가 이 낡은 집을 제주 최고의 집으로 만드는 것\n그것이 루루의 새로운 꿈이다.',
 ];
 
 // 돌하르방 — 상점 앞을 지키는 안내석. 처음 온 사람에게 섬 사는 법을 알려줍니다
@@ -5129,11 +5129,11 @@ const TUTOR_RANGE = 2.6;
 let tutorialSeen = false;
 const TUTOR_LINES = [
   '안녕하세요! 저는 이 섬을 지키는 돌하르방입니다. 섬에서 사는 법을 알려드릴게요.',
-  '🍊 귤나무 앞에서 🐾(F)를 누르면 귤을 딸 수 있어요. 상자를 가득 채워 택배사에 가져가면 한 박스 10,000원에 팔립니다.',
-  '🏪 상점 문 앞에 서면 안으로 들어갑니다. 당근을 사서 말에게 매일 한 개씩 먹여주세요 — 굶기면 위험해요!',
-  '🤿 물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가세요. 물속에서는 ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄이에요. 숨이 다하면 죽을 위험이 있어요!',
-  '🏠 남쪽 언덕의 돌집이 루루의 집입니다. 문 앞에 서면 들어가지고, 가구를 사서 꾸밀 수도 있어요.',
-  '🏇 말과 애정이 쌓이면 마구간 옆 팻말에서 경마에 나갈 수 있습니다. 좋은 하루 되세요!',
+  '귤나무 앞에서 (F)를 누르면 귤을 딸 수 있어요. 상자를 가득 채워 택배사에 가져가면 한 박스 10,000원에 팔립니다.',
+  '상점 문 앞에 서면 안으로 들어갑니다. 당근을 사서 말에게 매일 한 개씩 먹여주세요\n굶기면 위험해요!',
+  '물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가세요. 물속에서는 ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄이에요. 숨이 다하면 죽을 위험이 있어요!',
+  '남쪽 언덕의 돌집이 루루의 집입니다. 문 앞에 서면 들어가지고, 가구를 사서 꾸밀 수도 있어요.',
+  '말과 애정이 쌓이면 마구간 옆 팻말에서 경마에 나갈 수 있습니다. 좋은 하루 되세요!',
 ];
 function tutorTalk() {
   startTalk('돌하르방', TUTOR_LINES, () => {
@@ -5161,7 +5161,7 @@ const ACHIEVEMENTS = [
   { id: 'gold1',   name: '황금향!',     desc: '황금향을 처음 발견했다' },
   { id: 'octo1',   name: '문어 한탕',   desc: '문어를 처음 잡았다 (한 마리 5만원!)' },
   { id: 'rich',    name: '백만장자',    desc: '돈 1,000,000원 모으기' },
-  { id: 'dream',   name: '제주 최고의 집', desc: '수리·가구·인테리어까지 — 꿈을 이뤘다' },
+  { id: 'dream',   name: '제주 최고의 집', desc: '수리·가구·인테리어까지\n꿈을 이뤘다' },
 ];
 const ACH_TESTS = {
   box1: () => stat.boxes >= 1,
@@ -5223,10 +5223,10 @@ function openBag() {
   if (houseFloorColor !== 0) spent += 4000000;
   if (houseWallColor !== 0) spent += 6000000;
   bookList.innerHTML =
-    `<div class="bookHead">🎒 자산</div>` +
-    `<div class="bagMoney">💵 ${coins.toLocaleString()}원</div>` +
-    `<div class="bookTip" style="margin-bottom:10px">🏠 집꾸미기 ${spent.toLocaleString()} / 100,000,000원` +
-    (spent >= 100000000 ? ' — 꿈을 이뤘어요!' : ' — 1억을 채우면 꿈의 집 완성') + `</div>` +
+    `<div class="bookHead">자산</div>` +
+    `<div class="bagMoney">${coins.toLocaleString()}원</div>` +
+    `<div class="bookTip" style="margin-bottom:10px">집꾸미기 ${spent.toLocaleString()} / 100,000,000원` +
+    (spent >= 100000000 ? '꿈을 이뤘어요!' : '1억을 채우면 꿈의 집 완성') + `</div>` +
     `<div class="bagGrid">` + items.map((it) =>
       `<div class="bagItem${it.owned ? '' : ' off'}">` +
       `${it.owned && it.count > 0 ? `<div class="ct">×${it.count}</div>` : ''}` +
@@ -5276,7 +5276,7 @@ function openColorPicker(title, colors, onPick, price) {
   const refreshBtn = () => {
     buyBtn.disabled = !selected;
     buyBtn.textContent = selected
-      ? `${selected.name} · ${price.toLocaleString()}원 — 눌러서 구입`
+      ? `${selected.name} · ${price.toLocaleString()}원\n눌러서 구입`
       : '먼저 색을 골라주세요';
   };
   for (const c of colors) {
@@ -5326,7 +5326,7 @@ function openBuyDialog(emoji, name, price, onBuy) {
   pickGrid.appendChild(prev);
   const buyBtn = document.createElement('button');
   buyBtn.className = 'buyBtn';
-  buyBtn.textContent = `${price.toLocaleString()}원 — 눌러서 구입`;
+  buyBtn.textContent = `${price.toLocaleString()}원\n눌러서 구입`;
   buyBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation();
     pickWrap.style.display = 'none';
@@ -5385,7 +5385,7 @@ function saveGame(quiet) {
       floorC: houseFloorColor, wallC: houseWallColor, paintC: housePaintColor,
       stat, achieved,
     }));
-    if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '💾 저장했어요');
+    if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '저장했어요');
   } catch (e) { /* 시크릿 창 등에서는 저장이 막힐 수 있습니다 */ }
 }
 function loadGame() {
@@ -5587,7 +5587,7 @@ const carrotBadge = document.getElementById('carrotBadge');
 function updateCarrotBadge() {
   if (!carrotBadge) return;
   carrotBadge.style.display = carrots > 0 ? 'block' : 'none';
-  carrotBadge.textContent = `🥕 당근 ${carrots}개`;
+  carrotBadge.textContent = `당근 ${carrots}개`;
 }
 
 function tryBuyCarrot() {
@@ -5601,7 +5601,7 @@ function tryBuyCarrot() {
   updateCoinBadge();
   updateCarrotBadge();
   playPickSound();
-  spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `🥕 당근 구입! (${carrots}개)`);
+  spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `당근 구입! (${carrots}개)`);
 }
 
 // ---------- 12-1g-2. 조랑말 경마 ----------
@@ -5629,7 +5629,7 @@ let racing = false;
   post.castShadow = true;
   scene.add(post);
   const board = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.75),
-    new THREE.MeshBasicMaterial({ map: makePriceSign('🏇 경마', RACE_FEE), side: THREE.DoubleSide }));
+    new THREE.MeshBasicMaterial({ map: makePriceSign('경마', RACE_FEE), side: THREE.DoubleSide }));
   board.position.set(RACE_SPOT.x, y + 2.4, RACE_SPOT.z);
   board.rotation.y = Math.PI / 2;
   scene.add(board);
@@ -5642,12 +5642,12 @@ function tryRace() {
   const y = groundHeight(RACE_SPOT.x, RACE_SPOT.z) + 1.8;
   if (racing) return;
   if (!ponyAlive) {
-    spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, '💔 조랑말이 있어야 경마에 나갑니다');
+    spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, '조랑말이 있어야 경마에 나갑니다');
     return;
   }
   if (ponyLove < RACE_MIN_LOVE) {
     spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z,
-      `🐴 애정이 ${RACE_MIN_LOVE}은 되어야 출전해요 (지금 ${ponyLove}) — 당근을 먹여주세요`);
+      `애정이 ${RACE_MIN_LOVE}은 되어야 출전해요 (지금 ${ponyLove})\n당근을 먹여주세요`);
     return;
   }
   if (coins < RACE_FEE) {
@@ -5684,10 +5684,10 @@ function startRaceVideo(win) {
       stat.raceWins++;
       updateCoinBadge();
       playShipSound();
-      spawnMoneyPopup(state.x, py, state.z, `🏆 1등! 상금 ${prize.toLocaleString()}원을 받았어요`, 5);
+      spawnMoneyPopup(state.x, py, state.z, `1등! 상금 ${prize.toLocaleString()}원을 받았어요`, 5);
       checkAchievements();
     } else {
-      spawnMoneyPopup(state.x, py, state.z, '😢 꼴등… 당근을 더 먹이면 더 잘 뜁니다', 5);
+      spawnMoneyPopup(state.x, py, state.z, '꼴등… 당근을 더 먹이면 더 잘 뜁니다', 5);
     }
     saveGame(true);
   };
@@ -5740,7 +5740,7 @@ function tryFeedPony() {
     // 빈 마구간에서 F — 새 조랑말을 데려옵니다
     if (coins < PONY_PRICE) {
       spawnMoneyPopup(STABLE.x, y, STABLE.z,
-        `💔 마구간이 비었어요 — 새 조랑말은 ${PONY_PRICE.toLocaleString()}원 (${(PONY_PRICE - coins).toLocaleString()}원 부족)`);
+        `마구간이 비었어요\n새 조랑말은 ${PONY_PRICE.toLocaleString()}원 (${(PONY_PRICE - coins).toLocaleString()}원 부족)`);
       return;
     }
     coins -= PONY_PRICE;
@@ -5751,13 +5751,13 @@ function tryFeedPony() {
     updateCoinBadge();
     playShipSound();
     saveGame(true);
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, '🐴 새 조랑말을 데려왔어요! 이번엔 매일 챙겨주세요', 5);
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, '새 조랑말을 데려왔어요! 이번엔 매일 챙겨주세요', 5);
     return;
   }
   // 멀리서 던져 주는 게 아니라, 조랑말 앞까지 가서 손으로 먹입니다
   const d = Math.hypot(state.x - STABLE.x, state.z - STABLE.z);
   if (d > FEED_RANGE) {
-    spawnMoneyPopup(state.x, groundHeight(state.x, state.z) + 1.6, state.z, '🐴 조랑말 앞까지 더 가까이 가세요');
+    spawnMoneyPopup(state.x, groundHeight(state.x, state.z) + 1.6, state.z, '조랑말 앞까지 더 가까이 가세요');
     return;
   }
   playPonySfx();   // 말 곁에서 F — 히힝!
@@ -5774,9 +5774,9 @@ function tryFeedPony() {
   state.idleTime = 0; state.sit = 0;
   if (carrotFx) { carrotFx.visible = true; carrotFxT = 0; }   // 당근 그림이 냠냠 사라집니다
   if (ponyLove >= RACE_LOVE) {
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, `🏇 애정 ${ponyLove}! 승률이 최고예요 — 옆 팻말에서 경마 출전!`);
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, `애정 ${ponyLove}! 승률이 최고예요\n옆 팻말에서 경마 출전!`);
   } else {
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, `🥕 냠냠! ❤️ ${ponyLove}/${RACE_LOVE}`);
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, `냠냠! ${ponyLove}/${RACE_LOVE}`);
   }
   state.idleTime = 0;
 }
@@ -5823,7 +5823,7 @@ function handleActionKey() {
   if (nearestFruit() >= 0) {
     // 딴 귤은 상자에 담아야 하니, 상자가 곁에 있어야 딸 수 있습니다
     if (Math.hypot(basketPos.x - state.x, basketPos.z - state.z) > 6) {
-      spawnMoneyPopup(state.x, lulu.position.y + 1.8, state.z, '📦 귤 상자를 옆에 끌고 와야 담을 수 있어요');
+      spawnMoneyPopup(state.x, lulu.position.y + 1.8, state.z, '귤 상자를 옆에 끌고 와야 담을 수 있어요');
       return;
     }
     tryHarvest();
@@ -5871,15 +5871,15 @@ function handleActionKey() {
     // 태풍이 오는 날은 바다가 위험해 물질을 쉽니다
     if (dayEvent === 'storm') {
       spawnMoneyPopup(DIVE_ENTRY.x, groundHeight(DIVE_ENTRY.x, DIVE_ENTRY.z) + 2.2, DIVE_ENTRY.z,
-        '🌀 태풍이 몰아쳐요 — 오늘은 물질을 쉽니다');
+        '태풍이 몰아쳐요\n오늘은 물질을 쉽니다');
       return;
     }
     // 망사리를 메고 있어야만 바다에 들어갈 수 있습니다
     if (!netCarried) {
       const py = groundHeight(DIVE_ENTRY.x, DIVE_ENTRY.z) + 2.2;
       spawnMoneyPopup(DIVE_ENTRY.x, py, DIVE_ENTRY.z,
-        hasNet ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
-               : `🧺 망사리가 있어야 물질할 수 있어요 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
+        hasNet ? '망사리를 두고 왔어요\n메고 와야 물질할 수 있어요'
+               : `망사리가 있어야 물질할 수 있어요\n상점 안에서 ${NET_PRICE.toLocaleString()}원`);
       return;
     }
     enterDive();
