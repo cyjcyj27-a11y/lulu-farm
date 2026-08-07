@@ -3520,7 +3520,7 @@ const coinBadge = document.getElementById('coinBadge');
 const ropeBadge = document.getElementById('ropeBadge');
 const boxBadge = document.getElementById('boxBadge');
 function updateCoinBadge() {
-  if (coinBadge) coinBadge.textContent = `${coins.toLocaleString()}원`;
+  if (coinBadge) coinBadge.textContent = `💵 ${coins.toLocaleString()}원`;
 }
 // 상자에 귤이 몇 개 담겼는지 (가득 차면 색이 바뀌어 배송할 때가 됐음을 알립니다)
 // basketCount·BASKET_CAP은 아래 12-1b에서 만들어지지만, 이 함수는 그 뒤에야 불리므로 괜찮습니다.
@@ -3532,8 +3532,8 @@ function updateBasketBadge() {
   if (!dragging) return;
   const full = basketCount >= BASKET_CAP;
   boxBadge.textContent = full
-    ? `상자 가득! ${basketCount}/${BASKET_CAP}\n택배사의 이장님께 (한 박스 10,000원)`
-    : `상자 ${basketCount}/${BASKET_CAP}\n가득 채우면 10,000원`;
+    ? `📦 상자 가득! ${basketCount}/${BASKET_CAP}\n택배사의 이장님께 (한 박스 10,000원)`
+    : `📦 상자 ${basketCount}/${BASKET_CAP}\n가득 채우면 10,000원`;
   boxBadge.classList.toggle('full', full);
 }
 // 상자(basketPos)와 잡기 범위(GRAB_RANGE)는 아래 12-1b에서 정의되므로,
@@ -3608,7 +3608,7 @@ function updateRopeBadge() {
     } else {
       ropeBadge.textContent = netCarried
         ? `${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다` +
-          (isNight() ? '야간물질은 값을 2배로 쳐줘요! 대신 숨이 빨리 차요' : '')
+          (isNight() ? '\n야간물질은 값을 2배로 쳐줘요\n대신 숨이 빨리 차요' : '')
         : (hasNet
           ? '망사리를 두고 왔어요\n메고 와야 물질할 수 있어요'
           : `망사리가 있어야 물질합니다\n상점 안에서 ${NET_PRICE.toLocaleString()}원`);
@@ -3677,7 +3677,7 @@ function updateRopeBadge() {
       ropeBadge.textContent = `마구간이 비었어요\n${KEY_ACTION}으로 새 조랑말 데려오기 (${PONY_PRICE.toLocaleString()}원)`;
     } else if (carrots > 0) {
       ropeBadge.textContent = `${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)` +
-        (ponyFedToday() ? '' : '· 오늘 아직 안 먹였어요');
+        (ponyFedToday() ? '' : '\n오늘 아직 안 먹였어요');
     } else {
       ropeBadge.textContent = '조랑말한테 당근을 주세요\n당근은 이장님 상점에서';
     }
@@ -4251,7 +4251,7 @@ function updateDiveUI() {
   }
   if (netBadge) {
     netBadge.style.display = state.diving || net.length ? 'block' : 'none';
-    netBadge.textContent = `망사리 ${net.length}/${NET_CAP}`;
+    netBadge.textContent = `🧺 망사리 ${net.length}/${NET_CAP}`;
     netBadge.classList.toggle('full', net.length >= NET_CAP);
   }
 }
@@ -4380,8 +4380,8 @@ function leaveDive(reason) {
     const list = Object.entries(tally).map(([k, n]) => `${CATCH_KINDS[k].name} ${n}`).join(' · ');
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
       `${list} → +${pay.toLocaleString()}원` +
-      (nightSold ? '(야간물질 2배!)' : '') +
-      (dayEvent === 'haul' ? '(물반 고기반!)' : ''));
+      (nightSold ? ' (야간물질 2배!)' : '') +
+      (dayEvent === 'haul' ? ' (물반 고기반!)' : ''));
     checkAchievements();
   } else {
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, '뭍으로 나왔어요');
@@ -5223,9 +5223,9 @@ function openBag() {
   if (houseFloorColor !== 0) spent += 4000000;
   if (houseWallColor !== 0) spent += 6000000;
   bookList.innerHTML =
-    `<div class="bookHead">자산</div>` +
-    `<div class="bagMoney">${coins.toLocaleString()}원</div>` +
-    `<div class="bookTip" style="margin-bottom:10px">집꾸미기 ${spent.toLocaleString()} / 100,000,000원` +
+    `<div class="bookHead">🎒 자산</div>` +
+    `<div class="bagMoney">💵 ${coins.toLocaleString()}원</div>` +
+    `<div class="bookTip" style="margin-bottom:10px">🏠 집꾸미기 ${spent.toLocaleString()} / 100,000,000원<br>` +
     (spent >= 100000000 ? '꿈을 이뤘어요!' : '1억을 채우면 꿈의 집 완성') + `</div>` +
     `<div class="bagGrid">` + items.map((it) =>
       `<div class="bagItem${it.owned ? '' : ' off'}">` +
@@ -5587,7 +5587,7 @@ const carrotBadge = document.getElementById('carrotBadge');
 function updateCarrotBadge() {
   if (!carrotBadge) return;
   carrotBadge.style.display = carrots > 0 ? 'block' : 'none';
-  carrotBadge.textContent = `당근 ${carrots}개`;
+  carrotBadge.textContent = `🥕 당근 ${carrots}개`;
 }
 
 function tryBuyCarrot() {
