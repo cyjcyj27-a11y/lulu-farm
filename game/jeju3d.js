@@ -2763,56 +2763,70 @@ let luluModelReady = false;
 let luluModelYaw = 0;                     // 몸을 홱 돌리지 않고 스르륵 돌기 위한 현재 각도
 const LULU_MODEL_YAW = 0;                 // 모델 원본이 보는 방향 보정 (필요하면 ±Math.PI/2)
 
+// GLB 파일 하나(정지 메시 1개 + 그림 한 장)를 읽어 게임에 세울 수 있는 메시로 만듭니다.
+// 발끝이 y=0에 닿고 키가 height가 되게 맞춰서 돌려줍니다.
+// 모델 파일을 갈아끼우면 주소 뒤의 ?v= 숫자도 올려야 합니다 (서비스워커가 옛것을 물고 있지 않게)
+async function loadGlbCharacter(url, height) {
+  const buf = await (await fetch(url)).arrayBuffer();
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, true) !== 0x46546c67) throw new Error('glTF 아님');   // 'glTF' 서명 확인
+  const jsonLen = dv.getUint32(12, true);
+  const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
+  const binStart = 20 + jsonLen + 8;                      // JSON 덩어리 다음이 이진 덩어리
+  const prim = gltf.meshes[0].primitives[0];
+  const readAcc = (i) => {
+    const acc = gltf.accessors[i];
+    const bv = gltf.bufferViews[acc.bufferView];
+    const off = binStart + (bv.byteOffset || 0) + (acc.byteOffset || 0);
+    const n = acc.count * ({ SCALAR: 1, VEC2: 2, VEC3: 3 }[acc.type]);
+    return acc.componentType === 5125 ? new Uint32Array(buf.slice(off, off + n * 4))
+         : acc.componentType === 5123 ? new Uint16Array(buf.slice(off, off + n * 2))
+         : new Float32Array(buf.slice(off, off + n * 4));
+  };
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(readAcc(prim.attributes.POSITION), 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(readAcc(prim.attributes.TEXCOORD_0), 2));
+  geo.setIndex(new THREE.BufferAttribute(readAcc(prim.indices), 1));
+  geo.computeVertexNormals();
+  // 껴묻어 온 그림 한 장을 꺼내 입힙니다
+  const imgBv = gltf.bufferViews[gltf.images[0].bufferView];
+  const blob = new Blob([new Uint8Array(buf, binStart + (imgBv.byteOffset || 0), imgBv.byteLength)],
+    { type: gltf.images[0].mimeType || 'image/png' });
+  const bmp = await createImageBitmap(blob);
+  const tex = new THREE.Texture(bmp);
+  tex.flipY = false;                       // GLB의 그림 좌표는 위아래 기준이 반대입니다
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  // 이런 텍스처는 명암(그림자·음영)이 이미 그려져 있습니다. 게임 조명을 또 얹으면
+  // 음영이 두 번 겹쳐 때 묻은 것처럼 보여서, 종이 인형들과 똑같이 "조명 없이 원색 그대로" 그립니다.
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
+  mesh.castShadow = true;                  // 종이 인형과 달리 진짜 그림자를 드리웁니다
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const s = height / (bb.max.y - bb.min.y);
+  mesh.scale.setScalar(s);
+  mesh.position.y = -bb.min.y * s;
+  return mesh;
+}
+
 async function loadLuluModel() {
   try {
-    // 모델 파일을 갈아끼우면 뒤의 ?v= 숫자도 올려야 합니다 (서비스워커가 옛것을 물고 있지 않게)
-    // 지금 입은 옷: 스팀펑크 탐험가. 농부 차림으로 되돌리려면 'lulu.glb?v=7'로 바꾸면 됩니다.
-    const buf = await (await fetch('../assets/lulu_steampunk.glb')).arrayBuffer();
-    const dv = new DataView(buf);
-    if (dv.getUint32(0, true) !== 0x46546c67) return;       // 'glTF' 서명 확인
-    const jsonLen = dv.getUint32(12, true);
-    const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
-    const binStart = 20 + jsonLen + 8;                      // JSON 덩어리 다음이 이진 덩어리
-    const prim = gltf.meshes[0].primitives[0];
-    const readAcc = (i) => {
-      const acc = gltf.accessors[i];
-      const bv = gltf.bufferViews[acc.bufferView];
-      const off = binStart + (bv.byteOffset || 0) + (acc.byteOffset || 0);
-      const n = acc.count * ({ SCALAR: 1, VEC2: 2, VEC3: 3 }[acc.type]);
-      return acc.componentType === 5125 ? new Uint32Array(buf.slice(off, off + n * 4))
-           : acc.componentType === 5123 ? new Uint16Array(buf.slice(off, off + n * 2))
-           : new Float32Array(buf.slice(off, off + n * 4));
-    };
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(readAcc(prim.attributes.POSITION), 3));
-    geo.setAttribute('uv', new THREE.BufferAttribute(readAcc(prim.attributes.TEXCOORD_0), 2));
-    geo.setIndex(new THREE.BufferAttribute(readAcc(prim.indices), 1));
-    geo.computeVertexNormals();
-    // 껴묻어 온 PNG 한 장을 꺼내 입힙니다
-    const imgBv = gltf.bufferViews[gltf.images[0].bufferView];
-    const blob = new Blob([new Uint8Array(buf, binStart + (imgBv.byteOffset || 0), imgBv.byteLength)],
-      { type: gltf.images[0].mimeType || 'image/png' });
-    const bmp = await createImageBitmap(blob);
-    const tex = new THREE.Texture(bmp);
-    tex.flipY = false;                       // GLB의 그림 좌표는 위아래 기준이 반대입니다
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
-    // 이 텍스처는 명암(그림자·음영)이 이미 그려져 있습니다. 게임 조명을 또 얹으면
-    // 음영이 두 번 겹쳐 때 묻은 것처럼 보여서, 종이 인형들과 똑같이 "조명 없이 원색 그대로" 그립니다.
-    // (생성 도구의 미리보기와 같은 방식입니다)
-    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
-    mesh.castShadow = true;                  // 모델은 종이 인형과 달리 진짜 그림자를 드리웁니다
-    // 발끝이 y=0에 닿고 키가 SPRITE_H가 되게 맞춥니다
-    geo.computeBoundingBox();
-    const bb = geo.boundingBox;
-    const s = SPRITE_H / (bb.max.y - bb.min.y);
-    mesh.scale.setScalar(s);
-    mesh.position.y = -bb.min.y * s;
-    luluModelInner.add(mesh);
+    luluModelInner.add(await loadGlbCharacter('../assets/lulu.glb?v=7', SPRITE_H));
     luluModelReady = true;
   } catch (e) { /* 읽기에 실패하면 그림 루루를 그대로 씁니다 */ }
 }
-if (CAN_USE_IMAGES) loadLuluModel();
+// 해녀 할망 3D — 잠수복에 테왁(주황 부표)·망사리를 멘, 직접 만드신 할망 모델
+let halmangModel = null;
+async function loadHalmangModel() {
+  try {
+    const mesh = await loadGlbCharacter('../assets/halmang.glb', HALMANG_H);
+    halmangModel = new THREE.Group();
+    halmangModel.add(mesh);
+    halmangModel.rotation.y = Math.PI / 2;   // 축대 길목(동쪽)을 바라보고 계십니다
+    scene.add(halmangModel);
+  } catch (e) { /* 실패하면 그림 할망 그대로 */ }
+}
+if (CAN_USE_IMAGES) { loadLuluModel(); loadHalmangModel(); }
 
 // 매 프레임 — 위치·방향·걸음짓. 종이 인형과 달리 카메라가 아니라 "가는 방향"을 봅니다.
 function updateLuluModel() {
@@ -4419,16 +4433,24 @@ obstacles.push({ x: HALMANG_SPOT.x, z: HALMANG_SPOT.z, r: 0.7, topY: NO_JUMP });
 function halmangTalk() {
   startTalk('해녀 할망', ['……욕심내민, 바당이 데려간다.']);
 }
-// 매 프레임 — 항상 카메라를 바라보고 앉아 있습니다
+// 매 프레임 — 3D 모델이 있으면 모델로, 아직 없으면(내려받는 중) 그림 판으로 서 계십니다
 function updateHalmang() {
-  if (!halmangCard) return;
   const gy = groundHeight(HALMANG_SPOT.x, HALMANG_SPOT.z);
-  halmangCard.position.set(HALMANG_SPOT.x, gy, HALMANG_SPOT.z);
-  halmangCard.rotation.y = Math.atan2(camera.position.x - HALMANG_SPOT.x, camera.position.z - HALMANG_SPOT.z);
-  const sheet = SHEETS.halmang;
-  setCell(sheet, Math.floor(performance.now() * 0.004) % sheet.frames);
-  const Hp = halmangCard.userData.planeH;
-  halmangCard.scale.set(Hp * sheet.frameW / CELL_H, Hp, 1);
+  if (halmangModel) {
+    halmangModel.position.set(HALMANG_SPOT.x, gy, HALMANG_SPOT.z);
+    // 숨쉬듯 아주 살짝 부풀기 — 정지 모델이라도 살아 계신 느낌이 나게
+    const br = 1 + Math.sin(performance.now() * 0.0016) * 0.012;
+    halmangModel.scale.set(br, 1, br);
+    if (halmangCard) halmangCard.visible = false;
+  } else if (halmangCard) {
+    halmangCard.visible = true;
+    halmangCard.position.set(HALMANG_SPOT.x, gy, HALMANG_SPOT.z);
+    halmangCard.rotation.y = Math.atan2(camera.position.x - HALMANG_SPOT.x, camera.position.z - HALMANG_SPOT.z);
+    const sheet = SHEETS.halmang;
+    setCell(sheet, Math.floor(performance.now() * 0.004) % sheet.frames);
+    const Hp = halmangCard.userData.planeH;
+    halmangCard.scale.set(Hp * sheet.frameW / CELL_H, Hp, 1);
+  }
   // 곁을 지나면 잔소리 한마디 — 물질 나가는 길에 반드시 듣게 됩니다
   const near = !state.diving &&
     Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < 3.2;
