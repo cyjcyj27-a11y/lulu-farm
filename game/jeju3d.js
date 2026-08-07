@@ -3674,6 +3674,8 @@ const TOOL_INFO = {
 };
 
 function houseBadgeText() {
+  if (endingState === 2) return `💰 땅주인에게 땅값 ${LAND_PRICE.toLocaleString()}원 주기 (${KEY_ACTION}) — 지금 ${coins.toLocaleString()}원`;
+  if (endingState >= 3) return '🌅 진짜 내 땅 위의 내 집 · 문 앞에 서면 안으로';
   if (houseStage >= 3) return '🏡 내 집! 창고(48알) · 문 앞에 서면 안으로 들어갑니다';
   const t = TOOL_INFO[STAGE_TOOLS[houseStage]];
   if (!tools[STAGE_TOOLS[houseStage]]) {
@@ -3684,8 +3686,14 @@ function houseBadgeText() {
 
 function tryFixHouse() {
   const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
+  // 땅주인이 나타난 뒤에는, 집 앞 F가 "땅 사기"가 됩니다
+  if (endingState === 2) {
+    tryBuyLand();
+    return;
+  }
   if (houseStage >= 3) {
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 다 고쳤어요. 좋은 집이네요!');
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z,
+      endingState >= 3 ? '🌅 진짜 내 땅, 진짜 내 집입니다' : '🏡 다 고쳤어요. 좋은 집이네요!');
     return;
   }
   if (houseStage < 0) {
@@ -3871,6 +3879,65 @@ function dayEventNotice() {
 // 장날이면 상점 물건값이 반값이 됩니다 (사는 곳마다 이 함수를 거칩니다)
 function shopPrice(p) { return dayEvent === 'market' ? Math.round(p / 2) : p; }
 
+// ----- 엔딩 3막 — 꿈의 완성, 땅주인의 등장, 그리고 루루의 반격 -----
+// 0 = 진행 중 · 1 = 해피엔딩(제주 최고의 집) · 2 = 새드엔딩(땅주인 등장) · 3 = 진엔딩(땅 매입)
+let endingState = 0;
+let happyDay = 0;          // 해피엔딩을 본 날 (며칠 뒤 땅주인이 옵니다)
+const LAND_PRICE = 3000000;
+function dreamDone() {
+  return houseStage >= 3 &&
+         FURN_ORDER.every((k) => furnitureOwned[k]) &&
+         houseFloorColor !== 0 && houseWallColor !== 0;
+}
+const ENDING_HAPPY = [
+  '집 수리가 끝났다. 가구가 들어오고, 벽지와 바닥도 새로 갈았다.',
+  '이장님도, 해녀 할망도 구경을 왔다. "허, 제주에서 제일가는 집이구먼!"',
+  '서울에서는 이룰 수 없던 꿈을, 루루는 제주에서 이뤘다. 🏡 — 꿈 달성! —',
+];
+const ENDING_SAD = [
+  '어느 아침, 낯선 고양이가 서류 가방을 들고 찾아왔다.',
+  '"여기, 무허가 건물인 거 아시죠? 제가 이 땅 주인입니다."',
+  '"비워주세요. 여기다 카페를 지을 겁니다. …오션뷰 카페요."',
+  '열심히 고치고 꾸민 내 집이… 루루는 눈앞이 캄캄해졌다. ㅠㅠ',
+  '하지만 이대로 물러날 수는 없다. "그래요? 그럼… 내가 이 땅을 사겠어!"',
+  '💰 새로운 목표 — 3,000,000원을 모아, 집 앞에서 땅을 통째로 사자!',
+];
+const ENDING_TRUE = [
+  '루루는 땅주인 앞에 3,000,000원을 내밀었다.',
+  '"이 땅, 제가 사겠습니다. …영수증 주세요."',
+  '이제 아무도 루루를 쫓아낼 수 없다. 집도, 땅도, 바다가 보이는 이 언덕도 — 전부 루루의 것이다.',
+  '🌅 서른 살의 루루는, 마침내 진짜 집주인이 되었다. — 진짜 엔딩 — 🍊',
+];
+// 아침마다 엔딩 차례가 됐는지 확인합니다. 엔딩이 나오는 아침에는 다른 알림을 쉽니다.
+function checkEndingMorning() {
+  if (endingState === 0 && dreamDone()) {
+    endingState = 1;
+    happyDay = dayCount;
+    startTalk('루루의 이야기', ENDING_HAPPY, () => { checkAchievements(); saveGame(true); });
+    return true;
+  }
+  if (endingState === 1 && dayCount >= happyDay + 3) {
+    endingState = 2;
+    startTalk('루루의 이야기', ENDING_SAD, () => saveGame(true));
+    return true;
+  }
+  return false;
+}
+// 땅 사기 — 새드엔딩 이후, 집 앞에서 F
+function tryBuyLand() {
+  const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
+  if (coins < LAND_PRICE) {
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z,
+      `💰 땅값 ${LAND_PRICE.toLocaleString()}원 — ${(LAND_PRICE - coins).toLocaleString()}원 더 모아야 해요`);
+    return;
+  }
+  coins -= LAND_PRICE;
+  endingState = 3;
+  updateCoinBadge();
+  playShipSound();
+  startTalk('루루의 이야기', ENDING_TRUE, () => { checkAchievements(); saveGame(true); });
+}
+
 // 하늘·해·안개를 시간에 맞춰 물들입니다
 const SKY_DAY_TOP = new THREE.Color(0x2f7fd0), SKY_DAY_BOT = new THREE.Color(0xe2eff8);
 const SKY_NGT_TOP = new THREE.Color(0x0a1230), SKY_NGT_BOT = new THREE.Color(0x1c2a4a);
@@ -3883,9 +3950,12 @@ function updateDayNight(dt) {
   if (gameT >= DAY_LEN) {
     gameT -= DAY_LEN;
     dayCount++;
-    morningNotice();
     rollDayEvent();
-    setTimeout(dayEventNotice, 2200);   // 아침 인사 다음에 오늘의 소식
+    // 엔딩이 나오는 아침에는 다른 알림을 쉬고 이야기에 집중합니다
+    if (!checkEndingMorning()) {
+      morningNotice();
+      setTimeout(dayEventNotice, 2200);   // 아침 인사 다음에 오늘의 소식
+    }
   }
   const t01 = gameT / DAY_LEN;
   let daylight;
@@ -4074,6 +4144,8 @@ const ACHIEVEMENTS = [
   { id: 'gold1',   name: '황금향!',     desc: '황금향을 처음 발견했다' },
   { id: 'octo1',   name: '문어 한탕',   desc: '문어를 처음 잡았다 (한 마리 5만원!)' },
   { id: 'rich',    name: '백만장자',    desc: '돈 1,000,000원 모으기' },
+  { id: 'dream',   name: '제주 최고의 집', desc: '수리·가구·인테리어까지 — 꿈을 이뤘다' },
+  { id: 'landlord', name: '진짜 집주인', desc: '땅까지 사서, 아무도 못 쫓아내는 진짜 내 집' },
 ];
 const ACH_TESTS = {
   box1: () => stat.boxes >= 1,
@@ -4090,6 +4162,8 @@ const ACH_TESTS = {
   furn: () => FURN_ORDER.every((k) => furnitureOwned[k]),
   gold1: () => stat.gold >= 1,
   octo1: () => stat.octopus >= 1,
+  dream: () => endingState >= 1,
+  landlord: () => endingState >= 3,
   rich: () => coins >= 1000000,
 };
 let achieved = {};
@@ -4135,6 +4209,7 @@ function saveGame(quiet) {
       hasNet, netCarried, netX: netObj.position.x, netZ: netObj.position.z,
       furn: furnitureOwned,
       gameT, dayCount, lastFedDay, ponyAlive, tutorialSeen, introSeen, dayEvent,
+      endingState, happyDay,
       floorC: houseFloorColor, wallC: houseWallColor,
       stat, achieved,
     }));
@@ -4176,6 +4251,8 @@ function loadGame() {
   tutorialSeen = !!d.tutorialSeen;
   introSeen = !!d.introSeen;
   dayEvent = d.dayEvent || null;
+  endingState = d.endingState || 0;
+  happyDay = d.happyDay || 0;
   if (d.stat) Object.assign(stat, d.stat);
   achieved = d.achieved || {};
   applyPonyAlive();
