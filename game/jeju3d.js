@@ -585,7 +585,7 @@ buildDolharubang(34, 12, -1.1);
 buildDolharubang(-52, 20, 2.2);
 buildDolharubang(12, 58, 3.1);
 
-// ---------- 8-2b. 상점 「이장님의 보물창고」 (컨테이너를 묶는 끈을 파는 곳)
+// ---------- 8-2b. 상점 「이장님 만물상」 (당근·망사리·가구·인테리어를 파는 곳)
 // 제주 돌집 그대로 — 현무암 벽에 초가지붕을 얹고, 문을 활짝 열어 안쪽 진열장이 보이게 합니다.
 // 순수한 배경 오브젝트라 돌하르방처럼 모양만 만들고 장애물 목록에 등록해둡니다.
 // "살 수 있는지/샀는지" 같은 상호작용 로직은 여기 두지 않고 경제(코인) 쪽(12-1c)에서 처리합니다.
@@ -644,7 +644,7 @@ function makeSignTexture() {
   ctx.font = '600 34px "맑은 고딕", Malgun Gothic, sans-serif';
   ctx.fillText('제주감성소품', 256, 58);
   ctx.font = 'bold 54px "맑은 고딕", Malgun Gothic, sans-serif';
-  ctx.fillText('이장님의 보물창고', 256, 122);
+  ctx.fillText('이장님 만물상', 256, 122);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -3643,7 +3643,7 @@ function updateRopeBadge() {
     if (dayEvent === 'storm') {
       ropeBadge.textContent = '태풍이 몰아쳐요\n오늘은 물질을 쉽니다';
     } else if (!nearEnd) {
-      ropeBadge.textContent = '축대 끝까지 걸어나가면 물질하러 들어갈 수 있어요';
+      ropeBadge.textContent = '포구 끝까지 걸어나가면 물질하러 들어갈 수 있어요';
     } else {
       ropeBadge.textContent = netCarried
         ? `${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다` +
@@ -5546,7 +5546,7 @@ const TUTOR_LINES = [
   '안녕하세요! 저는 이 섬을 지키는 돌하르방입니다. 섬에서 사는 법을 알려드릴게요.',
   '귤나무 앞에서 (F)를 누르면 귤을 딸 수 있어요. 상자를 가득 채워 택배사에 가져가면 한 박스 1만원에 팔립니다.',
   '상점 문 앞에 서면 안으로 들어갑니다. 당근을 사서 말에게 매일 한 개씩 먹여주세요\n굶기면 위험해요!',
-  '물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가세요. 물속에서는 ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄이에요. 숨이 다하면 죽을 위험이 있어요!',
+  '물질을 하려면 상점에서 망사리를 사고, 포구 끝까지 걸어가세요. 물속에서는 ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄이에요. 숨이 다하면 죽을 위험이 있어요!',
   '남쪽 언덕의 돌집이 루루의 집입니다. 문 앞에 서면 들어가지고, 가구를 사서 꾸밀 수도 있어요.',
   '말과 애정이 쌓이면 마구간 옆 팻말에서 경마에 나갈 수 있습니다. 좋은 하루 되세요!',
 ];
