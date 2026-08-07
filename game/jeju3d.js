@@ -2178,7 +2178,7 @@ const SHOP_GOODS = [
     x: SHOP_ROOM.cx + 2.4, z: SHOP_ROOM.cz - 3.3 },
   { key: 'chair',  name: '의자',   emoji: '🪑', get price() { return FURNITURE.chair.price; },
     x: SHOP_ROOM.cx + 3.9, z: SHOP_ROOM.cz - 3.3 },
-  { key: 'closet', name: '옷장',   emoji: '🚪', get price() { return FURNITURE.closet.price; },
+  { key: 'closet', name: '옷장',   emoji: '🧥', get price() { return FURNITURE.closet.price; },
     x: SHOP_ROOM.cx + 5.3, z: SHOP_ROOM.cz - 3.3 },
   // ----- 동쪽 벽 — 집꾸미기 소품 코너 -----
   { key: 'rug',      name: '러그',        emoji: '🧶', get price() { return FURNITURE.rug.price; },
@@ -2222,7 +2222,7 @@ const SHOP_GOODS = [
   { key: 'cycad',       name: '소철나무',  emoji: '🌵', get price() { return FURNITURE.cycad.price; },
     x: SHOP_ROOM.cx - 1.2, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
   // ----- 매장 가운데 통로 — 가전 -----
-  { key: 'washer', name: '세탁기', emoji: '🌀', get price() { return FURNITURE.washer.price; },
+  { key: 'washer', name: '세탁기', emoji: '👕', get price() { return FURNITURE.washer.price; },
     x: SHOP_ROOM.cx - 1.2, z: SHOP_ROOM.cz + 1.9 },
   { key: 'fridge', name: '냉장고', emoji: '🧊', get price() { return FURNITURE.fridge.price; },
     x: SHOP_ROOM.cx - 2.3, z: SHOP_ROOM.cz + 2.0 },
@@ -3532,6 +3532,12 @@ const KEY_UP = IS_TOUCH ? '⤴ 버튼' : 'Space';
 
 function updateRopeBadge() {
   if (!ropeBadge) return;
+  // 구입 창·자산 창·대화가 떠 있는 동안은 뒤쪽 안내 배지를 감춥니다 (화면이 겹쳐 지저분해집니다)
+  const popupOpen =
+    (pickWrap && pickWrap.style.display === 'flex') ||
+    (bookWrap && bookWrap.style.display === 'flex') ||
+    (talkBoxEl && talkBoxEl.style.display === 'block');
+  if (popupOpen) { ropeBadge.style.display = 'none'; return; }
   ropeBadge.style.display = 'block';   // 아래 분기 중 하나가 걸리면 보입니다 (없으면 끝에서 숨김)
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
