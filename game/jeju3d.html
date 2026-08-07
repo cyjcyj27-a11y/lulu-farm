@@ -28,17 +28,11 @@
   }
   #title small { display: block; font-size: 12px; font-weight: 400; opacity: .85; margin-top: 3px; }
 
-  /* 새로 시작 — 화면 오른쪽 위 */
-  #restartTop {
+  /* 오른쪽 위 아이콘 2개 — 새게임(↻)·저장(💾)을 나란히 */
+  #topRow {
     position: absolute; top: 14px; right: 16px;
-    pointer-events: auto; cursor: pointer;
-    background: rgba(0,0,0,.45); color: #fff;
-    border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
-    padding: 8px 14px; font-size: 12.5px; font-family: inherit;
-    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
+    display: flex; gap: 8px; pointer-events: auto;
   }
-  #restartTop:active { background: rgba(255,190,80,.7); color: #2a1806; }
 
   #help {
     position: absolute; top: 60px; right: 20px;
@@ -479,12 +473,15 @@
     <b>상호작용</b> F<br>
     <b>물속에서</b> F 채집 · ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄 · 수면에서 F 나가기<br>
     <b>전체 지도</b> M (또는 🗺 배지)<br>
-    <b>왼쪽 아래</b> 💾 저장 · 🗺 지도 · 🎵 음악<br>
-    <b>오른쪽 위</b> ↻ 처음부터 다시하기
+    <b>왼쪽 아래</b> 🎒 자산 · 🗺 지도 · 🎵 음악<br>
+    <b>오른쪽 위</b> ↻ 새로 시작 · 💾 저장
   </div>
 
   <div id="coinBadge">💵 0원</div>
-  <button id="restartTop">↻ 처음부터 다시하기</button>
+  <div id="topRow">
+    <button class="ibtn" id="restartTop" title="처음부터 다시하기">↻</button>
+    <button class="ibtn" id="btnSave" title="저장하기">💾</button>
+  </div>
   <div id="mapWrap">
     <canvas id="mapCanvas"></canvas>
     <div class="cap">M 키나 화면을 누르면 닫힙니다</div>
@@ -508,7 +505,6 @@
   <div id="breathBar"><div id="breathFill"></div></div>
 
   <div id="iconRow">
-    <button class="ibtn" id="btnSave" title="저장하기">💾</button>
     <button class="ibtn" id="bookBadge" title="자산 (갖고 있는 아이템)">🎒</button>
     <button class="ibtn" id="mapBadge" title="지도 (M)">
       <!-- 제주도를 단순화한 모양: 동서로 길쭉한 섬 가운데에 한라산이 볼록 -->
