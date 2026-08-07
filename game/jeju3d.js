@@ -5078,7 +5078,7 @@ function openColorPicker(title, colors, onPick, price) {
   pickTitle.textContent = title;
   pickGrid.innerHTML = '';
   pickPrice.innerHTML = '';
-  if (pickTip) pickTip.textContent = '색을 눌러 고르고, 가격을 누르면 사져요 · 바깥을 누르면 취소';
+  if (pickTip) pickTip.textContent = '관광지라 물가가 비싸구나 ㅠㅠ';
   let selected = null;
   const swatches = [];
   const buyBtn = document.createElement('button');
@@ -5127,7 +5127,7 @@ function openBuyDialog(emoji, name, price, onBuy) {
   pickTitle.textContent = name;
   pickGrid.innerHTML = '';
   pickPrice.innerHTML = '';
-  if (pickTip) pickTip.textContent = '가격을 누르면 사져요 · 바깥을 누르면 취소';
+  if (pickTip) pickTip.textContent = '관광지라 물가가 비싸구나 ㅠㅠ';
   const prev = document.createElement('div');
   prev.className = 'bigPreview';
   prev.textContent = emoji;
