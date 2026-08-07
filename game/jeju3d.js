@@ -5055,7 +5055,12 @@ function openBag() {
     `<div class="bookTip" style="margin-top:10px">바깥을 누르면 닫힘</div>`;
   bookWrap.style.display = 'flex';
 }
-if (bookBadge) bookBadge.addEventListener('pointerdown', (e) => { e.preventDefault(); openBag(); });
+// 🎒 버튼은 여닫이 — 열려 있으면 닫고, 닫혀 있으면 엽니다
+if (bookBadge) bookBadge.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (bookWrap && bookWrap.style.display === 'flex') bookWrap.style.display = 'none';
+  else openBag();
+});
 // 목록 안을 만지면 스크롤, 바깥(어두운 곳)을 누르면 닫기
 if (bookWrap) bookWrap.addEventListener('pointerdown', (e) => {
   if (bookList && bookList.contains(e.target)) return;   // 목록 안 — 스크롤하게 둡니다
