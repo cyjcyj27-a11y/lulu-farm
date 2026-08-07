@@ -28,8 +28,20 @@
   }
   #title small { display: block; font-size: 12px; font-weight: 400; opacity: .85; margin-top: 3px; }
 
+  /* 새로 시작 — 화면 오른쪽 위 */
+  #restartTop {
+    position: absolute; top: 14px; right: 16px;
+    pointer-events: auto; cursor: pointer;
+    background: rgba(0,0,0,.45); color: #fff;
+    border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
+    padding: 8px 14px; font-size: 12.5px; font-family: inherit;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  #restartTop:active { background: rgba(255,190,80,.7); color: #2a1806; }
+
   #help {
-    position: absolute; top: 18px; right: 20px;
+    position: absolute; top: 60px; right: 20px;
     background: rgba(0,0,0,.35); border-radius: 10px; padding: 12px 14px;
     font-size: 12.5px; line-height: 1.9; backdrop-filter: blur(4px);
   }
@@ -130,7 +142,11 @@
     width: min(480px, 92vw); max-height: 82vh; overflow-y: auto;
     background: #f6edd8; border-radius: 16px; padding: 18px 20px;
     box-shadow: 0 4px 0 rgba(150,128,90,.55), 0 14px 40px rgba(0,0,0,.5);
+    touch-action: pan-y;   /* 손가락으로 위아래 스크롤 허용 */
+    overscroll-behavior: contain;
+    cursor: default;
   }
+  #bookList .bookTip { text-align: center; font-size: 11px; color: #a09378; text-shadow: none; margin-bottom: 8px; }
   #bookList .bookHead {
     font-size: 17px; font-weight: 800; color: #3a2817; text-shadow: none;
     margin-bottom: 10px; text-align: center;
@@ -396,10 +412,12 @@
     <b>상호작용</b> F 하나로 전부 (따기·사기·택배·수리·먹이기·상자·물질)<br>
     <b>물속에서</b> F 채집 · ↑ 보는 방향으로 헤엄 (W S 위아래 보기) · 수면에서 F 나가기<br>
     <b>전체 지도</b> M (또는 🗺 배지)<br>
-    <b>왼쪽 아래</b> 💾 저장 · 🗺 지도 · 🎵 음악 (자동 저장도 됩니다)
+    <b>왼쪽 아래</b> 💾 저장 · 🗺 지도 · 🎵 음악<br>
+    <b>오른쪽 위</b> ↻ 새로 시작
   </div>
 
   <div id="coinBadge">🍊 0원</div>
+  <button id="restartTop">↻ 새로 시작</button>
   <div id="mapWrap">
     <canvas id="mapCanvas"></canvas>
     <div class="cap">M 키나 화면을 누르면 닫힙니다</div>
@@ -508,6 +526,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=68"></script>
+<script src="jeju3d.js?v=70"></script>
 </body>
 </html>

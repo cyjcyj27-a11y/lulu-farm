@@ -4200,13 +4200,23 @@ function openBook() {
   const done = ACHIEVEMENTS.filter((a) => achieved[a.id]).length;
   bookList.innerHTML =
     `<div class="bookHead">🏅 업적 ${done} / ${ACHIEVEMENTS.length}</div>` +
+    `<div class="bookTip">위아래로 스크롤 · 바깥을 누르면 닫힘</div>` +
     ACHIEVEMENTS.map((a) =>
       `<div class="ach${achieved[a.id] ? ' on' : ''}"><b>${achieved[a.id] ? '🏅' : '🔒'} ${a.name}</b><span>${a.desc}</span></div>`
     ).join('');
   bookWrap.style.display = 'flex';
 }
 if (bookBadge) bookBadge.addEventListener('pointerdown', (e) => { e.preventDefault(); openBook(); });
-if (bookWrap) bookWrap.addEventListener('pointerdown', () => { bookWrap.style.display = 'none'; });
+// 목록 안을 만지면 스크롤, 바깥(어두운 곳)을 누르면 닫기
+if (bookWrap) bookWrap.addEventListener('pointerdown', (e) => {
+  if (bookList && bookList.contains(e.target)) return;   // 목록 안 — 스크롤하게 둡니다
+  bookWrap.style.display = 'none';
+});
+// 게임의 손가락 조작(조이스틱·시야)이 목록 스크롤을 가로채지 않게 막습니다
+if (bookList) {
+  ['touchstart', 'touchmove', 'pointermove'].forEach((ev) =>
+    bookList.addEventListener(ev, (e) => e.stopPropagation()));
+}
 
 // ---------- 12-1f-2b. 저장 · 처음부터 · 종료 ----------
 // 진행 상황을 브라우저 안(localStorage)에 남깁니다. 게임을 켜면 자동으로 이어집니다.
@@ -4286,13 +4296,20 @@ function loadGame() {
 
 const btnSave = document.getElementById('btnSave');
 if (btnSave) btnSave.addEventListener('pointerdown', (e) => { e.preventDefault(); saveGame(); });
-// (다시하기·종료 버튼은 뺐습니다. 저장은 아래 자동 저장이 알아서 해줍니다)
 
-// 자동 저장 — 몇 초에 한 번씩, 그리고 창을 닫거나 다른 앱으로 넘어가는 순간에도 조용히 저장합니다
-// (이때 돈·애정·집 같은 "지켜보기만 하면 되는" 업적들도 함께 확인합니다)
-setInterval(() => { checkAchievements(); saveGame(true); }, 5000);
-addEventListener('pagehide', () => saveGame(true));
-document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
+// 자동 저장은 뺐습니다 — 저장은 💾 버튼으로 직접, 그리고 죽음·업적·엔딩 같은
+// 중요한 순간에만 됩니다. (돈·애정·집 업적은 몇 초마다 확인만 합니다)
+setInterval(checkAchievements, 5000);
+
+// 새로 시작 — 화면 위쪽 버튼. 저장을 지우고 루루의 이야기부터 다시.
+const restartTop = document.getElementById('restartTop');
+if (restartTop) restartTop.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (confirm('처음부터 다시 시작할까요?\n저장된 진행이 모두 지워집니다.')) {
+    try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
+    location.reload();
+  }
+});
 
 // ---------- 12-1f-3. 전체 지도 (M키 / 🗺 배지) ----------
 // 지도는 따로 그림을 만들지 않고, 게임이 쓰는 지형 높이 함수(groundHeight)를 그대로
