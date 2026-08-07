@@ -2657,8 +2657,9 @@ if (CAN_USE_IMAGES) {
   // 헌집 고치기 — 망치질(0) · 톱질(1) · 페인트칠(2). 수리 단계에 맞는 칸 하나를 보여줍니다
   loadSheet('fixHouse',  'fix_house.webp',  3,  167);
   // 이장님 (상점과 택배사를 오가는 NPC). 걷기 원본은 루루와 반대로 "오른쪽"을 봅니다
-  loadSheet('mayorIdle', 'mayor_idle.webp', 8,  194);
-  loadSheet('mayorWalk', 'mayor_walk.webp', 8,  202);
+  // ?v=2 — 다리 사이 흰 여백을 지운 새 그림. 주소가 바뀌어야 폰들이 캐시 대신 새로 받습니다
+  loadSheet('mayorIdle', 'mayor_idle.webp?v=2', 8,  194);
+  loadSheet('mayorWalk', 'mayor_walk.webp?v=2', 8,  202);
 
   // 판은 1x1 로 만들고, 어느 그림을 쓰느냐에 따라 매 프레임 크기를 바꿉니다.
   // 아래쪽 끝을 기준점으로 옮겨두면 세로로 늘였다 줄여도 발이 땅에서 안 떨어집니다.
@@ -2765,7 +2766,7 @@ const LULU_MODEL_YAW = 0;                 // 모델 원본이 보는 방향 보�
 async function loadLuluModel() {
   try {
     // 모델 파일을 갈아끼우면 뒤의 ?v= 숫자도 올려야 합니다 (서비스워커가 옛것을 물고 있지 않게)
-    const buf = await (await fetch('../assets/lulu.glb?v=3')).arrayBuffer();
+    const buf = await (await fetch('../assets/lulu.glb?v=4')).arrayBuffer();
     const dv = new DataView(buf);
     if (dv.getUint32(0, true) !== 0x46546c67) return;       // 'glTF' 서명 확인
     const jsonLen = dv.getUint32(12, true);
