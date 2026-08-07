@@ -5664,7 +5664,7 @@ for (const img of document.querySelectorAll('#startJobs img[data-src]')) {
       const tutorHint = () => {
         if (!tutorialSeen) {
           setTimeout(() => spawnMoneyPopup(TUTOR_SPOT.x, groundHeight(TUTOR_SPOT.x, TUTOR_SPOT.z) + 3.4, TUTOR_SPOT.z,
-            '🗿 돌하르방 앞으로 가면 할 일을 알려줄 거예요\n가까이 가보세요', 8), 900);
+            '돌하르방 앞으로 가면 할 일을 알려줄 거예요\n가까이 가보세요', 8), 900);
         }
       };
       // 처음 온 사람에게는 루루의 사연부터, 그다음 돌하르방이 손짓합니다
