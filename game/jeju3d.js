@@ -2825,7 +2825,7 @@ async function loadHalmangModel() {
     const mesh = await loadGlbCharacter('../assets/halmang.glb', HALMANG_H);
     halmangModel = new THREE.Group();
     halmangModel.add(mesh);
-    halmangModel.rotation.y = Math.PI / 2;   // 축대 길목(동쪽)을 바라보고 계십니다
+    halmangModel.rotation.y = Math.PI;   // 뭍(남쪽)을 바라보고 계십니다 — 포구로 걸어오는 루루를 정면으로 맞습니다
     scene.add(halmangModel);
   } catch (e) { /* 실패하면 그림 할망 그대로 */ }
 }
@@ -5496,7 +5496,11 @@ function updateSpriteLulu(groundY) {
   // (물속의 둥둥·수면 그림은 정면이라 뒤집지 않습니다)
   // 잠수 그림(diveDown)·잠수복 뭍 자세도 옆모습이라, 오른쪽으로 갈 땐 좌우를 뒤집습니다
   const sideSheets = [SHEETS.walkSide, SHEETS.pullSide, SHEETS.diveSwim, SHEETS.divePick, SHEETS.diveDown, SHEETS.wetsuitLand];
-  const mirror = sideSheets.includes(sheet) && spriteCard.userData.headingRight;
+  // 잠수복 뭍 자세(해녀 시트에서 오린 것)만은 원본이 "오른쪽"을 봅니다 — 그래서 뒤집는 조건이 반대입니다.
+  // (이걸 다른 옆모습들과 똑같이 다루면, 왼쪽으로 걸을 때 머리가 오른쪽을 보는 우스운 꼴이 됩니다)
+  const facesRight = sheet === SHEETS.wetsuitLand;
+  const mirror = sideSheets.includes(sheet) &&
+    (facesRight ? !spriteCard.userData.headingRight : spriteCard.userData.headingRight);
   spriteCard.scale.set(mirror ? -Wp : Wp, Hp * breath, 1);
 
   // 발밑 그림자: 점프해서 뜨면 작아지고 옅어집니다
