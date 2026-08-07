@@ -2618,6 +2618,7 @@ function buildTangerineTree(x, y, z) {
 const NO_PLANT = [
   { x: STABLE.x, z: STABLE.z, r: 7.5 },   // 마구간 (지붕 폭 6m + 잎 반경)
   { x: HOUSE.x, z: HOUSE.z, r: 8 },       // 헌집 (그림 폭 8.5m + 뒤채)
+  { x: 12, z: -64, r: 12 },               // 무남이네 (집 + 바다를 보는 앞마당까지)
 ];
 function plantBlocked(x, z) {
   for (const n of NO_PLANT) {
@@ -4873,12 +4874,13 @@ function updateMayor(dt, t) {
 // 하는 일은 없는데 이상하게 품격이 있어 보이는 남자. 제주 촌구석에서도 매일 수트 차림입니다.
 // 루루가 집을 꾸며갈수록 한 단계씩 가까워지는데, 처음엔 젠틀하다가 갈수록
 // "오늘은 물질 안 가냐"는 재촉만 늘어납니다. 그래도 곁에 있으면 묘하게 기분이 좋습니다.
-// 무남이네 집 — 마을길 동쪽 끝. 백수인데 집은 그럴듯합니다.
+// 무남이네 집 — 마구간과 헌집 사이, 섬 남쪽 바닷가.
+// 백수인데 집은 그럴듯하고, 심지어 오션뷰입니다. 마당이 바다를 마주 봅니다.
 // 무남이는 이 집 앞을 좀처럼 벗어나지 않습니다 (갈 데가 없으니까).
-const MUNAM_HOUSE = { x: 26.0, z: 33.0 };
-const MUNAM_PATH = [                 // 자기 집 앞마당을 천천히 왕복합니다
-  { x: MUNAM_HOUSE.x - 3.4, z: MUNAM_HOUSE.z + 4.2 },
-  { x: MUNAM_HOUSE.x + 3.6, z: MUNAM_HOUSE.z + 4.6 },
+const MUNAM_HOUSE = { x: 12.0, z: -64.0, rot: Math.PI };   // 정면(마당)이 남쪽 바다를 향합니다
+const MUNAM_PATH = [                 // 바다를 보고 있는 앞마당을 천천히 왕복합니다
+  { x: MUNAM_HOUSE.x - 3.4, z: MUNAM_HOUSE.z - 4.2 },
+  { x: MUNAM_HOUSE.x + 3.6, z: MUNAM_HOUSE.z - 4.6 },
 ];
 const munam = {
   x: MUNAM_PATH[0].x, z: MUNAM_PATH[0].z,
@@ -4897,6 +4899,7 @@ function buildMunamHouse() {
   const g = new THREE.Group();
   const y = groundHeight(MUNAM_HOUSE.x, MUNAM_HOUSE.z);
   g.position.set(MUNAM_HOUSE.x, y, MUNAM_HOUSE.z);
+  g.rotation.y = MUNAM_HOUSE.rot || 0;   // 마당이 바다를 향하도록 돌려 세웁니다
   const add = (mesh, px, py, pz) => {
     mesh.position.set(px, py, pz);
     mesh.castShadow = true;
@@ -4941,8 +4944,48 @@ function buildMunamHouse() {
   });
   scene.add(g);
   obstacles.push({ x: MUNAM_HOUSE.x, z: MUNAM_HOUSE.z, r: 3.2, topY: NO_JUMP });
+  return g;
 }
-buildMunamHouse();
+
+// 집터에 이미 자란 나무·돌은 걷어냅니다.
+// (나무는 이 파일 앞쪽에서 벌써 다 심어놓은 뒤라, 자리를 비켜달라고 할 수가 없습니다.
+//  풀과 꽃은 그대로 둡니다 — 마당이 휑해 보이면 안 되니까요)
+let munamHouseGroup = null;
+function clearTreesAround(cx, cz, r) {
+  const m = new THREE.Matrix4(), v = new THREE.Vector3();
+  const inHouse = (o) => {                       // 무남이네 집은 건드리지 않습니다
+    for (let p = o; p; p = p.parent) if (p === munamHouseGroup) return true;
+    return false;
+  };
+  scene.traverse((o) => {
+    if (o.isInstancedMesh) {
+      if (o.geometry.type === 'PlaneGeometry') return;   // 풀·유채꽃·억새는 남깁니다
+      let changed = false;
+      for (let i = 0; i < o.count; i++) {
+        o.getMatrixAt(i, m);
+        v.setFromMatrixPosition(m);
+        if (Math.hypot(v.x - cx, v.z - cz) < r) {
+          m.makeScale(0, 0, 0);
+          o.setMatrixAt(i, m);
+          changed = true;
+        }
+      }
+      if (changed) o.instanceMatrix.needsUpdate = true;
+      return;
+    }
+    // 한 그루씩 따로 세워둔 나무들 — 줄기(원기둥)를 찾아 그 나무 통째로 감춥니다
+    if (!o.isMesh || !o.geometry || inHouse(o)) return;
+    if (o.geometry.type !== 'CylinderGeometry' && o.geometry.type !== 'IcosahedronGeometry') return;
+    o.getWorldPosition(v);
+    if (Math.hypot(v.x - cx, v.z - cz) >= r) return;
+    const tree = (o.parent && o.parent !== scene && !inHouse(o.parent)) ? o.parent : o;
+    tree.visible = false;
+  });
+}
+munamHouseGroup = buildMunamHouse();
+// 집 둘레를 시원하게 틔웁니다 — 바다가 보이는 빈터라야 오션뷰 소리를 듣죠
+clearTreesAround(MUNAM_HOUSE.x, MUNAM_HOUSE.z, 16);
+for (let i = 1; i <= 4; i++) clearTreesAround(MUNAM_HOUSE.x, MUNAM_HOUSE.z - i * 6, 13);
 const MUNAM_SPEED = 1.15;            // 서두를 일이 없는 걸음
 const MUNAM_RANGE = 2.0;
 let romanceStage = 0;                // 0 = 아직 못 만남, 6 = 프로포즈까지
@@ -5028,6 +5071,7 @@ let munamCard = null;
     geo.translate(0, 0.5, 0);
     munamCard = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
       map: SHEETS.munamIdle.tex, transparent: true, alphaTest: 0.08,
+      side: THREE.DoubleSide,   // 어느 쪽에서 다가와도 보이게
     }));
     munamCard.userData.planeH = MUNAM_H * CELL_H / (CELL_H - CELL_PAD * 2);
     munamCard.position.y = -(CELL_PAD / CELL_H) * munamCard.userData.planeH;
