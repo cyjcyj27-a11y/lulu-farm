@@ -1343,58 +1343,14 @@ const PAINT_COLORS = [
   { name: '바다 하늘', color: 0x9fc0d8 },
   { name: '들판 연두', color: 0xa8c078 },
   { name: '동백 분홍', color: 0xd8a8b0 },
+  { name: '한라 초록', color: 0x6a9a6a },
+  { name: '자주 포도', color: 0x9a6a9a },
+  { name: '깊은 바다', color: 0x4a6a8a },
+  { name: '벽돌 빨강', color: 0xb05a4a },
+  { name: '까망 먹빛', color: 0x4a4a48 },
+  { name: '보리 베이지', color: 0xcab894 },
 ];
-const TOOL_SPOT = { x: -0.6, z: 42.6 };
-const TOOL_RANGE = 2.2;
-{
-  const y = groundHeight(TOOL_SPOT.x, TOOL_SPOT.z);
-  const g = new THREE.Group();
-  g.position.set(TOOL_SPOT.x, y, TOOL_SPOT.z);
-  const table = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.7), shopWoodMat);
-  table.position.y = 0.62;
-  table.castShadow = true;
-  g.add(table);
-  [[-0.5, -0.25], [0.5, -0.25], [-0.5, 0.25], [0.5, 0.25]].forEach(([px, pz]) => {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), shopWoodDarkMat);
-    leg.position.set(px, 0.31, pz);
-    g.add(leg);
-  });
-  // 알록달록 페인트 통들 — 색을 골라 살 수 있다는 표시
-  PAINT_COLORS.slice(0, 5).forEach((c, i) => {
-    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.085, 0.17, 10),
-      new THREE.MeshLambertMaterial({ color: c.color, flatShading: true }));
-    bucket.position.set(-0.45 + i * 0.23, 0.76, (i % 2 ? 0.14 : -0.12));
-    bucket.castShadow = true;
-    g.add(bucket);
-  });
-  const brush = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 5), citrusTrunkMat);
-  brush.position.set(0.5, 0.9, 0.15);
-  brush.rotation.z = 0.3;
-  g.add(brush);
-  scene.add(g);
-}
-
-function tryBuyTool() {
-  const y = groundHeight(TOOL_SPOT.x, TOOL_SPOT.z) + 1.4;
-  if (tools.paint) {
-    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, '🖌 이미 페인트가 있어요 — 집 앞에서 칠하세요');
-    return;
-  }
-  if (coins < PAINT_PRICE) {
-    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, `${(PAINT_PRICE - coins).toLocaleString()}원 부족`);
-    return;
-  }
-  openColorPicker('🖌 외벽 페인트 — 색을 고르세요', PAINT_COLORS, (c) => {
-    if (tools.paint || coins < PAINT_PRICE) return;
-    coins -= PAINT_PRICE;
-    tools.paint = true;
-    housePaintColor = c.color;
-    updateCoinBadge();
-    playPickSound();
-    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, `🖌 ${c.name} 페인트 구입! 집 앞에서 칠해보세요`);
-    saveGame(true);
-  });
-}
+// (예전에는 상점 앞 공구대에서 페인트를 팔았지만, 이제 상점 안 인테리어 코너에서 팝니다)
 
 let carrots = 0;      // 들고 있는 당근
 let ponyLove = 0;     // 조랑말과 쌓은 애정 (당근 하나에 1씩)
@@ -2324,8 +2280,9 @@ const SHOP_GOODS = [
 // ---------- 8-2h-4b. 상점 왼쪽 인테리어 코너 — 바닥재·벽지 (누르면 색 고르기 팝업) ----------
 // 견본대 앞에서 F를 누르면 색 고르기 창이 뜨고, 색을 고르면 그 자리에서 결제·시공됩니다.
 const RENO_GOODS = [
-  { type: 'floor', name: '바닥재', price: 4000000, dz: -1.6 },
-  { type: 'wall',  name: '벽지',   price: 6000000, dz: 1.6 },
+  { type: 'floor', name: '바닥재',      price: 4000000, dz: -1.6 },
+  { type: 'wall',  name: '벽지',        price: 6000000, dz: 0 },
+  { type: 'paint', name: '외벽 페인트', get price() { return PAINT_PRICE; }, dz: 1.6 },
 ];
 const FLOOR_COLORS = [
   { name: '원목',     color: 0x9a7748 },
@@ -2334,6 +2291,10 @@ const FLOOR_COLORS = [
   { name: '붉은흙',   color: 0x9a6a4d },
   { name: '쪽빛',     color: 0x6a8a9a },
   { name: '먹빛',     color: 0x55504a },
+  { name: '흰대리석', color: 0xdcd8d0 },
+  { name: '체리목',   color: 0x8a4a3a },
+  { name: '올리브',   color: 0x7a7a52 },
+  { name: '모래빛',   color: 0xc0ac88 },
 ];
 const WALL_COLORS = [
   { name: '크림',   color: 0xf0e4c8 },
@@ -2342,6 +2303,12 @@ const WALL_COLORS = [
   { name: '연두',   color: 0xbcd8a0 },
   { name: '라벤더', color: 0xc8b8e0 },
   { name: '미색',   color: 0xe8e0d0 },
+  { name: '민트',   color: 0xa8d8c8 },
+  { name: '레몬',   color: 0xe8dc9a },
+  { name: '살구',   color: 0xe8c0a0 },
+  { name: '잿빛',   color: 0xb0b0ac },
+  { name: '청록',   color: 0x7ab0b0 },
+  { name: '흰색',   color: 0xf2f0ea },
 ];
 let houseFloorColor = 0;   // 0 = 아직 기본 (폐가 흙바닥·돌벽)
 let houseWallColor = 0;
@@ -2354,7 +2321,7 @@ let houseWallColor = 0;
     stand.position.set(rg.x, y0 + 0.25, rg.z);
     scene.add(stand);
     // 색 견본 부채 — 여러 색을 늘어놓아 "골라 살 수 있음"을 보여줍니다
-    const colors = rg.type === 'floor' ? FLOOR_COLORS : WALL_COLORS;
+    const colors = rg.type === 'floor' ? FLOOR_COLORS : rg.type === 'wall' ? WALL_COLORS : PAINT_COLORS;
     colors.slice(0, 4).forEach((c, i) => {
       const chip = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.1, 0.34),
         new THREE.MeshLambertMaterial({ color: c.color }));
@@ -2384,26 +2351,34 @@ function nearestReno() {
 function buyReno(rg) {
   const py = SHOP_ROOM.y + 1.6;
   const price = shopPrice(rg.price);   // 장날이면 반값!
-  if (coins < price) {
-    spawnMoneyPopup(state.x, py, state.z, `${(price - coins).toLocaleString()}원 부족`);
+  // 페인트는 한 통이면 충분합니다 (이미 있으면 다시 안 삽니다)
+  if (rg.type === 'paint' && tools.paint) {
+    spawnMoneyPopup(state.x, py, state.z, '이미 페인트가 있어요 — 집 앞에서 칠하세요');
     return;
   }
-  // 색 고르기 창을 띄우고, 고르는 순간 결제·시공합니다
-  const colors = rg.type === 'floor' ? FLOOR_COLORS : WALL_COLORS;
+  // 색 고르기 창을 띄우고, 색을 고른 뒤 가격 단추를 눌러야 결제됩니다
+  const colors = rg.type === 'floor' ? FLOOR_COLORS : rg.type === 'wall' ? WALL_COLORS : PAINT_COLORS;
   openColorPicker(`🎨 ${rg.name} — 색을 고르세요`, colors, (c) => {
-    if (coins < price) return;
+    if (coins < price) {
+      spawnMoneyPopup(state.x, py, state.z, `${(price - coins).toLocaleString()}원 부족`);
+      return;
+    }
     coins -= price;
     updateCoinBadge();
-    if (rg.type === 'floor') houseFloorColor = c.color;
-    else houseWallColor = c.color;
-    applyRoomLook();
+    if (rg.type === 'floor') { houseFloorColor = c.color; applyRoomLook(); }
+    else if (rg.type === 'wall') { houseWallColor = c.color; applyRoomLook(); }
+    else { tools.paint = true; housePaintColor = c.color; }
     playShipSound();
-    spawnMoneyPopup(state.x, py, state.z, `🎨 ${c.name} ${rg.name} 시공 완료! 집이 바뀌었어요`);
+    spawnMoneyPopup(state.x, py, state.z, rg.type === 'paint'
+      ? `${c.name} 페인트 구입! 집 앞에서 칠해보세요`
+      : `🎨 ${c.name} ${rg.name} 시공 완료! 집이 바뀌었어요`);
     saveGame(true);
-  }, `${price.toLocaleString()}원 — 어떤 색이든 값은 같습니다`);
+  }, price);
 }
 
-// 물건 하나 사기 — 물건 앞에서 F를 눌렀을 때
+// 물건 하나 사기 — 물건 앞에서 F를 눌렀을 때.
+// 바로 사지지 않고, 물건과 가격을 크게 보여주는 창이 먼저 뜹니다.
+// 창 안의 가격 단추를 눌러야 최종 구입됩니다 (잘못 눌러 사지는 일 방지).
 function buyShopGood(good) {
   const px = state.x, pz = state.z;
   const py = SHOP_ROOM.y + 1.6;
@@ -2421,6 +2396,9 @@ function buyShopGood(good) {
     return;
   }
   const price = shopPrice(good.price);   // 장날이면 반값!
+  openBuyDialog(good.emoji, good.name, price, () => doBuyShopGood(good, price, px, py, pz));
+}
+function doBuyShopGood(good, price, px, py, pz) {
   if (coins < price) {
     spawnMoneyPopup(px, py, pz, `${(price - coins).toLocaleString()}원 부족`);
     return;
@@ -3566,7 +3544,9 @@ function updateRopeBadge() {
   if (state.inShop) {
     const rg = nearestReno();
     if (rg) {
-      ropeBadge.textContent = `🎨 ${rg.name} · ${rg.colorName} — ${shopPrice(rg.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION}으로 시공)`;
+      ropeBadge.textContent = (rg.type === 'paint' && tools.paint)
+        ? '🖌 페인트 보유 중 — 집 앞에서 칠하세요'
+        : `🎨 ${rg.name} — ${shopPrice(rg.price).toLocaleString()}원${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION}으로 색 고르기)`;
       return;
     }
     const good = nearestShopGood();
@@ -3655,13 +3635,6 @@ function updateRopeBadge() {
   if (typeof CARROT_SPOT !== 'undefined' &&
       Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z) < CARROT_RANGE) {
     ropeBadge.textContent = `🥕 ${KEY_ACTION}으로 당근 구입 (${CARROT_PRICE.toLocaleString()}원)`;
-    return;
-  }
-  if (typeof TOOL_SPOT !== 'undefined' &&
-      Math.hypot(state.x - TOOL_SPOT.x, state.z - TOOL_SPOT.z) < TOOL_RANGE) {
-    ropeBadge.textContent = tools.paint
-      ? '🖌 페인트 보유 중 — 집 앞에서 칠하세요'
-      : `🖌 페인트 판매대 — ${KEY_ACTION}을 누르면 색을 골라 삽니다 (${PAINT_PRICE.toLocaleString()}원)`;
     return;
   }
   if (typeof TANK_SPOT !== 'undefined' &&
@@ -4558,7 +4531,7 @@ function tryFixHouse() {
     return;
   }
   if (!tools.paint) {
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🖌 페인트가 필요해요 — 상점 앞 공구대에서 색을 골라 사 오세요');
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🖌 페인트가 필요해요 — 상점 안 인테리어 코너에서 색을 골라 사 오세요');
     return;
   }
   // 붓질 한 번 — 동작이 끝나는 순간(updateHouse) 횟수가 올라갑니다
@@ -5087,11 +5060,25 @@ const pickBox = document.getElementById('pickBox');
 const pickTitle = document.getElementById('pickTitle');
 const pickPrice = document.getElementById('pickPrice');
 const pickGrid = document.getElementById('pickGrid');
-function openColorPicker(title, colors, onPick, priceText) {
+// 색을 누르면 일단 골라두기만 하고(테두리 표시), 아래 가격 단추를 눌러야 실제로 삽니다.
+// 실수로 색을 잘못 눌러 바로 결제되는 일을 막습니다.
+const pickTip = document.getElementById('pickTip');
+function openColorPicker(title, colors, onPick, price) {
   if (!pickWrap) return;
   pickTitle.textContent = title;
-  pickPrice.textContent = priceText || '';
   pickGrid.innerHTML = '';
+  pickPrice.innerHTML = '';
+  if (pickTip) pickTip.textContent = '색을 눌러 고르고, 가격을 누르면 사져요 · 바깥을 누르면 취소';
+  let selected = null;
+  const swatches = [];
+  const buyBtn = document.createElement('button');
+  buyBtn.className = 'buyBtn';
+  const refreshBtn = () => {
+    buyBtn.disabled = !selected;
+    buyBtn.textContent = selected
+      ? `${selected.name} · ${price.toLocaleString()}원 — 눌러서 구입`
+      : '먼저 색을 골라주세요';
+  };
   for (const c of colors) {
     const item = document.createElement('div');
     item.className = 'swItem';
@@ -5100,9 +5087,12 @@ function openColorPicker(title, colors, onPick, priceText) {
     b.style.background = '#' + c.color.toString(16).padStart(6, '0');
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
-      pickWrap.style.display = 'none';
-      onPick(c);
+      selected = c;
+      swatches.forEach((x) => x.classList.remove('sel'));
+      b.classList.add('sel');
+      refreshBtn();
     });
+    swatches.push(b);
     const nm = document.createElement('div');
     nm.className = 'swName';
     nm.textContent = c.name;
@@ -5110,6 +5100,37 @@ function openColorPicker(title, colors, onPick, priceText) {
     item.appendChild(nm);
     pickGrid.appendChild(item);
   }
+  buyBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!selected) return;
+    pickWrap.style.display = 'none';
+    onPick(selected);
+  });
+  refreshBtn();
+  pickPrice.appendChild(buyBtn);
+  pickWrap.style.display = 'flex';
+}
+
+// 물건 하나짜리 구입 확인 창 — 물건을 크게 미리 보여주고, 가격을 눌러야 사집니다
+function openBuyDialog(emoji, name, price, onBuy) {
+  if (!pickWrap) return;
+  pickTitle.textContent = name;
+  pickGrid.innerHTML = '';
+  pickPrice.innerHTML = '';
+  if (pickTip) pickTip.textContent = '가격을 누르면 사져요 · 바깥을 누르면 취소';
+  const prev = document.createElement('div');
+  prev.className = 'bigPreview';
+  prev.textContent = emoji;
+  pickGrid.appendChild(prev);
+  const buyBtn = document.createElement('button');
+  buyBtn.className = 'buyBtn';
+  buyBtn.textContent = `${price.toLocaleString()}원 — 눌러서 구입`;
+  buyBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    pickWrap.style.display = 'none';
+    onBuy();
+  });
+  pickPrice.appendChild(buyBtn);
   pickWrap.style.display = 'flex';
 }
 // 상자 바깥(어두운 곳)을 누르면 취소
@@ -5601,8 +5622,6 @@ function handleActionKey() {
   if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
   const tankDist = Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z);
   if (tankDist < TANK_RANGE) { tryBuyTank(); return; }
-  const toolDist = Math.hypot(state.x - TOOL_SPOT.x, state.z - TOOL_SPOT.z);
-  if (toolDist < TOOL_RANGE) { tryBuyTool(); return; }
   const depotDist = Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z);
   if (depotDist < DEPOT_RANGE) { tryShipBox(); return; }
   // 내려놓은 망사리 줍기 — 작은 물건이라 집수리 같은 넓은 범위보다 먼저 확인합니다
