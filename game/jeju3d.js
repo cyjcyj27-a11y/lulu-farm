@@ -5154,6 +5154,27 @@ if (pickWrap) pickWrap.addEventListener('pointerdown', (e) => {
   if (pickBox && pickBox.contains(e.target)) return;
   pickWrap.style.display = 'none';
 });
+// 지금 떠 있는 창을 닫습니다 (닫을 것이 있었으면 true).
+// 컴퓨터에서는 F·ESC로, 폰에서는 ✕ 단추와 바깥 누르기로 빠져나갑니다.
+function closeOpenPopup() {
+  if (pickWrap && pickWrap.style.display === 'flex') { pickWrap.style.display = 'none'; return true; }
+  if (bookWrap && bookWrap.style.display === 'flex') { bookWrap.style.display = 'none'; return true; }
+  if (mapWrap && mapWrap.style.display === 'flex') { toggleMap(); return true; }
+  return false;
+}
+addEventListener('keydown', (e) => { if (e.code === 'Escape') closeOpenPopup(); });
+// 창 오른쪽 위 ✕ — 어느 기기에서든 눈에 보이는 빠져나가기
+if (pickBox) {
+  const x = document.createElement('button');
+  x.className = 'closeX';
+  x.textContent = '✕';
+  x.title = '닫기';
+  x.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    pickWrap.style.display = 'none';
+  });
+  pickBox.appendChild(x);
+}
 if (pickBox) {
   ['touchstart', 'touchmove', 'pointermove'].forEach((ev) =>
     pickBox.addEventListener(ev, (e) => e.stopPropagation()));
@@ -5579,6 +5600,8 @@ function tryFeedPony() {
 // 뭍:   귤 따기 → 당근·산소통 사기 → 택배 부치기 → 집 사기·고치기 → 말 먹이기 → 물질 들어가기
 //       → 아무것도 없으면 상자 잡기/놓기
 function handleActionKey() {
+  // 창이 떠 있으면 F는 "창 닫기"입니다 (PC에서 빠져나갈 방법이 이것뿐이라 제일 먼저 봅니다)
+  if (closeOpenPopup()) return;
   // 대화 중이면 F는 "다음 줄"입니다
   if (talkOpen()) { advanceTalk(); return; }
   if (state.harvestT >= 0 || state.fixT >= 0) return;
