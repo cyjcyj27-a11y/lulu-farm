@@ -4879,8 +4879,8 @@ function updateMayor(dt, t) {
 // 무남이는 이 집 앞을 좀처럼 벗어나지 않습니다 (갈 데가 없으니까).
 const MUNAM_HOUSE = { x: 12.0, z: -64.0, rot: Math.PI };   // 정면(마당)이 남쪽 바다를 향합니다
 const MUNAM_PATH = [                 // 바다를 보고 있는 앞마당을 천천히 왕복합니다
-  { x: MUNAM_HOUSE.x - 3.4, z: MUNAM_HOUSE.z - 4.2 },
-  { x: MUNAM_HOUSE.x + 3.6, z: MUNAM_HOUSE.z - 4.6 },
+  { x: MUNAM_HOUSE.x - 3.0, z: MUNAM_HOUSE.z - 6.0 },
+  { x: MUNAM_HOUSE.x + 3.2, z: MUNAM_HOUSE.z - 6.4 },
 ];
 const munam = {
   x: MUNAM_PATH[0].x, z: MUNAM_PATH[0].z,
@@ -4943,8 +4943,7 @@ function buildMunamHouse() {
     chair.add(leg);
   });
   scene.add(g);
-  obstacles.push({ x: MUNAM_HOUSE.x, z: MUNAM_HOUSE.z, r: 3.2, topY: NO_JUMP });
-  return g;
+  return g;   // 집을 막는 충돌은 빈터를 다 치운 뒤에 세웁니다 (아래 참고)
 }
 
 // 집터에 이미 자란 나무·돌은 걷어냅니다.
@@ -4981,13 +4980,20 @@ function clearTreesAround(cx, cz, r) {
     const tree = (o.parent && o.parent !== scene && !inHouse(o.parent)) ? o.parent : o;
     tree.visible = false;
   });
+  // 눈에서만 지우면 보이지 않는 벽이 남습니다 — 부딪히는 판정도 같이 걷어냅니다
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    if (Math.hypot(obstacles[i].x - cx, obstacles[i].z - cz) < r) obstacles.splice(i, 1);
+  }
 }
 munamHouseGroup = buildMunamHouse();
 // 집 둘레를 시원하게 틔웁니다 — 바다가 보이는 빈터라야 오션뷰 소리를 듣죠
 clearTreesAround(MUNAM_HOUSE.x, MUNAM_HOUSE.z, 16);
 for (let i = 1; i <= 4; i++) clearTreesAround(MUNAM_HOUSE.x, MUNAM_HOUSE.z - i * 6, 13);
+// 빈터를 다 치운 뒤에야 집 자체를 막습니다 (먼저 세우면 위에서 같이 지워집니다).
+// 반경은 벽에 닿을 만큼만 — 마당의 무남이 곁까지는 걸어갈 수 있어야 합니다.
+obstacles.push({ x: MUNAM_HOUSE.x, z: MUNAM_HOUSE.z, r: 2.8, topY: NO_JUMP });
 const MUNAM_SPEED = 1.15;            // 서두를 일이 없는 걸음
-const MUNAM_RANGE = 2.0;
+const MUNAM_RANGE = 3.0;   // 마당이 넓어 조금 멀리서도 말을 걸 수 있게
 let romanceStage = 0;                // 0 = 아직 못 만남, 6 = 프로포즈까지
 let romanceSeen = {};                // 단계별 이벤트를 봤는지
 let lonelySeen = {};                 // 외로움 독백을 봤는지
