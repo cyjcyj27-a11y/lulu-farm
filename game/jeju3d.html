@@ -422,10 +422,9 @@
   /* 폰은 화면이 좁아서 조작 안내표와 아래쪽 설명은 접어둡니다 */
   body.touch #help, body.touch #hint { display: none; }
   body.touch .badge { font-size: 12px; padding: 7px 12px; }
-  /* 시작 화면의 조작 설명은 키보드용·손가락용 중 해당하는 것만 보여줍니다 */
+  /* 시작 화면의 조작 설명 — 폰에서는 화면 버튼·조이스틱이 눈에 보이니 설명 자체를 뺍니다 */
   #startKeys .mob { display: none; }
-  body.touch #startKeys .pc { display: none; }
-  body.touch #startKeys .mob { display: block; }
+  body.touch #startKeys { display: none; }
 </style>
 </head>
 <body>
