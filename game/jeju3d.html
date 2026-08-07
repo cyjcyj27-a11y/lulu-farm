@@ -67,7 +67,8 @@
     backdrop-filter: blur(3px);
   }
   body.touch #ropeBadge { font-size: 14px; padding: 10px 14px; }
-  #boxBadge { left: auto; right: 14px; bottom: 14px; font-size: 11.5px; padding: 6px 11px; }
+  /* 돈(💵) 배지 바로 아래 — 상자를 끌 때만 나타나므로 평소엔 자리를 차지하지 않습니다 */
+  #boxBadge { top: 104px; bottom: auto; font-size: 11.5px; padding: 6px 11px; }
 
   /* 누를 수 있는 배지 — #ui 전체가 손가락 입력을 막고 있어서 이것만 다시 열어줍니다 */
   .badge.tappable {
@@ -429,24 +430,24 @@
     width: 58px; height: 58px;
     background: rgba(255,255,255,.42); border: 2px solid rgba(255,255,255,.6);
   }
-  /* 오른쪽 아래 행동 버튼들 */
+  /* 오른쪽 아래 행동 버튼들 — 왼쪽 아이콘 줄(.ibtn 40px)과 같은 크기·같은 높이 */
   #touchBtns {
-    position: absolute; right: 14px; bottom: 88px;
+    position: absolute; right: 16px; bottom: 16px;
     flex-wrap: nowrap; justify-content: flex-end; gap: 8px;
     pointer-events: auto;
   }
   .tbtn {
-    width: 46px; height: 46px; border-radius: 50%;
+    width: 40px; height: 40px; border-radius: 50%;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: rgba(0,0,0,.42); border: 2px solid rgba(255,255,255,.5);
-    font-size: 8.5px; font-weight: 700; line-height: 1.15; text-align: center;
+    font-size: 7.5px; font-weight: 700; line-height: 1.15; text-align: center;
     user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
     touch-action: none;
   }
   /* 버튼 안의 글자·이모지는 손가락 입력을 받지 않게 합니다.
      그래야 어디를 눌러도 항상 버튼 자체가 눌린 것으로 처리됩니다. */
   .tbtn * { pointer-events: none; }
-  .tbtn .k { font-size: 17px; }
+  .tbtn .k { font-size: 14px; }
   .tbtn.on { background: rgba(255,190,80,.75); border-color: #fff; }
   /* 폰은 화면이 좁아서 조작 안내표와 아래쪽 설명은 접어둡니다 */
   body.touch #help, body.touch #hint { display: none; }
