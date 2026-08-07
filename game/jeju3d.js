@@ -4619,38 +4619,44 @@ const bookList = document.getElementById('bookList');
 const bookBadge = document.getElementById('bookBadge');
 function openBag() {
   if (!bookWrap || !bookList) return;
-  // 가진 것만 골라 작은 아이콘으로 늘어놓습니다 (개수가 있는 것은 오른쪽 위에 ×N)
+  // 모을 수 있는 것 전부를 아이콘으로 — 가진 것은 또렷하게(개수는 ×N), 없는 것은 회색으로
   const items = [];
-  const add = (emoji, name, count) => items.push({ emoji, name, count: count || 0 });
-  if (basketCount > 0) add('🍊', '귤', basketCount);
-  if (carrots > 0) add('🥕', '당근', carrots);
-  if (hasNet) add('🧺', netCarried ? '망사리' : '망사리(내려둠)');
-  if (hasTank) add('🤿', '산소통');
-  if (tools.hammer) add('🔨', '망치');
-  if (tools.saw) add('🪚', '톱');
-  if (tools.paint) add('🖌', '페인트');
+  const add = (owned, emoji, name, count) => items.push({ owned, emoji, name, count: count || 0 });
+  add(basketCount > 0, '🍊', '귤', basketCount);
+  add(carrots > 0, '🥕', '당근', carrots);
+  add(hasNet, '🧺', hasNet && !netCarried ? '망사리(내려둠)' : '망사리');
+  add(hasTank, '🤿', '산소통');
+  add(tools.hammer, '🔨', '망치');
+  add(tools.saw, '🪚', '톱');
+  add(tools.paint, '🖌', '페인트');
   if (state.diving && net.length) {
     const em = { kelp: '🌿', conch: '🐚', abalone: '🦪', octopus: '🐙' };
     const cnt = {};
     for (const k of net) cnt[k] = (cnt[k] || 0) + 1;
-    for (const [k, n] of Object.entries(cnt)) add(em[k] || '🌊', CATCH_KINDS[k].name, n);
+    for (const [k, n] of Object.entries(cnt)) add(true, em[k] || '🌊', CATCH_KINDS[k].name, n);
   }
   for (const k of FURN_ORDER) {
-    if (!furnitureOwned[k]) continue;
     const g = SHOP_GOODS.find((s) => s.key === k);
-    add(g ? g.emoji : '🛋', g ? g.name : k);
+    add(!!furnitureOwned[k], g ? g.emoji : '🛋', g ? g.name : k);
   }
-  if (houseFloorColor !== 0) add('🟫', '바닥재');
-  if (houseWallColor !== 0) add('🎨', '벽지');
+  add(houseFloorColor !== 0, '🟫', '바닥재');
+  add(houseWallColor !== 0, '🎨', '벽지');
+  // 집공사 진행 금액 — 가구·소품 9,000만 + 바닥 400만 + 벽지 600만 = 딱 1억.
+  // 1억을 다 채우면(=전부 들여놓으면) 다음 날 아침, 꿈의 집 엔딩이 찾아옵니다.
+  let spent = 0;
+  for (const k of FURN_ORDER) if (furnitureOwned[k]) spent += FURNITURE[k].price;
+  if (houseFloorColor !== 0) spent += 4000000;
+  if (houseWallColor !== 0) spent += 6000000;
   bookList.innerHTML =
     `<div class="bookHead">🎒 자산</div>` +
     `<div class="bagMoney">💰 ${coins.toLocaleString()}원</div>` +
-    (items.length
-      ? `<div class="bagGrid">` + items.map((it) =>
-          `<div class="bagItem">${it.count > 0 ? `<div class="ct">×${it.count}</div>` : ''}` +
-          `<div class="em">${it.emoji}</div><div class="nm">${it.name}</div></div>`
-        ).join('') + `</div>`
-      : `<div class="bookTip">아직 가진 게 없어요 — 귤부터 따 볼까요? 🍊</div>`) +
+    `<div class="bookTip" style="margin-bottom:10px">🏠 집꾸미기 ${spent.toLocaleString()} / 100,000,000원` +
+    (spent >= 100000000 ? ' — 꿈을 이뤘어요!' : ' — 1억을 채우면 꿈의 집 완성') + `</div>` +
+    `<div class="bagGrid">` + items.map((it) =>
+      `<div class="bagItem${it.owned ? '' : ' off'}">` +
+      `${it.owned && it.count > 0 ? `<div class="ct">×${it.count}</div>` : ''}` +
+      `<div class="em">${it.emoji}</div><div class="nm">${it.name}</div></div>`
+    ).join('') + `</div>` +
     `<div class="bookTip" style="margin-top:10px">바깥을 누르면 닫힘</div>`;
   bookWrap.style.display = 'flex';
 }
