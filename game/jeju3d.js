@@ -1586,6 +1586,10 @@ function pickUpNet() {
 const netFollow = new THREE.Vector3();
 function updateNet(dt, t) {
   if (!netCarried) return;
+  // 잠수복 차림 그림(물속·포구)에는 망사리가 이미 그려져 있어서,
+  // 실물까지 보이면 루루를 가립니다 — 그때는 실물을 숨깁니다.
+  netObj.visible = hasNet && !state.diving && !inWetsuitZone();
+  if (!netObj.visible) return;
   const back = state.facing + Math.PI;
   // 몸에 살짝 겹칠 만큼 바짝(0.28), 허리 높이(0.35)에 붙입니다 — 허공에 떠 보이지 않게
   netFollow.set(
@@ -2771,8 +2775,8 @@ function updateRopeBadge() {
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
     ropeBadge.textContent = IS_TOUCH
-      ? '🤿 🐾 채집 · 조이스틱 ↓ 잠수 · ↑ 보는 쪽으로 헤엄 · 수면에서 🐾 나가기'
-      : '🤿 F 채집 · ↓ 잠수 · ↑ 보는 방향으로 헤엄 · 수면에서 F 나가기';
+      ? '🤿 🐾 채집 · ↓ 잠수 · ⤴ 위로 · ↑←→ 헤엄 · 수면에서 🐾 나가기'
+      : '🤿 F 채집 · ↓ 잠수 · Space 위로 · ↑←→ 헤엄 · 수면에서 F 나가기';
     return;
   }
   // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
@@ -3672,6 +3676,13 @@ function updateDiving(dt) {
 
   if (atSurface) {
     breath = Math.min(BREATH_MAX, breath + dt * 12);   // 수면에서 숨을 몰아쉽니다
+    // 그림의 물결선(가슴께)이 실제 수면과 맞도록, 떠 있으면 그 높이에 살며시 붙습니다
+    const goingDown = keys['ArrowDown'] || touchMove.f < -0.3;
+    if (!goingDown && drowning <= 0) {
+      const floatY = SEA_Y - 0.8;
+      lulu.position.y += (floatY - lulu.position.y) * Math.min(1, dt * 5);
+      if (state.vy > 0.3) state.vy = 0.3;
+    }
   } else {
     breath -= dt;
     if (breath <= 0) {
@@ -4838,15 +4849,14 @@ function updateLulu(dt) {
   const spd = (running ? RUN : WALK) * tilt;
 
   if (state.diving) {
-    // ↑는 카메라가 보는 쪽으로 헤엄치고(위를 보면 상승·아래를 보면 하강),
-    // ↓는 시야와 상관없이 곧장 아래로 잠수합니다. ← →는 옆으로.
-    const cosP = Math.cos(camPitch);
-    const fwdIn = Math.max(0, f);          // ↑ — 시선 방향 전진
+    // 물속 조작은 버튼 그대로: ↑ 앞으로 · ↓ 아래로 잠수 · ← → 좌우.
+    // 위로는 ⤴(점프 버튼)이고, 아무것도 안 누르면 부력으로 천천히 떠오릅니다.
+    const fwdIn = Math.max(0, f);          // ↑ — 앞으로 (수평)
     const downIn = Math.max(0, -f);        // ↓ — 곧장 잠수
     moveDir.set(
-      fwdX * cosP * fwdIn + rgtX * r,
-      -Math.sin(camPitch) * fwdIn - downIn,
-      fwdZ * cosP * fwdIn + rgtZ * r
+      fwdX * fwdIn + rgtX * r,
+      -downIn,
+      fwdZ * fwdIn + rgtZ * r
     );
     const swimTilt = Math.min(1, Math.hypot(f, r));
     if (moveDir.lengthSq() > 0.0001) {
@@ -4934,8 +4944,8 @@ function updateLulu(dt) {
   const gy = state.diving ? seabedHeight(state.x, state.z) : groundHeight(state.x, state.z);
   const wantUp = keys['Space'] || touchJump;
   if (state.diving) {
-    // 상하 추진력은 위 이동 계산(시선 방향)에서 이미 vy에 더했습니다.
-    if (Math.abs(f) <= 0.1) state.vy += BUOYANCY * dt;   // 부력 — 가만히 있으면 살며시 떠오릅니다
+    if (wantUp) state.vy += SWIM_UP * dt;                    // ⤴ — 위로 헤엄치기
+    else if (Math.abs(f) <= 0.1) state.vy += BUOYANCY * dt;  // 부력 — 가만히 있으면 살며시 떠오릅니다
     state.vy *= Math.max(0, 1 - 2.6 * dt);          // 물의 저항 — 움직임이 부드럽게 잦아듭니다
     state.vy = Math.max(-2.4, Math.min(2.4, state.vy));
   } else {
