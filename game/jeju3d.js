@@ -3634,9 +3634,9 @@ function updateRopeBadge() {
   // 마구간 안내 (당근·산소통은 상점 안에서 삽니다)
   if (typeof RACE_SPOT !== 'undefined' &&
       Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z) < RACE_RANGE) {
-    ropeBadge.textContent = carrots < RACE_CARROTS
-      ? `경마\n여물로 당근 ${RACE_CARROTS}개가 필요해요 (지금 ${carrots}개)`
-      : `경마 출전 ${formatWon(raceFee())} + 당근 ${RACE_CARROTS}개\n1등 상금 ${formatWon(racePrize())} · 승률은 반반 (${KEY_ACTION})`;
+    ropeBadge.textContent = (!stat.races && ponyLove < RACE_LOVE)
+      ? `경마\n첫 출전은 애정 ${RACE_LOVE}이 되어야 해요 (지금 ${ponyLove})`
+      : `경마 출전 ${formatWon(raceFee())}\n1등 상금 ${formatWon(racePrize())} · 승률은 반반 (${KEY_ACTION})`;
     return;
   }
   if (typeof STABLE !== 'undefined' &&
@@ -5967,8 +5967,9 @@ function updateCarrotBadge() {
 // 마구간 옆 팻말에서 당근 100개를 여물로 내면 경주가 열립니다. 직접 뽑으신 경주 영상이
 // 그대로 중계가 됩니다: 이기면 1등으로 웃는 영상, 지면 꼴등으로 우는 영상.
 // 승부는 순전히 그날의 운입니다 — 아무리 잘 먹여도 말은 말이니까요.
-const RACE_LOVE = 100;         // 애정이 이만큼이면 조랑말이 가장 신이 납니다 (승부와는 무관)
-const RACE_CARROTS = 100;      // 출전하려면 이만큼 여물로 실어 보내야 합니다
+// 첫 출전은 애정 100이 되어야 합니다 — 당근을 100개 먹여야 닿는 값입니다.
+// 한 번 데뷔한 뒤로는 애정을 다시 채울 필요 없이 참가비만 내면 나갑니다.
+const RACE_LOVE = 100;         // 데뷔에 필요한 애정 (당근 100개)
 const RACE_FEE_BASE = 20000;   // 첫 출전 참가비
 // 나갈 때마다 판이 두 배로 커집니다 — 참가비도, 상금도.
 // 2만원 걸면 20만원 · 4만원 걸면 40만원 · 8만원 걸면 80만원 …
@@ -5998,9 +5999,10 @@ function tryRace() {
     spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, '조랑말이 있어야 경마에 나갑니다');
     return;
   }
-  if (carrots < RACE_CARROTS) {
+  // 데뷔전만 애정 100을 봅니다 (당근 100개를 먹여야 닿는 값)
+  if (!stat.races && ponyLove < RACE_LOVE) {
     spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z,
-      `여물로 당근 ${RACE_CARROTS}개가 필요해요 (지금 ${carrots}개)`);
+      `첫 출전은 애정 ${RACE_LOVE}이 되어야 해요 (지금 ${ponyLove})\n당근을 먹여주세요`);
     return;
   }
   const fee = raceFee();
@@ -6008,10 +6010,8 @@ function tryRace() {
     spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, `${formatWon(fee - coins)} 부족`);
     return;
   }
-  carrots -= RACE_CARROTS;
   coins -= fee;
   stat.races++;
-  updateCarrotBadge();
   updateCoinBadge();
   const win = Math.random() < raceWinChance();
   startRaceVideo(win, fee);
@@ -6130,7 +6130,9 @@ function tryFeedPony() {
   state.idleTime = 0; state.sit = 0;
   if (carrotFx) { carrotFx.visible = true; carrotFxT = 0; }   // 당근 그림이 냠냠 사라집니다
   if (ponyLove >= RACE_LOVE) {
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, `애정 ${ponyLove}! 조랑말이 아주 신이 났어요`);
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, stat.races
+      ? `애정 ${ponyLove}! 조랑말이 아주 신이 났어요`
+      : `애정 ${ponyLove}! 이제 경마에 나갈 수 있어요\n옆 팻말에서 출전!`);
   } else {
     spawnMoneyPopup(STABLE.x, y, STABLE.z, `냠냠! 애정 ${ponyLove}/${RACE_LOVE}`);
   }
