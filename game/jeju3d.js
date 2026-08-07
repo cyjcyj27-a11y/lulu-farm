@@ -2766,7 +2766,7 @@ const LULU_MODEL_YAW = 0;                 // 모델 원본이 보는 방향 보�
 async function loadLuluModel() {
   try {
     // 모델 파일을 갈아끼우면 뒤의 ?v= 숫자도 올려야 합니다 (서비스워커가 옛것을 물고 있지 않게)
-    const buf = await (await fetch('../assets/lulu.glb?v=4')).arrayBuffer();
+    const buf = await (await fetch('../assets/lulu.glb?v=5')).arrayBuffer();
     const dv = new DataView(buf);
     if (dv.getUint32(0, true) !== 0x46546c67) return;       // 'glTF' 서명 확인
     const jsonLen = dv.getUint32(12, true);
