@@ -641,10 +641,10 @@ function makeSignTexture() {
   }
   ctx.fillStyle = '#3d2410';
   ctx.textAlign = 'center';
-  ctx.font = '600 34px "맑은 고딕", Malgun Gothic, sans-serif';
-  ctx.fillText('제주감성소품', 256, 58);
-  ctx.font = 'bold 54px "맑은 고딕", Malgun Gothic, sans-serif';
-  ctx.fillText('이장님 만물상', 256, 122);
+  // 가게 이름만 큼직하게 — 위 작은 글씨는 뺐습니다
+  ctx.font = 'bold 62px "맑은 고딕", Malgun Gothic, sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('이장님 만물상', 256, 84);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -1359,70 +1359,8 @@ const CARROT_PRICE = 1000;
 const TANK_PRICE = 100000;
 const TANK_BREATH = 180;   // 산소통을 멘 뒤의 숨 — 3분
 
-// 산소통 판매대 — 상점 정면 동쪽. 당근 바구니(서쪽)와 반대편에 나란히 놓입니다.
-const TANK_SPOT = { x: 9.4, z: 42.4 };
-const TANK_RANGE = 2.4;
-let tankMeshes = null;
-{
-  const y = groundHeight(TANK_SPOT.x, TANK_SPOT.z);
-  const g = new THREE.Group();
-  g.position.set(TANK_SPOT.x, y, TANK_SPOT.z);
-  const tankMat = new THREE.MeshLambertMaterial({ color: 0xd8862a, flatShading: true });
-  const valveMat = new THREE.MeshLambertMaterial({ color: 0x8b8f94, flatShading: true });
-  // 받침대와 산소통 두 개 (하나 팔려도 진열은 계속 남습니다)
-  const stand = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 0.6), shopWoodMat);
-  stand.position.y = 0.08;
-  stand.castShadow = true;
-  g.add(stand);
-  [-0.26, 0.26].forEach((px) => {
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.62, 4, 10), tankMat);
-    body.position.set(px, 0.66, 0);
-    body.castShadow = true;
-    g.add(body);
-    const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 6), valveMat);
-    valve.position.set(px, 1.12, 0);
-    g.add(valve);
-  });
-  scene.add(g);
-  tankMeshes = g;
-}
-
-function tryBuyTank() {
-  const y = groundHeight(TANK_SPOT.x, TANK_SPOT.z) + 1.6;
-  if (hasTank) {
-    spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, '이미 산소통이 있어요');
-    return;
-  }
-  if (coins < TANK_PRICE) {
-    spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, `${formatWon((TANK_PRICE - coins))} 부족`);
-    return;
-  }
-  coins -= TANK_PRICE;
-  hasTank = true;
-  BREATH_MAX = TANK_BREATH;   // 지금 물질 중이 아니어도, 다음 잠수부터 바로 적용됩니다
-  updateCoinBadge();
-  playShipSound();
-  spawnMoneyPopup(TANK_SPOT.x, y, TANK_SPOT.z, '산소통 구입! 숨이 3분으로 늘었어요');
-}
-// 당근 바구니 — 상점 정면 서쪽에 놓인 판매대입니다. 상점(끈)과 자리를 나눠 씁니다.
-const CARROT_SPOT = { x: 3.2, z: 42.6 };
-const CARROT_RANGE = 2.4;
-{
-  const y = groundHeight(CARROT_SPOT.x, CARROT_SPOT.z);
-  const tub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.38, 0.34, 10), shopWoodMat);
-  tub.position.set(CARROT_SPOT.x, y + 0.17, CARROT_SPOT.z);
-  tub.castShadow = true;
-  scene.add(tub);
-  const carrotMat = new THREE.MeshLambertMaterial({ color: 0xe06a1d, flatShading: true });
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const c = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 6), carrotMat);
-    c.position.set(CARROT_SPOT.x + Math.cos(a) * 0.24, y + 0.42, CARROT_SPOT.z + Math.sin(a) * 0.24);
-    c.rotation.set((Math.random() - 0.5) * 0.9, 0, (Math.random() - 0.5) * 0.9);
-    c.castShadow = true;
-    scene.add(c);
-  }
-}
+// 가게 앞에 있던 당근 바구니와 산소통 판매대는 치웠습니다.
+// 둘 다 상점 안 진열대에서 사면 되니, 문 앞이 물건으로 어수선할 이유가 없습니다.
 
 // ---------- 8-2h. 실내 방들 (집 내부 · 상점 내부) ----------
 // 문 앞에 서면 화면이 어두워지며 안으로 들어갑니다. 방은 섬에서 멀리 떨어진
@@ -3690,19 +3628,7 @@ function updateRopeBadge() {
       : '이장님이 오고 계세요\n문 앞에서 잠깐 기다려주세요';
     return;
   }
-  // 당근 바구니·산소통·마구간 안내
-  if (typeof CARROT_SPOT !== 'undefined' &&
-      Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z) < CARROT_RANGE) {
-    ropeBadge.textContent = `${KEY_ACTION}으로 당근 구입 (${formatWon(CARROT_PRICE)})`;
-    return;
-  }
-  if (typeof TANK_SPOT !== 'undefined' &&
-      Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z) < TANK_RANGE) {
-    ropeBadge.textContent = hasTank
-      ? '산소통 보유 중\n숨 3분'
-      : `해녀 산소통\n${KEY_ACTION}으로 구입 (${formatWon(TANK_PRICE)}, 숨 60초→3분)`;
-    return;
-  }
+  // 마구간 안내 (당근·산소통은 상점 안에서 삽니다)
   if (typeof RACE_SPOT !== 'undefined' &&
       Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z) < RACE_RANGE) {
     ropeBadge.textContent = ponyLove < RACE_MIN_LOVE
@@ -4411,7 +4337,6 @@ function leaveDive(reason) {
         `망사리에 담았던 ${lost}개도 바다에 흘렸습니다`, 5), 2600);
     }
   } else if (caught > 0) {
-    if (dayEvent === 'haul') pay = Math.round(pay * 1.5);   // 물반 고기반 — 오늘은 1.5배!
     coins += pay;
     for (const [k, n] of Object.entries(tally)) stat[k] = (stat[k] || 0) + n;
     updateCoinBadge();
@@ -4419,8 +4344,7 @@ function leaveDive(reason) {
     const list = Object.entries(tally).map(([k, n]) => `${CATCH_KINDS[k].name} ${n}`).join(' · ');
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
       `${list} → +${formatWon(pay)}` +
-      (nightSold ? ' (야간물질 2배!)' : '') +
-      (dayEvent === 'haul' ? ' (물반 고기반!)' : ''));
+      (nightSold ? ' (야간물질 2배!)' : ''));
     checkAchievements();
   } else {
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, '뭍으로 나왔어요');
@@ -5290,18 +5214,18 @@ function morningNotice() {
 }
 
 // ----- 오늘의 사건 — 아침마다 그날만의 일이 벌어집니다 (접속할 이유!) -----
-// null(평온) 40% · 태풍 15% · 황금귤 15% · 물반고기반 15% · 장날 15%
+// null(평온) 40% · 태풍 20% · 황금귤 20% · 장날 20%
+// (물반 고기반은 뺐습니다 — 물질로 더 버는 길은 야간물질 하나로 충분합니다)
 let dayEvent = null;
 function rollDayEvent() {
   const r = Math.random();
-  dayEvent = r < 0.4 ? null : r < 0.55 ? 'storm' : r < 0.7 ? 'gold' : r < 0.85 ? 'haul' : 'market';
+  dayEvent = r < 0.4 ? null : r < 0.6 ? 'storm' : r < 0.8 ? 'gold' : 'market';
 }
 function dayEventNotice() {
   if (!dayEvent) return;
   const msg = {
     storm:  '태풍이 와요! 오늘은 물질을 쉽니다',
     gold:   '황금향이 열리는 날! 황금향 하나는 귤 3알 몫으로 담깁니다',
-    haul:   '물반 고기반! 오늘 물질 채집물은 1.5배 값',
     market: '오늘은 장날! 상점 물건이 전부 반값',
   }[dayEvent];
   spawnMoneyPopup(state.x, lulu.position.y + 3.0, state.z, msg, 7);
@@ -6018,19 +5942,7 @@ function updateCarrotBadge() {
   carrotBadge.textContent = `🥕 당근 ${carrots}개`;
 }
 
-function tryBuyCarrot() {
-  const y = groundHeight(CARROT_SPOT.x, CARROT_SPOT.z) + 1.3;
-  if (coins < CARROT_PRICE) {
-    spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `${formatWon((CARROT_PRICE - coins))} 부족`);
-    return;
-  }
-  coins -= CARROT_PRICE;
-  carrots++;
-  updateCoinBadge();
-  updateCarrotBadge();
-  playPickSound();
-  spawnMoneyPopup(CARROT_SPOT.x, y, CARROT_SPOT.z, `당근 구입! (${carrots}개)`);
-}
+// (가게 앞 당근 바구니는 치웠습니다 — 당근은 상점 안에서 삽니다)
 
 // ---------- 12-1g-2. 조랑말 경마 ----------
 // 마구간 옆 팻말에서 참가비를 내면 경주가 열립니다. 직접 뽑으신 경주 영상이
@@ -6280,10 +6192,6 @@ function handleActionKey() {
     munamTalk();
     return;
   }
-  const carrotDist = Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z);
-  if (carrotDist < CARROT_RANGE) { tryBuyCarrot(); return; }
-  const tankDist = Math.hypot(state.x - TANK_SPOT.x, state.z - TANK_SPOT.z);
-  if (tankDist < TANK_RANGE) { tryBuyTank(); return; }
   const depotDist = Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z);
   if (depotDist < DEPOT_RANGE) { tryShipBox(); return; }
   // 내려놓은 망사리 줍기 — 작은 물건이라 집수리 같은 넓은 범위보다 먼저 확인합니다
