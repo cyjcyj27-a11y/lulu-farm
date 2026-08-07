@@ -2815,6 +2815,9 @@ async function loadLuluModel() {
     luluModelReady = true;
   } catch (e) { /* 읽기에 실패하면 그림 루루를 그대로 씁니다 */ }
 }
+// ※ 루루 3D는 잠시 쉬는 중 — 걷기 애니메이션 모델이 준비되면 다시 켭니다.
+//   그때까지는 원래의 그림(종이 인형) 루루가 걸어다닙니다.
+//   다시 켜려면 아래 loadHalmangModel() 옆에 loadLuluModel()을 함께 불러주면 됩니다.
 // 해녀 할망 3D — 잠수복에 테왁(주황 부표)·망사리를 멘, 직접 만드신 할망 모델
 let halmangModel = null;
 async function loadHalmangModel() {
@@ -2826,7 +2829,7 @@ async function loadHalmangModel() {
     scene.add(halmangModel);
   } catch (e) { /* 실패하면 그림 할망 그대로 */ }
 }
-if (CAN_USE_IMAGES) { loadLuluModel(); loadHalmangModel(); }
+if (CAN_USE_IMAGES) { loadHalmangModel(); }
 
 // 매 프레임 — 위치·방향·걸음짓. 종이 인형과 달리 카메라가 아니라 "가는 방향"을 봅니다.
 function updateLuluModel() {
