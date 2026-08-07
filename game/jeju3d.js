@@ -3392,11 +3392,15 @@ function updatePopups(dt) {
   for (let i = popups.length - 1; i >= 0; i--) {
     const p = popups[i];
     p.t += dt;
-    if (p.t > p.life) { p.el.remove(); popups.splice(i, 1); continue; }
-    // 위로 떠오르되, 오래 머무는 문구는 끝없이 올라가지 않게 1.2초어치까지만
-    harvestVec.set(p.x, p.y + Math.min(p.t, 1.2) * 0.9, p.z).project(camera);
-    p.el.style.left = ((harvestVec.x * 0.5 + 0.5) * innerWidth) + 'px';
-    p.el.style.top = ((-harvestVec.y * 0.5 + 0.5) * innerHeight) + 'px';
+    if (p.t > p.life) { p.el.remove(); popups.splice(i, 1); }
+  }
+  // 알림은 세계 좌표를 따라다니지 않고, 화면 가운데 위쪽에 차곡차곡 쌓입니다
+  let stackTop = 64;
+  for (let i = 0; i < popups.length; i++) {
+    const p = popups[i];
+    p.el.style.left = '50%';
+    p.el.style.top = stackTop + 'px';
+    stackTop += (p.el.offsetHeight || 34) + 8;
     // 수명의 마지막 30% 구간에서만 서서히 사라집니다
     p.el.style.opacity = p.t < p.life * 0.7 ? 1 : Math.max(0, 1 - (p.t - p.life * 0.7) / (p.life * 0.3));
   }
