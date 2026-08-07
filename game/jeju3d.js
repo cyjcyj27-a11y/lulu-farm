@@ -5265,7 +5265,9 @@ function openColorPicker(title, colors, onPick, price) {
   pickTitle.textContent = title;
   pickGrid.innerHTML = '';
   pickPrice.innerHTML = '';
-  if (pickTip) pickTip.textContent = '관광지라 물가가 비싸구나 ㅠㅠ';
+  if (pickTip) pickTip.textContent = IS_TOUCH
+    ? '관광지라 물가가 비싸구나 ㅠㅠ'
+    : '관광지라 물가가 비싸구나 ㅠㅠ (F 구입 · ESC 나가기)';
   let selected = null;
   const swatches = [];
   const buyBtn = document.createElement('button');
@@ -5297,11 +5299,15 @@ function openColorPicker(title, colors, onPick, price) {
     item.appendChild(nm);
     pickGrid.appendChild(item);
   }
-  buyBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault(); e.stopPropagation();
+  // 컴퓨터에서 F키로도 누를 수 있게, 단추가 하는 일을 따로 담아둡니다
+  buyBtn.activate = () => {
     if (!selected) return;
     pickWrap.style.display = 'none';
     onPick(selected);
+  };
+  buyBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    buyBtn.activate();
   });
   refreshBtn();
   pickPrice.appendChild(buyBtn);
@@ -5314,7 +5320,9 @@ function openBuyDialog(emoji, name, price, onBuy) {
   pickTitle.textContent = name;
   pickGrid.innerHTML = '';
   pickPrice.innerHTML = '';
-  if (pickTip) pickTip.textContent = '관광지라 물가가 비싸구나 ㅠㅠ';
+  if (pickTip) pickTip.textContent = IS_TOUCH
+    ? '관광지라 물가가 비싸구나 ㅠㅠ'
+    : '관광지라 물가가 비싸구나 ㅠㅠ (F 구입 · ESC 나가기)';
   const prev = document.createElement('div');
   prev.className = 'bigPreview';
   prev.textContent = emoji;
@@ -5322,10 +5330,14 @@ function openBuyDialog(emoji, name, price, onBuy) {
   const buyBtn = document.createElement('button');
   buyBtn.className = 'buyBtn';
   buyBtn.textContent = `${price.toLocaleString()}원 — 눌러서 구입`;
-  buyBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault(); e.stopPropagation();
+  // 컴퓨터에서 F키로도 누를 수 있게, 단추가 하는 일을 따로 담아둡니다
+  buyBtn.activate = () => {
     pickWrap.style.display = 'none';
     onBuy();
+  };
+  buyBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    buyBtn.activate();
   });
   pickPrice.appendChild(buyBtn);
   pickWrap.style.display = 'flex';
@@ -5781,7 +5793,13 @@ function tryFeedPony() {
 // 뭍:   귤 따기 → 당근·산소통 사기 → 택배 부치기 → 집 사기·고치기 → 말 먹이기 → 물질 들어가기
 //       → 아무것도 없으면 상자 잡기/놓기
 function handleActionKey() {
-  // 창이 떠 있으면 F는 "창 닫기"입니다 (PC에서 빠져나갈 방법이 이것뿐이라 제일 먼저 봅니다)
+  // 구입 창이 떠 있으면 F는 "구입"입니다 (나가기는 ESC·✕·바깥 누르기)
+  if (pickWrap && pickWrap.style.display === 'flex') {
+    const btn = pickBox && pickBox.querySelector('.buyBtn');
+    if (btn && !btn.disabled && btn.activate) btn.activate();
+    return;
+  }
+  // 그 밖의 창(자산·지도)이 떠 있으면 F는 "창 닫기"입니다
   if (closeOpenPopup()) return;
   // 대화 중이면 F는 "다음 줄"입니다
   if (talkOpen()) { advanceTalk(); return; }
