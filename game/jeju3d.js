@@ -2123,17 +2123,16 @@ const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: t
   netPile.castShadow = true;
   scene.add(netPile);
 
-  // 「해녀 물질」 나무 푯말 — 들판 어디서든 눈에 띄어야 물질하러 올 수 있습니다
+  // 「해녀 물질」 나무 푯말 — 밝은 바탕에 큼직한 글씨로, 멀리서도 또렷하게
   const signC = document.createElement('canvas');
-  signC.width = 256; signC.height = 96;
+  signC.width = 320; signC.height = 110;
   {
     const g2 = signC.getContext('2d');
-    g2.fillStyle = '#c9a06a'; g2.fillRect(0, 0, 256, 96);
-    g2.strokeStyle = 'rgba(110,72,30,.5)'; g2.lineWidth = 3;
-    for (let ly = 12; ly < 96; ly += 20) { g2.beginPath(); g2.moveTo(0, ly); g2.lineTo(256, ly); g2.stroke(); }
-    g2.fillStyle = '#3b2410'; g2.textAlign = 'center';
-    g2.font = 'bold 40px "맑은 고딕", Malgun Gothic, sans-serif';
-    g2.fillText('포구 · 물질', 128, 62);
+    g2.fillStyle = '#f0e4c8'; g2.fillRect(0, 0, 320, 110);
+    g2.strokeStyle = '#8a6038'; g2.lineWidth = 8; g2.strokeRect(4, 4, 312, 102);
+    g2.fillStyle = '#2b1a0c'; g2.textAlign = 'center';
+    g2.font = '900 56px "맑은 고딕", Malgun Gothic, sans-serif';
+    g2.fillText('🤿 물질', 160, 74);
   }
   const signTex = new THREE.CanvasTexture(signC);
   signTex.colorSpace = THREE.SRGBColorSpace;
@@ -2141,9 +2140,9 @@ const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: t
   signPost.position.set(PORT.x - 3.6, y + 1.4, PORT.z - 1.4);
   signPost.castShadow = true;
   scene.add(signPost);
-  const signBoard = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.75, 0.1),
+  const signBoard = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.85, 0.1),
     new THREE.MeshLambertMaterial({ map: signTex }));
-  signBoard.position.set(PORT.x - 3.6, y + 2.6, PORT.z - 1.4);
+  signBoard.position.set(PORT.x - 3.6, y + 2.65, PORT.z - 1.4);
   signBoard.rotation.y = 0.3;
   signBoard.castShadow = true;
   scene.add(signBoard);
