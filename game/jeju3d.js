@@ -3328,6 +3328,20 @@ if (!CAN_USE_IMAGES) {
 }
 
 // ---------- 11. 조작 ----------
+// 한글 입력 상태(IME)에서는 브라우저가 e.code를 비워서 보내는 일이 있습니다.
+// 그때는 글자(e.key)와 옛 키번호(keyCode)까지 함께 봐야 키가 먹습니다.
+// 한글 자판에서 F 자리는 'ㄹ', M 자리는 'ㅡ' 입니다.
+const KEY_ALIAS = {
+  KeyF: ['f', 'F', 'ㄹ', 70],
+  KeyM: ['m', 'M', 'ㅡ', 77],
+  Escape: ['Escape', 'Esc', 27],
+};
+function isKey(e, code) {
+  if (e.code === code) return true;
+  const alias = KEY_ALIAS[code];
+  if (!alias) return false;
+  return alias.includes(e.key) || alias.includes(e.keyCode);
+}
 const keys = {};
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
@@ -5162,7 +5176,7 @@ function closeOpenPopup() {
   if (mapWrap && mapWrap.style.display === 'flex') { toggleMap(); return true; }
   return false;
 }
-addEventListener('keydown', (e) => { if (e.code === 'Escape') closeOpenPopup(); });
+addEventListener('keydown', (e) => { if (isKey(e, 'Escape')) closeOpenPopup(); });
 // 창 오른쪽 위 ✕ — 어느 기기에서든 눈에 보이는 빠져나가기
 if (pickBox) {
   const x = document.createElement('button');
@@ -5388,7 +5402,7 @@ function drawMap() {
   g.fillStyle = '#ffd88a';
   g.fillText('루루', px, py - 12);
 }
-addEventListener('keydown', (e) => { if (e.code === 'KeyM') toggleMap(); });
+addEventListener('keydown', (e) => { if (isKey(e, 'KeyM')) toggleMap(); });
 if (mapWrap) mapWrap.addEventListener('pointerdown', (e) => { e.preventDefault(); toggleMap(); });
 const mapBadge = document.getElementById('mapBadge');
 if (mapBadge) {
@@ -5706,7 +5720,7 @@ function handleActionKey() {
 }
 
 // (예전의 E키 전용 함수는 상호작용 통일로 handleActionKey에 합쳐졌습니다)
-addEventListener('keydown', (e) => { if (e.code === 'KeyF') handleActionKey(); });
+addEventListener('keydown', (e) => { if (isKey(e, 'KeyF')) handleActionKey(); });
 
 // 시작 화면의 일거리 그림 — 바로 불러와서, 뜨는 순간 부드럽게 나타나게 합니다.
 // (예전에는 "파일이 있는지 먼저 재보고" 붙여서 두 번 기다렸고, 그 사이 이모지 화면이
