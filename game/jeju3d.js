@@ -2469,7 +2469,7 @@ function teleportInto(R, insideFlagName, greet) {
     lulu.position.set(state.x, R.y, state.z);
     camYaw = 0;               // 카메라는 문 쪽(남쪽)에서 방 안을 들여다봅니다
     camera.position.set(state.x, R.y + 4, state.z + 8);
-    if (greet) spawnMoneyPopup(state.x, R.y + 2, state.z, greet);
+    if (greet) spawnMoneyPopup(state.x, R.y + 2, state.z, greet, 3, 'big');
   });
 }
 function teleportOut(outX, outZ) {
@@ -3697,9 +3697,10 @@ updateCoinBadge();
 // 일반 HTML 글자로 띄우는 방식이라(WebGL 텍스트보다 간단), 매 프레임 위치만 갱신해주면 됩니다.
 const popups = [];
 // life를 주면 그 시간(초)만큼 떠 있습니다 — 중요한 문구는 길게 (기본 1.1초)
-function spawnMoneyPopup(worldX, worldY, worldZ, text, life) {
+// cls를 넘기면 그 꾸밈을 덧입힙니다 (예: 'big' — 할망 말씀처럼 크게 보여야 하는 알림)
+function spawnMoneyPopup(worldX, worldY, worldZ, text, life, cls) {
   const el = document.createElement('div');
-  el.className = 'moneyPopup';
+  el.className = cls ? 'moneyPopup ' + cls : 'moneyPopup';
   el.textContent = text;
   document.getElementById('ui').appendChild(el);
   popups.push({ el, x: worldX, y: worldY, z: worldZ, t: 0, life: life || 1.1 });
@@ -5102,7 +5103,7 @@ function updateHalmang() {
     Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < 3.2;
   if (near && !halmangNear) {
     spawnMoneyPopup(HALMANG_SPOT.x, gy + HALMANG_H + 0.5, HALMANG_SPOT.z,
-      isNight() ? '👵 "까불다 이어도 가주."' : '👵 "욕심내민, 바당이 데려간다."', 4);
+      isNight() ? '👵 "까불다 이어도 가주."' : '👵 "욕심내민, 바당이 데려간다."', 4, 'big');
   }
   halmangNear = near;
 }
