@@ -3331,7 +3331,7 @@ const coinBadge = document.getElementById('coinBadge');
 const ropeBadge = document.getElementById('ropeBadge');
 const boxBadge = document.getElementById('boxBadge');
 function updateCoinBadge() {
-  if (coinBadge) coinBadge.textContent = `💰 ${coins.toLocaleString()}원`;
+  if (coinBadge) coinBadge.textContent = `💵 ${coins.toLocaleString()}원`;
 }
 // 상자에 귤이 몇 개 담겼는지 (가득 차면 색이 바뀌어 배송할 때가 됐음을 알립니다)
 // basketCount·BASKET_CAP은 아래 12-1b에서 만들어지지만, 이 함수는 그 뒤에야 불리므로 괜찮습니다.
@@ -4879,7 +4879,7 @@ function openBag() {
   if (houseWallColor !== 0) spent += 6000000;
   bookList.innerHTML =
     `<div class="bookHead">🎒 자산</div>` +
-    `<div class="bagMoney">💰 ${coins.toLocaleString()}원</div>` +
+    `<div class="bagMoney">💵 ${coins.toLocaleString()}원</div>` +
     `<div class="bookTip" style="margin-bottom:10px">🏠 집꾸미기 ${spent.toLocaleString()} / 100,000,000원` +
     (spent >= 100000000 ? ' — 꿈을 이뤘어요!' : ' — 1억을 채우면 꿈의 집 완성') + `</div>` +
     `<div class="bagGrid">` + items.map((it) =>
