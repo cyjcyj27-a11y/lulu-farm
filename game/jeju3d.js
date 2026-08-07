@@ -2358,7 +2358,11 @@ const catchMeshes = {};       // 종류별 InstancedMesh
   for (let i = 0; i < 70; i++) {
     const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * DIVE.r;
     const x = DIVE.x + Math.cos(a) * rr, z = DIVE.z + Math.sin(a) * rr;
-    rockSpots.push({ x, y: seabedHeight(x, z), z, s: 0.7 + Math.random() * 1.5 });
+    const s = 0.7 + Math.random() * 1.5;
+    // 포구 축대 끝 앞은 비워둡니다 — 얕은 데 큰 바위가 서면 수면 위로 머리를 내밀어
+    // 축대 길과 입수 자리를 가로막습니다 (실제로 길을 막고 서 있었습니다)
+    if (x > -5 && x < 5 && z < 108) continue;
+    rockSpots.push({ x, y: seabedHeight(x, z), z, s });
   }
   const rockMesh = buildInstanced(new THREE.DodecahedronGeometry(1, 0), darkStoneMat, rockSpots, (s) => {
     dummy.position.set(s.x, s.y + s.s * 0.35, s.z);
@@ -4309,11 +4313,13 @@ function mayorTalkLines() {
   return idle[Math.floor(Math.random() * idle.length)];
 }
 
-// 해녀 할망 — 물질 나가는 포구 옆에 앉아, 언제 말을 걸어도 같은 말만 되뇌입니다.
+// 해녀 할망 — 포구 축대 중간에 앉아 계십니다. 물질하러 축대 끝까지 걸어나가려면
+// 반드시 할망 곁을 지나게 되고, 지날 때마다 등 뒤로 잔소리 한마디를 듣고 갑니다.
 // 물질하다 숨이 다하면 나오는 바로 그 말입니다. 새겨들읍시다.
-const HALMANG_SPOT = { x: -4.4, z: 93 };
-const HALMANG_RANGE = 2.4;
-obstacles.push({ x: HALMANG_SPOT.x, z: HALMANG_SPOT.z, r: 0.9, topY: NO_JUMP });
+const HALMANG_SPOT = { x: -1.9, z: 97.3 };
+const HALMANG_RANGE = 1.6;
+let halmangNear = false;   // 곁을 지나는 중인가 — 범위에 새로 들어설 때 한 번만 말씀하십니다
+obstacles.push({ x: HALMANG_SPOT.x, z: HALMANG_SPOT.z, r: 0.7, topY: NO_JUMP });
 function halmangTalk() {
   startTalk('해녀 할망', ['……욕심내민, 바당이 데려간다.']);
 }
@@ -4327,6 +4333,14 @@ function updateHalmang() {
   setCell(sheet, Math.floor(performance.now() * 0.004) % sheet.frames);
   const Hp = halmangCard.userData.planeH;
   halmangCard.scale.set(Hp * sheet.frameW / CELL_H, Hp, 1);
+  // 곁을 지나면 잔소리 한마디 — 물질 나가는 길에 반드시 듣게 됩니다
+  const near = !state.diving &&
+    Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < 3.2;
+  if (near && !halmangNear) {
+    spawnMoneyPopup(HALMANG_SPOT.x, gy + HALMANG_H + 0.5, HALMANG_SPOT.z,
+      '👵 "……욕심내민, 바당이 데려간다."', 4);
+  }
+  halmangNear = near;
 }
 
 // 루루의 이야기 — 처음 시작할 때 딱 한 번 들려줍니다.
