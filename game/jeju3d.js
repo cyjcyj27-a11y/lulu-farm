@@ -2718,7 +2718,8 @@ const state = {
   x: 6, z: 28,
   vy: 0,
   onGround: true,
-  facing: Math.PI,
+  facing: 0,     // 시작할 때 카메라를 마주 봅니다 — 등 뒤 멀리 성산일출봉이 보이는 구도
+
   walkPhase: 0,
   speed: 0,      // 0~1, 애니메이션 세기
   idleTime: 0,
