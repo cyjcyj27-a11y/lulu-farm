@@ -199,6 +199,29 @@
   /* 아직 못 가진 것 — 회색으로 흐릿하게 (뭘 모을 수 있는지 한눈에 보이게) */
   #bookList .bagItem.off { background: rgba(95,85,70,.10); filter: grayscale(1); opacity: .45; }
 
+  /* ---- 색 고르기 팝업 (벽지·외벽 페인트) ---- */
+  #pickWrap {
+    display: none;
+    position: absolute; inset: 0; pointer-events: auto;
+    background: rgba(8, 18, 16, .82);
+    align-items: center; justify-content: center;
+  }
+  #pickBox {
+    width: min(420px, 90vw);
+    background: #f6edd8; border-radius: 16px; padding: 18px 20px;
+    box-shadow: 0 4px 0 rgba(150,128,90,.55), 0 14px 40px rgba(0,0,0,.5);
+  }
+  #pickTitle { font-size: 17px; font-weight: 800; color: #3a2817; text-shadow: none; text-align: center; margin-bottom: 4px; }
+  #pickPrice { font-size: 12.5px; color: #a09378; text-shadow: none; text-align: center; margin-bottom: 12px; }
+  #pickGrid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  #pickGrid .swItem { text-align: center; }
+  #pickGrid .swatch {
+    width: 58px; height: 58px; border-radius: 12px;
+    border: 3px solid rgba(58,40,23,.35); cursor: pointer;
+  }
+  #pickGrid .swName { font-size: 10.5px; color: #6b5537; text-shadow: none; margin-top: 4px; }
+  .pickTip { text-align: center; font-size: 11px; color: #a09378; text-shadow: none; margin-top: 12px; }
+
   /* ---- 대화 카드 — 이장님·돌하르방과 이야기 ---- */
   #talkBox {
     display: none;
@@ -468,6 +491,10 @@
   <div id="sceneFade"></div>
   <div id="talkBox"><b id="talkName"></b><p id="talkText"></p><div class="next">🐾 누르면 다음</div></div>
   <div id="bookWrap"><div id="bookList"></div></div>
+  <div id="pickWrap"><div id="pickBox">
+    <div id="pickTitle"></div><div id="pickPrice"></div><div id="pickGrid"></div>
+    <div class="pickTip">색을 누르면 바로 결제됩니다 · 바깥을 누르면 취소</div>
+  </div></div>
   <div id="raceWrap">
     <video id="raceVideo" playsinline></video>
     <div class="cap">화면을 누르면 건너뜁니다</div>
@@ -565,6 +592,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=117"></script>
+<script src="jeju3d.js?v=118"></script>
 </body>
 </html>

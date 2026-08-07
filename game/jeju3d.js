@@ -1016,6 +1016,7 @@ let houseStage = 0;    // 루루가 처음부터 살고 있는 집입니다. 0~2
 let roofUpgraded = false;    // 상점의 "새 지붕"을 샀는가 — 사기 전엔 낡아 거뭇한 지붕입니다
 let hasHouseDoor = false;    // 「대문」을 샀는가 — 사기 전엔 문간이 뻥 뚫려 있습니다
 let hasHouseWindow = false;  // 「창문」을 샀는가 — 사기 전엔 시커먼 구멍 두 개뿐입니다
+let housePaintColor = 0;     // 공구대에서 고른 외벽 페인트 색 (0 = 아직 안 칠함)
 const house = (() => {
   const g = new THREE.Group();
   // 절벽 비탈 위의 집 — 발밑 네 귀퉁이 땅높이 중 "가장 높은 곳"에 바닥을 맞추고,
@@ -1174,7 +1175,9 @@ const house = (() => {
   obstacles.push({ x: HOUSE.x, z: HOUSE.z, r: 3.4, topY: NO_JUMP });
   // 지붕 널빤지들(구멍 제외)을 모아둡니다 — "새 지붕"을 사면 이것들만 환한 재질로 바뀝니다
   const roofMeshes = [...roofFine.children, ...rb.children].filter((o) => o.isMesh);
-  return { group: g, wallMesh, wallDarkMat, roofFine, roofBad, roofMeshes, roofOldMat, roofNewMat,
+  // 외벽 페인트용 재질 — 칠을 마치면 골라 둔 색이 여기 입혀집니다
+  const paintMat = new THREE.MeshLambertMaterial({ color: 0xe8e2d4, flatShading: true });
+  return { group: g, wallMesh, wallDarkMat, paintMat, roofFine, roofBad, roofMeshes, roofOldMat, roofNewMat,
            doorway, doorFine, winGroup, winHoles, winFrames, junk, sale };
 })();
 // (예전의 "그림판 + 뒤채 몸통" 조합은 뺐습니다 — 옆·뒤에서 보면 그림 위로 뒤채 지붕이
@@ -1182,10 +1185,16 @@ const house = (() => {
 
 function applyHouseLook() {
   const s = houseStage;
-  house.wallMesh.material = s >= 1 ? shopStoneMat : house.wallDarkMat;   // 1단계: 벽 고침
-  house.roofFine.visible = s >= 2;                                       // 2단계: 지붕 골조를 반듯하게
-  house.roofBad.visible = s < 2;
-  // 상점의 "새 지붕"을 샀으면 짚이 환한 새 빛깔로 (골조 수리와 별개의 치장입니다)
+  // 외벽 — 페인트칠(s>=3)을 마치면 골라 둔 색으로, 그 전엔 그을린 현무암
+  if (s >= 3 && housePaintColor) {
+    house.paintMat.color.setHex(housePaintColor);
+    house.wallMesh.material = house.paintMat;
+  } else {
+    house.wallMesh.material = house.wallDarkMat;
+  }
+  // 지붕 — 상점의 "새 지붕"을 사면 주저앉은 골조가 반듯해지고 환한 새 짚빛이 됩니다
+  house.roofFine.visible = roofUpgraded;
+  house.roofBad.visible = !roofUpgraded;
   const rm = roofUpgraded ? house.roofNewMat : house.roofOldMat;
   for (const m of house.roofMeshes) m.material = rm;
   // 대문·창문은 상점에서 사야 달립니다 — 사기 전엔 시커먼 구멍
@@ -1193,8 +1202,8 @@ function applyHouseLook() {
   house.doorFine.userData.knob.visible = hasHouseDoor;
   house.winGroup.visible = hasHouseWindow;
   for (const h of house.winHoles) h.visible = !hasHouseWindow;
-  for (const f of house.winFrames) f.material = s >= 3 ? shopWoodMat : shopWoodDarkMat;   // 3단계: 칠한 창틀
-  house.junk.visible = s < 3;             // 다 고치면 마당의 잡동사니가 치워집니다
+  for (const f of house.winFrames) f.material = s >= 3 ? shopWoodMat : shopWoodDarkMat;   // 칠 끝나면 창틀도 밝게
+  house.junk.visible = s < 3;             // 칠까지 끝나면 마당의 잡동사니가 치워집니다
   house.sale.visible = s < 0;             // 처음부터 루루의 집이라 팻말은 안 보입니다
 }
 applyHouseLook();
@@ -1323,8 +1332,18 @@ const stable = (() => {
 })();
 
 // 공구 — 헌집을 고치는 데 필요한 망치·톱·페인트. 이장님 상점 앞 공구대에서 팝니다.
-const tools = { hammer: false, saw: false, paint: false };
-const TOOL_PRICE = 5000;
+// 공구대 → 페인트 판매대. 망치·톱은 뺐습니다 (벽·지붕은 이제 상점에서 사서 해결).
+// 페인트는 색을 골라 사고, 집 앞에서 직접 칠합니다 — 외벽이 고른 색으로 바뀝니다.
+const tools = { paint: false };
+const PAINT_PRICE = 5000000;      // 외벽 페인트 — 집공사 1억의 한 조각입니다
+const PAINT_COLORS = [
+  { name: '회벽 하양', color: 0xe8e2d4 },
+  { name: '귤빛 노랑', color: 0xe0c368 },
+  { name: '노을 주황', color: 0xd98d5a },
+  { name: '바다 하늘', color: 0x9fc0d8 },
+  { name: '들판 연두', color: 0xa8c078 },
+  { name: '동백 분홍', color: 0xd8a8b0 },
+];
 const TOOL_SPOT = { x: -0.6, z: 42.6 };
 const TOOL_RANGE = 2.2;
 {
@@ -1340,31 +1359,16 @@ const TOOL_RANGE = 2.2;
     leg.position.set(px, 0.31, pz);
     g.add(leg);
   });
-  // 망치 (자루 + 머리)
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 6), citrusTrunkMat);
-  handle.position.set(-0.4, 0.72, 0);
-  handle.rotation.z = 1.2;
-  g.add(handle);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.09),
-    new THREE.MeshLambertMaterial({ color: 0x6a6f74, flatShading: true }));
-  head.position.set(-0.22, 0.78, 0);
-  g.add(head);
-  // 톱 (날 + 손잡이)
-  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.008, 0.09),
-    new THREE.MeshLambertMaterial({ color: 0x9aa0a6 }));
-  blade.position.set(0.08, 0.69, 0.12);
-  g.add(blade);
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.1), citrusTrunkMat);
-  grip.position.set(0.32, 0.7, 0.12);
-  g.add(grip);
-  // 페인트 통 (붓 꽂힌 초록 통 — 지붕 색)
-  const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.18, 10),
-    new THREE.MeshLambertMaterial({ color: 0x3f7d46, flatShading: true }));
-  bucket.position.set(0.45, 0.76, -0.15);
-  bucket.castShadow = true;
-  g.add(bucket);
+  // 알록달록 페인트 통들 — 색을 골라 살 수 있다는 표시
+  PAINT_COLORS.slice(0, 5).forEach((c, i) => {
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.085, 0.17, 10),
+      new THREE.MeshLambertMaterial({ color: c.color, flatShading: true }));
+    bucket.position.set(-0.45 + i * 0.23, 0.76, (i % 2 ? 0.14 : -0.12));
+    bucket.castShadow = true;
+    g.add(bucket);
+  });
   const brush = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 5), citrusTrunkMat);
-  brush.position.set(0.45, 0.9, -0.15);
+  brush.position.set(0.5, 0.9, 0.15);
   brush.rotation.z = 0.3;
   g.add(brush);
   scene.add(g);
@@ -1372,22 +1376,24 @@ const TOOL_RANGE = 2.2;
 
 function tryBuyTool() {
   const y = groundHeight(TOOL_SPOT.x, TOOL_SPOT.z) + 1.4;
-  // 아직 없는 공구를 수리 순서대로 하나씩 팝니다 (망치 → 톱 → 페인트)
-  const next = STAGE_TOOLS.find((t) => !tools[t]);
-  if (!next) {
-    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, '공구를 다 갖췄어요!');
+  if (tools.paint) {
+    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, '🖌 이미 페인트가 있어요 — 집 앞에서 칠하세요');
     return;
   }
-  if (coins < TOOL_PRICE) {
-    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, `${(TOOL_PRICE - coins).toLocaleString()}원 부족`);
+  if (coins < PAINT_PRICE) {
+    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, `${(PAINT_PRICE - coins).toLocaleString()}원 부족`);
     return;
   }
-  coins -= TOOL_PRICE;
-  tools[next] = true;
-  updateCoinBadge();
-  playPickSound();
-  const t = TOOL_INFO[next];
-  spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, `${t.icon} ${t.name} 구입!`);
+  openColorPicker('🖌 외벽 페인트 — 색을 고르세요', PAINT_COLORS, (c) => {
+    if (tools.paint || coins < PAINT_PRICE) return;
+    coins -= PAINT_PRICE;
+    tools.paint = true;
+    housePaintColor = c.color;
+    updateCoinBadge();
+    playPickSound();
+    spawnMoneyPopup(TOOL_SPOT.x, y, TOOL_SPOT.z, `🖌 ${c.name} 페인트 구입! 집 앞에서 칠해보세요`);
+    saveGame(true);
+  });
 }
 
 let carrots = 0;      // 들고 있는 당근
@@ -1545,34 +1551,42 @@ buildRoom(SHOP_ROOM, 0x9a7748, 0xd3b97e);                    // 상점 안 — �
 
 // ---------- 8-2h-2. 가구 (상점에서 사서 집을 꾸밉니다) ----------
 // 처음엔 집이 텅 비어서 맨땅에서 잡니다. 상점 안에서 가구를 사면 집 안에 놓입니다.
-const FURN_ORDER = ['bed', 'chair', 'table', 'closet', 'rug', 'lamp', 'plant', 'shelf', 'painting', 'window', 'tv', 'kitchen',
-                    'island', 'roof', 'door', 'palm', 'lawn', 'stones', 'gardenlight'];
+const FURN_ORDER = ['bed', 'chair', 'closet', 'rug', 'lamp', 'plant', 'shelf', 'painting', 'window', 'tv', 'tvstand', 'kitchen',
+                    'island', 'sofa', 'sink', 'coffeetable', 'washer', 'fridge', 'roof', 'door',
+                    'palm', 'lawn', 'stones', 'gardenlight', 'cycad'];
 // 마당 조경 아이템 — 방 안이 아니라 집 앞마당(실제 지형 위)에 심습니다
-const YARD_KEYS = new Set(['palm', 'lawn', 'stones', 'gardenlight']);
+const YARD_KEYS = new Set(['palm', 'lawn', 'stones', 'gardenlight', 'cycad']);
 // 집 자체에 다는 것들 — 방에 놓는 물건이 아니라 집의 겉모습을 바꿉니다 (처음엔 지붕은 낡고, 문·창문은 아예 없음)
 const HOUSE_PART_KEYS = new Set(['roof', 'door', 'window']);
-// 집공사 총액은 딱 1억 원입니다: 실내 가구·소품 5,200만 + 지붕·문·창문 1,500만 + 마당 조경 2,400만 + 바닥 400만 + 벽지 600만.
+// 집공사 총액은 딱 1억 원입니다:
+// 실내 18종 5,200만 + 지붕·대문 900만 + 외벽 페인트 500만 + 마당 조경 5종 2,400만 + 바닥 400만 + 벽지 600만.
 // 서울의 20억 아파트 대신, 제주에서 1억으로 완성하는 내 집 — 루루의 꿈의 가격표입니다.
 const FURNITURE = {
-  bed:      { name: '침대',        price: 6000000 },
-  chair:    { name: '의자',        price: 2000000 },
-  table:    { name: '식탁',        price: 4000000 },
-  closet:   { name: '옷장',        price: 6000000 },
-  rug:      { name: '러그',        price: 1500000 },
-  lamp:     { name: '스탠드 조명', price: 2500000 },
+  bed:      { name: '침대',        price: 4000000 },
+  chair:    { name: '의자',        price: 1500000 },
+  closet:   { name: '옷장',        price: 3500000 },
+  rug:      { name: '러그',        price: 1000000 },
+  lamp:     { name: '스탠드 조명', price: 2000000 },
   plant:    { name: '화분',        price: 500000 },
-  shelf:    { name: '책장',        price: 3000000 },
-  painting: { name: '벽걸이 그림', price: 3000000 },
-  window:   { name: '창문',        price: 6000000 },
-  tv:       { name: '텔레비전',    price: 8000000 },
-  kitchen:  { name: '부엌 찬장',   price: 10000000 },
-  island:   { name: '아일랜드 식탁', price: 4500000 },
+  shelf:    { name: '책장',        price: 2500000 },
+  painting: { name: '벽걸이 그림', price: 1500000 },
+  window:   { name: '창문',        price: 4000000 },
+  tv:       { name: '텔레비전',    price: 5000000 },   // 티비다이가 먼저 있어야 놓을 수 있습니다
+  tvstand:  { name: '티비다이',    price: 1500000 },
+  kitchen:  { name: '부엌 찬장',   price: 5000000 },
+  island:   { name: '아일랜드 식탁', price: 2500000 },
+  sofa:     { name: '소파',        price: 4500000 },
+  sink:     { name: '싱크대',      price: 3000000 },
+  coffeetable: { name: '소파 테이블', price: 2000000 },
+  washer:   { name: '세탁기',      price: 3500000 },
+  fridge:   { name: '냉장고',      price: 4500000 },
   roof:     { name: '새 지붕',     price: 5000000 },   // 낡아 거뭇한 지붕이 환한 새 짚빛으로
   door:     { name: '대문',        price: 4000000 },   // 처음엔 문짝 없이 뻥 뚫려 있습니다
-  palm:        { name: '야자수',    price: 8000000 },
-  lawn:        { name: '잔디밭',    price: 6000000 },
+  palm:        { name: '야자수',    price: 7000000 },
+  lawn:        { name: '잔디밭',    price: 5000000 },
   stones:      { name: '조경석',    price: 4000000 },
-  gardenlight: { name: '마당 조명', price: 6000000 },
+  gardenlight: { name: '마당 조명', price: 5000000 },
+  cycad:       { name: '소철나무',  price: 3000000 },   // 잔디 마당에 심는 둥근 소철
 };
 function emptyFurnOwned() {
   const o = {};
@@ -1895,12 +1909,152 @@ function makeDoorItemMesh() {
   g.add(knob);
   return g;
 }
+// ----- 거실 세간 — 소파·소파 테이블·티비다이, 부엌의 싱크대 -----
+function makeSofaMesh() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.42, 0.75), furnClothMat);
+  base.position.y = 0.32;
+  g.add(base);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.55, 0.22), furnClothMat);
+  back.position.set(0, 0.72, -0.28);
+  g.add(back);
+  [-0.78, 0.78].forEach((x) => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 0.7), furnClothMat);
+    arm.position.set(x, 0.62, 0);
+    g.add(arm);
+  });
+  [-0.42, 0.42].forEach((x) => {                        // 방석 자국
+    const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.1, 0.6),
+      new THREE.MeshLambertMaterial({ color: 0xc9a86a, flatShading: true }));
+    cushion.position.set(x, 0.56, 0.04);
+    g.add(cushion);
+  });
+  return g;
+}
+function makeCoffeeTableMesh() {
+  const g = new THREE.Group();
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.07, 0.6), furnWoodMat);
+  top.position.y = 0.38;
+  g.add(top);
+  [[-0.46, -0.22], [0.46, -0.22], [-0.46, 0.22], [0.46, 0.22]].forEach(([x, z]) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.38, 0.07), furnDarkMat);
+    leg.position.set(x, 0.19, z);
+    g.add(leg);
+  });
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.09, 8),
+    new THREE.MeshLambertMaterial({ color: 0xe8e0cc }));
+  cup.position.set(0.25, 0.46, 0.1);
+  g.add(cup);
+  return g;
+}
+function makeTvStandMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.45, 0.5), furnWoodMat);
+  body.position.y = 0.32;
+  g.add(body);
+  [[-0.6, 0], [0.6, 0]].forEach(([x, z]) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.12, 0.4), furnDarkMat);
+    leg.position.set(x, 0.06, z);
+    g.add(leg);
+  });
+  const drawer = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.22, 0.04), furnDarkMat);
+  drawer.position.set(0, 0.32, 0.26);
+  g.add(drawer);
+  return g;
+}
+function makeSinkMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 0.6), furnWoodMat);
+  body.position.y = 0.4;
+  g.add(body);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.68),
+    new THREE.MeshLambertMaterial({ color: 0xc7c9c4, flatShading: true }));
+  top.position.y = 0.83;
+  g.add(top);
+  const basin = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.4),
+    new THREE.MeshLambertMaterial({ color: 0x9aa0a2, flatShading: true }));
+  basin.position.set(-0.25, 0.85, 0);
+  g.add(basin);
+  const faucet = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 6),
+    new THREE.MeshLambertMaterial({ color: 0x8a9094 }));
+  faucet.position.set(-0.25, 1.0, -0.2);
+  g.add(faucet);
+  const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.22, 6),
+    new THREE.MeshLambertMaterial({ color: 0x8a9094 }));
+  spout.rotation.x = Math.PI / 2;
+  spout.position.set(-0.25, 1.13, -0.1);
+  g.add(spout);
+  return g;
+}
+// ----- 가전 — 세탁기·냉장고 -----
+const applianceMat = new THREE.MeshLambertMaterial({ color: 0xe6e4de, flatShading: true });
+const applianceDarkMat = new THREE.MeshLambertMaterial({ color: 0x8f948f, flatShading: true });
+function makeWasherMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.85, 0.7), applianceMat);
+  body.position.y = 0.43;
+  g.add(body);
+  const doorRing = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.05, 14), applianceDarkMat);
+  doorRing.rotation.x = Math.PI / 2;
+  doorRing.position.set(0, 0.45, 0.36);
+  g.add(doorRing);
+  const glassM = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.05, 12),
+    new THREE.MeshLambertMaterial({ color: 0x5a6a72 }));
+  glassM.rotation.x = Math.PI / 2;
+  glassM.position.set(0, 0.45, 0.38);
+  g.add(glassM);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.04), applianceDarkMat);
+  panel.position.set(0, 0.8, 0.34);
+  g.add(panel);
+  return g;
+}
+function makeFridgeMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.7, 0.7), applianceMat);
+  body.position.y = 0.85;
+  g.add(body);
+  const split = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.03, 0.72), applianceDarkMat);
+  split.position.y = 1.15;
+  g.add(split);
+  [[1.32, 0.5], [0.85, 0.45]].forEach(([hy, hl]) => {   // 손잡이 둘 (냉장/냉동)
+    const h = new THREE.Mesh(new THREE.BoxGeometry(0.05, hl, 0.05), applianceDarkMat);
+    h.position.set(-0.3, hy, 0.39);
+    g.add(h);
+  });
+  return g;
+}
+// ----- 소철나무 — 잔디 마당에 심는 둥근 소철 -----
+function makeCycadMesh() {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 0.55, 8),
+    new THREE.MeshLambertMaterial({ color: 0x7a6244, flatShading: true }));
+  trunk.position.y = 0.28;
+  trunk.castShadow = true;
+  g.add(trunk);
+  const frondMat = new THREE.MeshLambertMaterial({ color: 0x2f6e38, flatShading: true });
+  for (let i = 0; i < 10; i++) {
+    const arm = new THREE.Group();
+    arm.rotation.y = (i / 10) * Math.PI * 2;
+    const frond = new THREE.Mesh(new THREE.ConeGeometry(0.11, 1.0, 4), frondMat);
+    frond.position.x = 0.42;
+    frond.rotation.z = Math.PI / 2 + 0.85;   // 낮게 활처럼 휘어진 잎
+    frond.scale.z = 0.3;
+    frond.castShadow = true;
+    arm.add(frond);
+    arm.position.y = 0.55;
+    g.add(arm);
+  }
+  return g;
+}
 const FURN_BUILDERS = {
-  bed: makeBedMesh, chair: makeChairMesh, table: makeTableMesh, closet: makeClosetMesh,
+  bed: makeBedMesh, chair: makeChairMesh, closet: makeClosetMesh,
   rug: makeRugMesh, lamp: makeLampMesh, plant: makePlantMesh, shelf: makeShelfMesh,
-  painting: makePaintingMesh, window: makeWindowMesh, tv: makeTvMesh, kitchen: makeKitchenMesh,
-  island: makeIslandMesh, roof: makeRoofItemMesh, door: makeDoorItemMesh,
+  painting: makePaintingMesh, window: makeWindowMesh, tv: makeTvMesh, tvstand: makeTvStandMesh,
+  kitchen: makeKitchenMesh, island: makeIslandMesh, sofa: makeSofaMesh, sink: makeSinkMesh,
+  coffeetable: makeCoffeeTableMesh, washer: makeWasherMesh, fridge: makeFridgeMesh,
+  roof: makeRoofItemMesh, door: makeDoorItemMesh,
   palm: makePalmMesh, lawn: makeLawnMesh, stones: makeStonesMesh, gardenlight: makeGardenLightMesh,
+  cycad: makeCycadMesh,
 };
 
 // 집 안에 실제로 놓이는 가구 — 사기 전에는 숨겨져 있습니다
@@ -1908,18 +2062,23 @@ const furnitureMeshes = {};
 {
   const spots = {
     bed:      [ROOM.cx - 4.2, ROOM.cz - 2.4, 0],
-    chair:    [ROOM.cx + 1.6, ROOM.cz + 0.6, 0],
-    table:    [ROOM.cx + 1.6, ROOM.cz - 0.8, 0],
+    chair:    [ROOM.cx - 1.6, ROOM.cz - 1.0, 0],           // 아일랜드 식탁 곁
     closet:   [ROOM.cx + 4.4, ROOM.cz - 3.7, 0],
-    rug:      [ROOM.cx + 1.6, ROOM.cz + 0.0, 0],           // 식탁 아래 깔개
+    rug:      [ROOM.cx + 2.4, ROOM.cz + 0.6, 0],           // 소파와 테이블 아래 깔개
     lamp:     [ROOM.cx - 4.6, ROOM.cz + 2.6, 0],           // 남서쪽 구석
     plant:    [ROOM.cx + 4.8, ROOM.cz + 2.8, 0],           // 남동쪽 구석
     shelf:    [ROOM.cx - 1.4, ROOM.cz - 3.9, 0],           // 북쪽 벽
     painting: [ROOM.cx - 3.2, ROOM.cz - 4.4, 0],           // 북쪽 벽에 걸림
     window:   [ROOM.cx + 1.0, ROOM.cz - 4.4, 0],           // 북쪽 벽 창문
-    tv:       [ROOM.cx + 4.9, ROOM.cz + 0.8, -Math.PI / 2],// 동쪽 벽을 등지고
+    tv:       [ROOM.cx + 4.9, ROOM.cz + 0.8, -Math.PI / 2],// 동쪽 벽을 등지고 — 티비다이 위에 올라갑니다
+    tvstand:  [ROOM.cx + 4.9, ROOM.cz + 0.8, -Math.PI / 2],// 티비 받침장 (같은 자리 아래)
     kitchen:  [ROOM.cx - 4.5, ROOM.cz - 3.9, 0],           // 북서쪽 부엌 자리
-    island:   [ROOM.cx - 3.0, ROOM.cz - 2.2, 0],           // 부엌 찬장 앞의 조리대 겸 식탁
+    sink:     [ROOM.cx - 2.9, ROOM.cz - 3.9, 0],           // 부엌 찬장 옆 싱크대
+    island:   [ROOM.cx - 3.0, ROOM.cz - 2.0, 0],           // 부엌 앞의 조리대 겸 식탁
+    sofa:     [ROOM.cx + 2.4, ROOM.cz + 1.9, Math.PI],     // 거실 — 방 안쪽을 바라보는 소파
+    coffeetable: [ROOM.cx + 2.4, ROOM.cz + 0.6, 0],        // 소파 앞 테이블
+    fridge:   [ROOM.cx - 4.8, ROOM.cz - 0.6, Math.PI / 2], // 서쪽 벽 — 부엌 가까이 냉장고
+    washer:   [ROOM.cx - 4.8, ROOM.cz + 0.9, Math.PI / 2], // 그 옆에 세탁기
   };
   // 마당 조경은 방이 아니라 집 바깥 실제 지형 위에 심습니다
   const yardSpots = {
@@ -1927,6 +2086,7 @@ const furnitureMeshes = {};
     lawn:        [HOUSE.x + 4.6, HOUSE.z + 5.2, 0],        // 앞마당 잔디밭
     stones:      [HOUSE.x - 4.6, HOUSE.z + 5.8, 0.9],      // 앞마당 조경석
     gardenlight: [HOUSE.x + 2.6, HOUSE.z + 4.0, 0],        // 문 앞 돌계단 옆 마당 조명
+    cycad:       [HOUSE.x + 5.5, HOUSE.z + 4.4, 1.2],      // 잔디밭 가장자리의 소철나무
   };
   for (const k of FURN_ORDER) {
     if (k === 'roof' || k === 'door') continue;   // 지붕·대문은 물건이 아니라 집 자체를 바꿉니다 (applyHouseLook)
@@ -1936,7 +2096,9 @@ const furnitureMeshes = {};
       g.position.set(ys[0], groundHeight(ys[0], ys[1]), ys[1]);
       g.rotation.y = ys[2];
     } else {
-      g.position.set(spots[k][0], ROOM.y, spots[k][1]);
+      // 텔레비전은 티비다이 위에 올라갑니다 (다이 높이만큼 띄움)
+      const lift = k === 'tv' ? 0.48 : 0;
+      g.position.set(spots[k][0], ROOM.y + lift, spots[k][1]);
       g.rotation.y = spots[k][2];
     }
     g.visible = false;
@@ -2056,7 +2218,7 @@ const SHOP_GOODS = [
     x: SHOP_ROOM.cx - 1.4, z: SHOP_ROOM.cz - 3.4 },
   { key: 'bed',    name: '침대',   emoji: '🛏', get price() { return FURNITURE.bed.price; },
     x: SHOP_ROOM.cx + 0.6, z: SHOP_ROOM.cz - 3.3 },
-  { key: 'table',  name: '식탁',   emoji: '🍽', get price() { return FURNITURE.table.price; },
+  { key: 'sofa',   name: '소파',   emoji: '🛋', get price() { return FURNITURE.sofa.price; },
     x: SHOP_ROOM.cx + 2.4, z: SHOP_ROOM.cz - 3.3 },
   { key: 'chair',  name: '의자',   emoji: '🪑', get price() { return FURNITURE.chair.price; },
     x: SHOP_ROOM.cx + 3.9, z: SHOP_ROOM.cz - 3.3 },
@@ -2085,15 +2247,29 @@ const SHOP_GOODS = [
     x: SHOP_ROOM.cx + 1.2, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
   { key: 'door',     name: '대문',        emoji: '🚪', get price() { return FURNITURE.door.price; },
     x: SHOP_ROOM.cx - 0.4, z: SHOP_ROOM.cz - 3.4 },
+  // ----- 매장 가운데 통로 — 거실·부엌 세간 진열 -----
+  { key: 'tvstand',     name: '티비다이',    emoji: '🗄', get price() { return FURNITURE.tvstand.price; },
+    x: SHOP_ROOM.cx + 1.4, z: SHOP_ROOM.cz + 1.9, rot: Math.PI },
+  { key: 'coffeetable', name: '소파 테이블', emoji: '🫖', get price() { return FURNITURE.coffeetable.price; },
+    x: SHOP_ROOM.cx + 3.6, z: SHOP_ROOM.cz + 1.9, rot: Math.PI },
+  { key: 'sink',        name: '싱크대',      emoji: '🚰', get price() { return FURNITURE.sink.price; },
+    x: SHOP_ROOM.cx - 3.4, z: SHOP_ROOM.cz + 1.8 },
   // ----- 남쪽 벽(문 서쪽) — 마당 조경 코너 -----
   { key: 'palm',        name: '야자수',    emoji: '🌴', get price() { return FURNITURE.palm.price; },
-    x: SHOP_ROOM.cx - 5.2, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+    x: SHOP_ROOM.cx - 5.6, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
   { key: 'lawn',        name: '잔디밭',    emoji: '🌱', get price() { return FURNITURE.lawn.price; },
-    x: SHOP_ROOM.cx - 3.8, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+    x: SHOP_ROOM.cx - 4.5, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
   { key: 'stones',      name: '조경석',    emoji: '🪨', get price() { return FURNITURE.stones.price; },
-    x: SHOP_ROOM.cx - 2.4, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+    x: SHOP_ROOM.cx - 3.4, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
   { key: 'gardenlight', name: '마당 조명', emoji: '🏮', get price() { return FURNITURE.gardenlight.price; },
-    x: SHOP_ROOM.cx - 1.0, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+    x: SHOP_ROOM.cx - 2.3, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+  { key: 'cycad',       name: '소철나무',  emoji: '🌵', get price() { return FURNITURE.cycad.price; },
+    x: SHOP_ROOM.cx - 1.2, z: SHOP_ROOM.cz + 3.5, rot: Math.PI },
+  // ----- 매장 가운데 통로 — 가전 -----
+  { key: 'washer', name: '세탁기', emoji: '🌀', get price() { return FURNITURE.washer.price; },
+    x: SHOP_ROOM.cx - 1.2, z: SHOP_ROOM.cz + 1.9 },
+  { key: 'fridge', name: '냉장고', emoji: '🧊', get price() { return FURNITURE.fridge.price; },
+    x: SHOP_ROOM.cx - 2.3, z: SHOP_ROOM.cz + 2.0 },
 ];
 
 // 진열: 받침대 + 물건 + 가격표
@@ -2145,17 +2321,27 @@ const SHOP_GOODS = [
   }
 }
 
-// ---------- 8-2h-4b. 상점 왼쪽 인테리어 코너 — 집 바닥재·벽지 (색을 골라 삽니다) ----------
-// 서쪽 벽을 따라 색 견본이 줄지어 있고, 마음에 드는 색 앞에서 F를 누르면
-// 그 색으로 집 안 바닥/벽이 바로 바뀝니다. (바꿀 때마다 시공비를 냅니다)
+// ---------- 8-2h-4b. 상점 왼쪽 인테리어 코너 — 바닥재·벽지 (누르면 색 고르기 팝업) ----------
+// 견본대 앞에서 F를 누르면 색 고르기 창이 뜨고, 색을 고르면 그 자리에서 결제·시공됩니다.
 const RENO_GOODS = [
-  { type: 'floor', name: '바닥', price: 4000000, colorName: '원목',     color: 0x9a7748, dz: -2.7 },
-  { type: 'floor', name: '바닥', price: 4000000, colorName: '밝은나무', color: 0xc9a86a, dz: -1.8 },
-  { type: 'floor', name: '바닥', price: 4000000, colorName: '현무암',   color: 0x8d8b85, dz: -0.9 },
-  { type: 'floor', name: '바닥', price: 4000000, colorName: '붉은흙',   color: 0x9a6a4d, dz: 0.0 },
-  { type: 'wall',  name: '벽지', price: 6000000, colorName: '크림',     color: 0xf0e4c8, dz: 1.2 },
-  { type: 'wall',  name: '벽지', price: 6000000, colorName: '하늘',     color: 0xa8c8e0, dz: 2.1 },
-  { type: 'wall',  name: '벽지', price: 6000000, colorName: '연분홍',   color: 0xe8b8c0, dz: 3.0 },
+  { type: 'floor', name: '바닥재', price: 4000000, dz: -1.6 },
+  { type: 'wall',  name: '벽지',   price: 6000000, dz: 1.6 },
+];
+const FLOOR_COLORS = [
+  { name: '원목',     color: 0x9a7748 },
+  { name: '밝은나무', color: 0xc9a86a },
+  { name: '현무암',   color: 0x8d8b85 },
+  { name: '붉은흙',   color: 0x9a6a4d },
+  { name: '쪽빛',     color: 0x6a8a9a },
+  { name: '먹빛',     color: 0x55504a },
+];
+const WALL_COLORS = [
+  { name: '크림',   color: 0xf0e4c8 },
+  { name: '하늘',   color: 0xa8c8e0 },
+  { name: '연분홍', color: 0xe8b8c0 },
+  { name: '연두',   color: 0xbcd8a0 },
+  { name: '라벤더', color: 0xc8b8e0 },
+  { name: '미색',   color: 0xe8e0d0 },
 ];
 let houseFloorColor = 0;   // 0 = 아직 기본 (폐가 흙바닥·돌벽)
 let houseWallColor = 0;
@@ -2164,24 +2350,24 @@ let houseWallColor = 0;
   for (const rg of RENO_GOODS) {
     rg.x = x;
     rg.z = SHOP_ROOM.cz + rg.dz;
-    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.7), shopWoodMat);
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.9), shopWoodMat);
     stand.position.set(rg.x, y0 + 0.25, rg.z);
     scene.add(stand);
-    const chip = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.12, 0.55),
-      new THREE.MeshLambertMaterial({ color: rg.color }));
-    chip.position.set(rg.x, y0 + 0.56, rg.z);
-    scene.add(chip);
+    // 색 견본 부채 — 여러 색을 늘어놓아 "골라 살 수 있음"을 보여줍니다
+    const colors = rg.type === 'floor' ? FLOOR_COLORS : WALL_COLORS;
+    colors.slice(0, 4).forEach((c, i) => {
+      const chip = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.1, 0.34),
+        new THREE.MeshLambertMaterial({ color: c.color }));
+      chip.position.set(rg.x + (i % 2 ? 0.2 : -0.2), y0 + 0.56 + Math.floor(i / 2) * 0.11, rg.z + (i % 2 ? 0.16 : -0.14));
+      chip.rotation.y = i * 0.35;
+      scene.add(chip);
+    });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.58),
+      new THREE.MeshBasicMaterial({ map: makePriceSign(rg.name, rg.price) }));
+    sign.position.set(rg.x + 0.1, y0 + 2.0, rg.z);
+    sign.rotation.y = Math.PI / 2;
+    scene.add(sign);
   }
-  const s1 = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.58),
-    new THREE.MeshBasicMaterial({ map: makePriceSign('바닥', 50000) }));
-  s1.position.set(x + 0.1, y0 + 2.0, SHOP_ROOM.cz - 1.35);
-  s1.rotation.y = Math.PI / 2;
-  scene.add(s1);
-  const s2 = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.58),
-    new THREE.MeshBasicMaterial({ map: makePriceSign('벽지', 100000) }));
-  s2.position.set(x + 0.1, y0 + 2.0, SHOP_ROOM.cz + 2.1);
-  s2.rotation.y = Math.PI / 2;
-  scene.add(s2);
 }
 function applyRoomLook() {
   if (houseFloorColor) houseRoomLook.floorMat.color.setHex(houseFloorColor);
@@ -2202,13 +2388,19 @@ function buyReno(rg) {
     spawnMoneyPopup(state.x, py, state.z, `${(price - coins).toLocaleString()}원 부족`);
     return;
   }
-  coins -= price;
-  updateCoinBadge();
-  if (rg.type === 'floor') houseFloorColor = rg.color;
-  else houseWallColor = rg.color;
-  applyRoomLook();
-  playShipSound();
-  spawnMoneyPopup(state.x, py, state.z, `🎨 ${rg.colorName} ${rg.name} 시공 완료! 집이 바뀌었어요`);
+  // 색 고르기 창을 띄우고, 고르는 순간 결제·시공합니다
+  const colors = rg.type === 'floor' ? FLOOR_COLORS : WALL_COLORS;
+  openColorPicker(`🎨 ${rg.name} — 색을 고르세요`, colors, (c) => {
+    if (coins < price) return;
+    coins -= price;
+    updateCoinBadge();
+    if (rg.type === 'floor') houseFloorColor = c.color;
+    else houseWallColor = c.color;
+    applyRoomLook();
+    playShipSound();
+    spawnMoneyPopup(state.x, py, state.z, `🎨 ${c.name} ${rg.name} 시공 완료! 집이 바뀌었어요`);
+    saveGame(true);
+  }, `${price.toLocaleString()}원 — 어떤 색이든 값은 같습니다`);
 }
 
 // 물건 하나 사기 — 물건 앞에서 F를 눌렀을 때
@@ -2221,6 +2413,11 @@ function buyShopGood(good) {
     (FURNITURE[good.key] && furnitureOwned[good.key]);
   if (already) {
     spawnMoneyPopup(px, py, pz, `이미 ${good.name}${good.key === 'tank' ? '이' : '가'} 있어요`);
+    return;
+  }
+  // 텔레비전은 올려놓을 티비다이가 먼저 있어야 합니다
+  if (good.key === 'tv' && !furnitureOwned.tvstand) {
+    spawnMoneyPopup(px, py, pz, '📺 티비다이가 먼저 있어야 놓을 수 있어요 (매장 가운데 진열)');
     return;
   }
   const price = shopPrice(good.price);   // 장날이면 반값!
@@ -3461,10 +3658,9 @@ function updateRopeBadge() {
   }
   if (typeof TOOL_SPOT !== 'undefined' &&
       Math.hypot(state.x - TOOL_SPOT.x, state.z - TOOL_SPOT.z) < TOOL_RANGE) {
-    const next = STAGE_TOOLS.find((t) => !tools[t]);
-    ropeBadge.textContent = next
-      ? `🧰 공구대 — ${KEY_ACTION}으로 ${TOOL_INFO[next].name} 구입 (${TOOL_PRICE.toLocaleString()}원)`
-      : '🧰 공구를 다 갖췄어요';
+    ropeBadge.textContent = tools.paint
+      ? '🖌 페인트 보유 중 — 집 앞에서 칠하세요'
+      : `🖌 페인트 판매대 — ${KEY_ACTION}을 누르면 색을 골라 삽니다 (${PAINT_PRICE.toLocaleString()}원)`;
     return;
   }
   if (typeof TANK_SPOT !== 'undefined' &&
@@ -3478,7 +3674,7 @@ function updateRopeBadge() {
       Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z) < RACE_RANGE) {
     ropeBadge.textContent = ponyLove < RACE_MIN_LOVE
       ? `🏇 경마 — 애정 ${RACE_MIN_LOVE} 이상부터 출전 (지금 ${ponyLove})`
-      : `🏇 경마 출전 ${RACE_FEE.toLocaleString()}원 · 1등 상금 ${RACE_PRIZE.toLocaleString()}원 · 승률 ${Math.round(raceWinChance() * 100)}% (${KEY_ACTION})`;
+      : `🏇 경마 출전 ${RACE_FEE.toLocaleString()}원 · 1등 상금 ${racePrize().toLocaleString()}원(당근 먹인 만큼 커짐) · 승률 ${Math.round(raceWinChance() * 100)}% (${KEY_ACTION})`;
     return;
   }
   if (typeof STABLE !== 'undefined' &&
@@ -4329,29 +4525,21 @@ function updateDiving(dt) {
   updateDiveUI();
 }
 
-// ---------- 12-1f. 헌집 사서 고치기 ----------
-// 폐가를 50,000원에 산 뒤, 이장님 상점에서 산 공구를 들고 와서 직접 고칩니다.
-// 단계마다 다른 공구가 필요하고(벽=망치, 지붕=톱, 칠=페인트), F를 누를 때마다
-// 한 번씩 두드립니다. 여섯 번 두드리면 그 단계가 끝나고 집이 눈에 띄게 좋아집니다.
-const HOUSE_PRICE = 50000;
-const SWINGS_PER_STAGE = 6;    // 한 단계를 끝내는 데 드는 망치질(톱질·붓질) 횟수
+// ---------- 12-1f. 페인트칠 — 집수리의 마지막 손길 ----------
+// (망치·톱 수리는 뺐습니다 — 벽·지붕·문·창은 이제 상점 구매로 해결하고,
+//  집에서 직접 하는 일은 골라 온 색으로 외벽을 칠하는 것 하나입니다)
+// 공구대에서 페인트(색 고르기)를 사 온 뒤, 집 앞에서 F를 눌러 여섯 번 칠하면 완성.
+const SWINGS_PER_STAGE = 6;    // 페인트칠을 끝내는 데 드는 붓질 횟수
 const FIX_DURATION = 0.9;      // 한 번 휘두르는 동작 시간(초)
-let fixSwings = 0;             // 지금 단계에서 몇 번 두드렸나
-const STAGE_TOOLS = ['hammer', 'saw', 'paint'];
-const TOOL_INFO = {
-  hammer: { name: '망치', icon: '🔨', work: '벽 고치기' },
-  saw:    { name: '톱',   icon: '🪚', work: '지붕 고치기' },
-  paint:  { name: '페인트', icon: '🖌', work: '페인트칠' },
-};
+let fixSwings = 0;             // 붓질 몇 번 했나
 
 function houseBadgeText() {
   if (endingState >= 2) return '🏚 곧 카페가 들어선다는 내 집… · 문 앞에 서면 안으로';
   if (houseStage >= 3) return '🏡 내 집! 창고(30알) · 문 앞에 서면 안으로 들어갑니다';
-  const t = TOOL_INFO[STAGE_TOOLS[houseStage]];
-  if (!tools[STAGE_TOOLS[houseStage]]) {
-    return `🏚 ${t.work}에는 ${t.name}이 필요해요 — 이장님 상점에서 (${TOOL_PRICE.toLocaleString()}원)`;
+  if (!tools.paint) {
+    return `🏚 외벽 페인트칠을 하려면 공구대에서 페인트를 사 오세요 (${PAINT_PRICE.toLocaleString()}원 · 색 고르기)`;
   }
-  return `${t.icon} ${t.work} ${fixSwings}/${SWINGS_PER_STAGE} — ${KEY_ACTION}으로 계속 · 문 앞에 서면 안으로`;
+  return `🖌 페인트칠 ${fixSwings}/${SWINGS_PER_STAGE} — ${KEY_ACTION}으로 계속 · 문 앞에 서면 안으로`;
 }
 
 function tryFixHouse() {
@@ -4361,28 +4549,11 @@ function tryFixHouse() {
       endingState >= 2 ? '🏚 …이 집도 곧 카페가 된다고 한다' : '🏡 다 고쳤어요. 좋은 집이네요!');
     return;
   }
-  if (houseStage < 0) {
-    if (coins < HOUSE_PRICE) {
-      spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${(HOUSE_PRICE - coins).toLocaleString()}원 부족`);
-      return;
-    }
-    coins -= HOUSE_PRICE;
-    houseStage = 0;
-    fixSwings = 0;
-    updateCoinBadge();
-    applyHouseLook();
-    playShipSound();
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🔑 내 집 마련! 공구를 사서 고쳐봅시다');
+  if (!tools.paint) {
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🖌 페인트가 필요해요 — 상점 앞 공구대에서 색을 골라 사 오세요');
     return;
   }
-  // 이 단계에 맞는 공구가 있어야 두드릴 수 있습니다
-  const tool = STAGE_TOOLS[houseStage];
-  if (!tools[tool]) {
-    const t = TOOL_INFO[tool];
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${t.icon} ${t.name}이 필요해요 — 이장님 상점에서`);
-    return;
-  }
-  // 한 번 두드리기 — 동작이 끝나는 순간(updateHouse) 횟수가 올라갑니다
+  // 붓질 한 번 — 동작이 끝나는 순간(updateHouse) 횟수가 올라갑니다
   state.fixT = 0;
   state.facing = Math.atan2(HOUSE.x - state.x, HOUSE.z - state.z);
   state.idleTime = 0; state.sit = 0;
@@ -4398,22 +4569,17 @@ function updateHouse(dt) {
   fixSwings++;
   const py = groundHeight(HOUSE.x, HOUSE.z) + HOUSE_H + 0.6;
   if (fixSwings < SWINGS_PER_STAGE) {
-    const t = TOOL_INFO[STAGE_TOOLS[houseStage]];
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${t.icon} ${t.work} ${fixSwings}/${SWINGS_PER_STAGE}`);
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `🖌 페인트칠 ${fixSwings}/${SWINGS_PER_STAGE}`);
     return;
   }
-  // 단계 완성!
+  // 칠 완성!
   fixSwings = 0;
-  houseStage++;
+  houseStage = 3;
   applyHouseLook();
-  if (houseStage >= 3) {
-    BASKET_CAP = 30;
-    updateBasketBadge();
-    playShipSound();
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 완성! 창고가 생겨 상자가 30알로 커졌어요');
-  } else {
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${TOOL_INFO[STAGE_TOOLS[houseStage - 1]].work} 끝!`);
-  }
+  BASKET_CAP = 30;
+  updateBasketBadge();
+  playShipSound();
+  spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 페인트칠 끝! 창고가 생겨 상자가 30알로 커졌어요');
 }
 
 // 망치질 소리 — 탕, 탕, 탕 세 번
@@ -4856,8 +5022,6 @@ function openBag() {
   add(carrots > 0, '🥕', '당근', carrots);
   add(hasNet, '🧺', hasNet && !netCarried ? '망사리(내려둠)' : '망사리');
   add(hasTank, '🤿', '산소통');
-  add(tools.hammer, '🔨', '망치');
-  add(tools.saw, '🪚', '톱');
   add(tools.paint, '🖌', '페인트');
   if (state.diving && net.length) {
     const em = { kelp: '🌿', conch: '🐚', abalone: '🦪', octopus: '🐙' };
@@ -4875,6 +5039,7 @@ function openBag() {
   // 1억을 다 채우면(=전부 들여놓으면) 다음 날 아침, 꿈의 집 엔딩이 찾아옵니다.
   let spent = 0;
   for (const k of FURN_ORDER) if (furnitureOwned[k]) spent += FURNITURE[k].price;
+  if (tools.paint) spent += PAINT_PRICE;      // 외벽 페인트
   if (houseFloorColor !== 0) spent += 4000000;
   if (houseWallColor !== 0) spent += 6000000;
   bookList.innerHTML =
@@ -4902,6 +5067,47 @@ if (bookList) {
     bookList.addEventListener(ev, (e) => e.stopPropagation()));
 }
 
+// ---------- 색 고르기 팝업 — 벽지(집 안)·바닥재·외벽 페인트가 함께 씁니다 ----------
+const pickWrap = document.getElementById('pickWrap');
+const pickBox = document.getElementById('pickBox');
+const pickTitle = document.getElementById('pickTitle');
+const pickPrice = document.getElementById('pickPrice');
+const pickGrid = document.getElementById('pickGrid');
+function openColorPicker(title, colors, onPick, priceText) {
+  if (!pickWrap) return;
+  pickTitle.textContent = title;
+  pickPrice.textContent = priceText || '';
+  pickGrid.innerHTML = '';
+  for (const c of colors) {
+    const item = document.createElement('div');
+    item.className = 'swItem';
+    const b = document.createElement('button');
+    b.className = 'swatch';
+    b.style.background = '#' + c.color.toString(16).padStart(6, '0');
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      pickWrap.style.display = 'none';
+      onPick(c);
+    });
+    const nm = document.createElement('div');
+    nm.className = 'swName';
+    nm.textContent = c.name;
+    item.appendChild(b);
+    item.appendChild(nm);
+    pickGrid.appendChild(item);
+  }
+  pickWrap.style.display = 'flex';
+}
+// 상자 바깥(어두운 곳)을 누르면 취소
+if (pickWrap) pickWrap.addEventListener('pointerdown', (e) => {
+  if (pickBox && pickBox.contains(e.target)) return;
+  pickWrap.style.display = 'none';
+});
+if (pickBox) {
+  ['touchstart', 'touchmove', 'pointermove'].forEach((ev) =>
+    pickBox.addEventListener(ev, (e) => e.stopPropagation()));
+}
+
 // ---------- 12-1f-2b. 저장 · 처음부터 · 종료 ----------
 // 진행 상황을 브라우저 안(localStorage)에 남깁니다. 게임을 켜면 자동으로 이어집니다.
 // (딴 귤·채집물 위치까지는 저장하지 않습니다 — 자원은 켤 때마다 새로 차 있습니다)
@@ -4918,7 +5124,7 @@ function saveGame(quiet) {
       furn: furnitureOwned,
       gameT, dayCount, lastFedDay, ponyAlive, ponyDeaths, tutorialSeen, introSeen, dayEvent,
       endingState, happyDay,
-      floorC: houseFloorColor, wallC: houseWallColor,
+      floorC: houseFloorColor, wallC: houseWallColor, paintC: housePaintColor,
       stat, achieved,
     }));
     if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '💾 저장했어요');
@@ -4965,9 +5171,10 @@ function loadGame() {
   if (d.stat) Object.assign(stat, d.stat);
   achieved = d.achieved || {};
   applyPonyAlive();
-  // 집 인테리어 (바닥재·벽지)
+  // 집 인테리어 (바닥재·벽지·외벽 페인트)
   houseFloorColor = d.floorC || 0;
   houseWallColor = d.wallC || 0;
+  housePaintColor = d.paintC || 0;
   applyRoomLook();
   // 예전 저장이 실내 좌표를 담고 있으면 무시하고 섬의 시작 자리에서 깨어납니다
   if (typeof d.x === 'number' && d.x < 380) {
@@ -5146,7 +5353,13 @@ function tryBuyCarrot() {
 const RACE_LOVE = 100;        // 애정이 이만큼이면 승률이 최고치에 닿습니다
 const RACE_MIN_LOVE = 10;     // 최소 이만큼은 정이 들어야 출전합니다
 const RACE_FEE = 20000;
-const RACE_PRIZE = 100000;
+// 1등 상금은 당근을 먹인 횟수(애정)에 따라 커집니다 — 10번마다 두 배씩.
+// 10번대 10만 → 20번대 20만 → 30번대 40만 → 40번대 80만 → 최대 160만 (그 밑은 5만)
+function racePrize() {
+  const tier = Math.floor(ponyLove / 10);
+  if (tier <= 0) return 50000;
+  return Math.min(1600000, 100000 * Math.pow(2, tier - 1));
+}
 const RACE_SPOT = { x: STABLE.x + 3.5, z: STABLE.z + 5.5 };
 const RACE_RANGE = 2.2;
 let racing = false;
@@ -5208,11 +5421,12 @@ function startRaceVideo(win) {
     racing = false;
     const py = groundHeight(state.x, state.z) + 2;
     if (win) {
-      coins += RACE_PRIZE;
+      const prize = racePrize();
+      coins += prize;
       stat.raceWins++;
       updateCoinBadge();
       playShipSound();
-      spawnMoneyPopup(state.x, py, state.z, `🏆 1등! 상금 ${RACE_PRIZE.toLocaleString()}원을 받았어요`, 5);
+      spawnMoneyPopup(state.x, py, state.z, `🏆 1등! 상금 ${prize.toLocaleString()}원을 받았어요`, 5);
       checkAchievements();
     } else {
       spawnMoneyPopup(state.x, py, state.z, '😢 꼴등… 당근을 더 먹이면 더 잘 뜁니다', 5);
@@ -5761,10 +5975,9 @@ function updateSpriteLulu(groundY) {
     sheet = SHEETS.diveIdle;
     cell = Math.floor(t * 6) % sheet.frames;
   } else if (state.fixT >= 0 && SHEETS.fixHouse) {
-    // 집 고치는 중 — 수리 단계에 맞는 연장을 든 그림 (0 망치, 1 톱, 2 붓).
-    // 살짝살짝 두드리는 느낌이 나게 그림판을 아주 조금 흔들어줍니다.
+    // 페인트칠 중 — 붓을 든 그림(시트의 3번째 칸)만 씁니다 (망치·톱 수리는 뺐습니다)
     sheet = SHEETS.fixHouse;
-    cell = Math.min(2, Math.max(0, houseStage));
+    cell = 2;
   } else if (state.harvestT >= 0) {
     // 감귤 따는 중. 뻗기→내리기→기뻐하기가 한 방향으로 재생되고, 끝나면 마지막(기뻐하는) 칸에 멈춥니다
     sheet = SHEETS.harvest;
