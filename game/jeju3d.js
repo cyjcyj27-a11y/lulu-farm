@@ -5197,7 +5197,7 @@ setInterval(checkAchievements, 5000);
 const restartTop = document.getElementById('restartTop');
 if (restartTop) restartTop.addEventListener('pointerdown', (e) => {
   e.preventDefault();
-  if (confirm('처음부터 다시 시작할까요?\n저장된 진행이 모두 지워집니다.')) {
+  if (confirm('처음부터 다시할까요?\n저장된 진행이 모두 지워집니다.')) {
     try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
     location.reload();
   }
