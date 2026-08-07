@@ -3588,7 +3588,7 @@ function updateRopeBadge() {
     } else {
       ropeBadge.textContent = netCarried
         ? `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다` +
-          (isNight() ? '\n밤 물질은 수확 2배! 대신 숨이 빨리 차요' : '')
+          (isNight() ? '\n야간물질은 값을 2배로 쳐줘요! 대신 숨이 빨리 차요' : '')
         : (hasNet
           ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
           : `🧺 망사리가 있어야 물질합니다 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
@@ -4211,6 +4211,7 @@ const NET_CAP = 24;            // 망사리에 담을 수 있는 개수
 const CATCH_RANGE = 1.7;       // 이 거리 안의 것만 딸 수 있음
 let breath = BREATH_MAX;
 let net = [];                  // 이번 물질에서 딴 것들의 종류 목록
+let netNight = [];             // 각각을 밤에 땄는가 — 야간물질은 값을 2배로 쳐줍니다
 let breathLow = false;         // 숨이 얼마 안 남아 몸이 무거워진 상태
 let surfacing = 0;             // (예전 "저절로 떠오르기"의 잔재 — 이제 안 쓰지만 다른 코드가 참조합니다)
 let drowning = 0;              // 0보다 크면 숨이 다해 정신을 잃는 중 (남은 시간)
@@ -4281,6 +4282,7 @@ function enterDive() {
   drowning = 0;
   swimVel.x = 0; swimVel.z = 0;
   net = [];
+  netNight = [];
   state.x = DIVE.x;
   state.z = DIVE.z - DIVE.r * 0.6;
   state.vy = 0;
@@ -4289,9 +4291,8 @@ function enterDive() {
   state.idleTime = 0; state.sit = 0;
   applyDiveLook();
   updateDiveUI();
-  spawnMoneyPopup(state.x, SEA_Y + 1.5, state.z, isNight()
-    ? '밤 물질 시작! 수확은 2배\n대신 숨이 더 빨리 차올라요'
-    : '🤿 물질 시작! 숨 조심하세요');
+  // 야간물질 안내는 포구 배지가 이미 해줍니다 — 입수 알림은 하나로 통일
+  spawnMoneyPopup(state.x, SEA_Y + 1.5, state.z, '🤿 물질 시작! 숨 조심하세요');
 }
 
 // 뭍으로 나오면서 딴 것을 전부 팝니다.
@@ -4299,14 +4300,18 @@ function enterDive() {
 function leaveDive(reason) {
   let pay = 0;
   const tally = {};
-  for (const kind of net) {
-    pay += CATCH_KINDS[kind].price;
+  let nightSold = false;
+  net.forEach((kind, i) => {
+    // 밤에 딴 것은 값을 2배로 쳐줍니다 (야간물질 보너스)
+    pay += CATCH_KINDS[kind].price * (netNight[i] ? 2 : 1);
+    if (netNight[i]) nightSold = true;
     tally[kind] = (tally[kind] || 0) + 1;
-  }
+  });
   const caught = reason === 'drown' ? 0 : net.length;
   const lost = net.length;
   state.diving = false;
   net = [];
+  netNight = [];
   breath = BREATH_MAX;
   breathLow = false;
   surfacing = 0;
@@ -4350,7 +4355,9 @@ function leaveDive(reason) {
     playShipSound();
     const list = Object.entries(tally).map(([k, n]) => `${CATCH_KINDS[k].name} ${n}`).join(' · ');
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
-      `${list} → +${pay.toLocaleString()}원${dayEvent === 'haul' ? ' (물반 고기반!)' : ''}`);
+      `${list} → +${pay.toLocaleString()}원` +
+      (nightSold ? ' (야간물질 2배!)' : '') +
+      (dayEvent === 'haul' ? ' (물반 고기반!)' : ''));
     checkAchievements();
   } else {
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z, '뭍으로 나왔어요');
@@ -4401,13 +4408,13 @@ function tryCollect() {
   state.pickT = 0;                       // 손 뻗어 떼어내는 동작 시작
   hideCatch(i);
   net.push(s.kind);
-  // 밤 물질 보너스 — 같은 것을 한 번에 두 개 땁니다 (망사리에 자리가 남았을 때만)
-  const nightDouble = isNight() && net.length < NET_CAP;
-  if (nightDouble) net.push(s.kind);
+  // 야간물질 보너스 — 밤에 딴 것은 팔 때 값을 2배로 쳐줍니다
+  const night = isNight();
+  netNight.push(night);
   playPickSound();
   updateDiveUI();
   spawnMoneyPopup(s.x, s.y + 0.6, s.z,
-    nightDouble ? `${CATCH_KINDS[s.kind].name} ×2 (밤 물질)` : CATCH_KINDS[s.kind].name);
+    night ? `${CATCH_KINDS[s.kind].name} (야간 2배)` : CATCH_KINDS[s.kind].name);
   state.idleTime = 0;
 }
 
@@ -4474,7 +4481,7 @@ function updateDiving(dt) {
       if (state.vy > 0.3) state.vy = 0.3;
     }
   } else {
-    // 밤에는 물이 차고 어두워 숨이 1.5배 빨리 닳습니다 (밤 물질 2배 수확의 대가)
+    // 밤에는 물이 차고 어두워 숨이 1.5배 빨리 닳습니다 (야간물질 값 2배의 대가)
     breath -= dt * (isNight() ? 1.5 : 1);
     if (breath <= 0) {
       breath = 0;
@@ -4880,7 +4887,10 @@ const HALMANG_RANGE = 1.6;
 let halmangNear = false;   // 곁을 지나는 중인가 — 범위에 새로 들어설 때 한 번만 말씀하십니다
 obstacles.push({ x: HALMANG_SPOT.x, z: HALMANG_SPOT.z, r: 0.7, topY: NO_JUMP });
 function halmangTalk() {
-  startTalk('해녀 할망', ['……욕심내민, 바당이 데려간다.']);
+  // 밤에는 야간물질을 나서는 이에게 한마디 — "까불다간 이어도(저승 섬)에 간다"는 제주 말
+  startTalk('해녀 할망', isNight()
+    ? ['……까불다 이어도 가주.']
+    : ['……욕심내민, 바당이 데려간다.']);
 }
 // 매 프레임 — 3D 모델이 있으면 모델로, 아직 없으면(내려받는 중) 그림 판으로 서 계십니다
 function updateHalmang() {
@@ -4905,7 +4915,7 @@ function updateHalmang() {
     Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < 3.2;
   if (near && !halmangNear) {
     spawnMoneyPopup(HALMANG_SPOT.x, gy + HALMANG_H + 0.5, HALMANG_SPOT.z,
-      '👵 "……욕심내민, 바당이 데려간다."', 4);
+      isNight() ? '👵 "……까불다 이어도 가주."' : '👵 "……욕심내민, 바당이 데려간다."', 4);
   }
   halmangNear = near;
 }
