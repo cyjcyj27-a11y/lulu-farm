@@ -5076,8 +5076,8 @@ obstacles.push({ x: HALMANG_SPOT.x, z: HALMANG_SPOT.z, r: 0.7, topY: NO_JUMP });
 function halmangTalk() {
   // 밤에는 야간물질을 나서는 이에게 한마디 — "까불다간 이어도(저승 섬)에 간다"는 제주 말
   startTalk('해녀 할망', isNight()
-    ? ['……까불다 이어도 가주.']
-    : ['……욕심내민, 바당이 데려간다.']);
+    ? ['까불다 이어도 가주.']
+    : ['욕심내민, 바당이 데려간다.']);
 }
 // 매 프레임 — 3D 모델이 있으면 모델로, 아직 없으면(내려받는 중) 그림 판으로 서 계십니다
 function updateHalmang() {
@@ -5102,7 +5102,7 @@ function updateHalmang() {
     Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < 3.2;
   if (near && !halmangNear) {
     spawnMoneyPopup(HALMANG_SPOT.x, gy + HALMANG_H + 0.5, HALMANG_SPOT.z,
-      isNight() ? '👵 "……까불다 이어도 가주."' : '👵 "……욕심내민, 바당이 데려간다."', 4);
+      isNight() ? '👵 "까불다 이어도 가주."' : '👵 "욕심내민, 바당이 데려간다."', 4);
   }
   halmangNear = near;
 }
