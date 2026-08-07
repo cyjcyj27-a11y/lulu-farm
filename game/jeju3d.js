@@ -1020,9 +1020,10 @@ const house = (() => {
   // → 2 지붕 고침(반듯한 새 지붕) → 3 완성(칠한 문·창틀).
   const W = 7.4, D = 5.2, WALL = 2.55;
 
-  // 기단 — 집보다 한 뼘 넓은 현무암 받침. 비탈 아래쪽까지 내려가 땅에 닿습니다.
+  // 기단 — 집보다 한 뼘 넓은 받침. 비탈 아래쪽까지 내려가 땅에 닿습니다. (흙갈색)
   const fh = (floorY - lowY) + 1.4;
-  const foundation = new THREE.Mesh(new THREE.BoxGeometry(W + 0.7, fh, D + 0.7), shopStoneMat);
+  const foundationMat = new THREE.MeshLambertMaterial({ color: 0x7d5f42, flatShading: true });
+  const foundation = new THREE.Mesh(new THREE.BoxGeometry(W + 0.7, fh, D + 0.7), foundationMat);
   foundation.position.y = -fh / 2 + 0.06;
   foundation.castShadow = true;
   g.add(foundation);
@@ -2898,7 +2899,9 @@ async function loadHalmangModel() {
     scene.add(halmangModel);
   } catch (e) { /* 실패하면 그림 할망 그대로 */ }
 }
-if (CAN_USE_IMAGES) { loadHalmangModel(); }
+// ※ 할망 3D도 잠시 쉬는 중 — 사용자 결정으로 원래 그림 할망으로 복원했습니다.
+//   다시 켜려면: if (CAN_USE_IMAGES) { loadHalmangModel(); }
+//   (모델 파일 assets/halmang.glb 과 위의 불러오기 코드는 그대로 보관)
 
 // 매 프레임 — 위치·방향·걸음짓. 종이 인형과 달리 카메라가 아니라 "가는 방향"을 봅니다.
 function updateLuluModel() {
@@ -3676,7 +3679,7 @@ function tryToggleGrab() {
 }
 // E키는 상황에 따라 다르게 씁니다: 뭍에서는 상자 잡기, 물속에서는 물질 끝내고 나오기.
 // 상호작용 키는 F 하나로 통일했습니다. E는 손에 익은 분들을 위한 같은 기능의 별칭입니다.
-addEventListener('keydown', (e) => { if (e.code === 'KeyE') handleActionKey(); });
+// (E 별칭은 뺐습니다 — 상호작용은 F 하나뿐입니다)
 
 // 딴 귤 하나를 나무 위치에서 바구니까지 실제 중력으로 포물선을 그리며 날려보냅니다
 // (도착 시점의 위치를 미리 정해두고, 그 지점에 정확히 떨어지도록 초기 속도를 역산합니다)
@@ -4498,7 +4501,7 @@ function mayorTalkLines() {
 // 해녀 할망 — 포구 축대 중간에 앉아 계십니다. 물질하러 축대 끝까지 걸어나가려면
 // 반드시 할망 곁을 지나게 되고, 지날 때마다 등 뒤로 잔소리 한마디를 듣고 갑니다.
 // 물질하다 숨이 다하면 나오는 바로 그 말입니다. 새겨들읍시다.
-const HALMANG_SPOT = { x: -1.9, z: 97.3 };
+const HALMANG_SPOT = { x: 0, z: 97.3 };   // 축대 한가운데 — 물질 가는 길목을 지키고 앉아 계십니다
 const HALMANG_RANGE = 1.6;
 let halmangNear = false;   // 곁을 지나는 중인가 — 범위에 새로 들어설 때 한 번만 말씀하십니다
 obstacles.push({ x: HALMANG_SPOT.x, z: HALMANG_SPOT.z, r: 0.7, topY: NO_JUMP });
