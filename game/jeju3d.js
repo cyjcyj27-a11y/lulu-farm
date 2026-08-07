@@ -2950,8 +2950,8 @@ function updateRopeBadge() {
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
     ropeBadge.textContent = IS_TOUCH
-      ? '🤿 🐾 채집 · ↓ 잠수 · ⤴ 위로 · ↑←→ 헤엄 · 수면에서 🐾 나가기'
-      : '🤿 F 채집 · ↓ 잠수 · Space 위로 · ↑←→ 헤엄 · 수면에서 F 나가기';
+      ? '🤿 🐾 채집 · ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄 · 수면에서 🐾 나가기'
+      : '🤿 F 채집 · ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄 · 수면에서 F 나가기';
     return;
   }
   // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
@@ -3829,11 +3829,34 @@ const BREATH_LOW = 0.3;        // 이 아래로 떨어지면 "숨이 차는" 구
 const PICK_DURATION = 0.55;    // 전복 따는 동작이 재생되는 시간(초)
 // 숨이 다하면 화면이 어두워지며 제주 속담과 DIE 자막이 떠오릅니다
 const deathOverlay = document.getElementById('deathOverlay');
+// 물속 부유물(플랑크톤 티끌) — 물이 텅 비어 있으면 옆으로 헤엄쳐도 화면에
+// 아무 변화가 없어서 "키가 안 먹는다"고 느껴집니다. 작은 티끌들이 곁을
+// 스쳐 지나가면 내가 어느 쪽으로 얼마나 움직이는지 눈에 보입니다.
+let motes = null;
+function buildMotes() {
+  const n = 140, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * DIVE.r;
+    pos[i * 3] = DIVE.x + Math.cos(a) * rr;
+    pos[i * 3 + 1] = SEA_Y - 0.6 - Math.random() * (DIVE_DEPTH - 0.5);
+    pos[i * 3 + 2] = DIVE.z + Math.sin(a) * rr;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  motes = new THREE.Points(g, new THREE.PointsMaterial({
+    color: 0xcdeae6, size: 0.11, transparent: true, opacity: 0.5, sizeAttenuation: true,
+  }));
+  motes.visible = false;
+  scene.add(motes);
+}
+buildMotes();
+
 function updateDiving(dt) {
   if (state.pickT >= 0) {
     state.pickT += dt;
     if (state.pickT >= PICK_DURATION) state.pickT = -1;
   }
+  if (motes) motes.visible = state.diving;
   if (!state.diving) { if (vignette) vignette.style.opacity = 0; return; }
   const atSurface = lulu.position.y > SEA_Y - 1.2;
 
@@ -4059,6 +4082,7 @@ let gameT = DAY_LEN * 0.06;          // 아침 직후에서 시작
 let dayCount = 1;
 let lastFedDay = 0;                  // 마지막으로 당근을 준 날 (0 = 아직 한 번도 안 줌)
 let ponyAlive = true;
+let ponyDeaths = 0;   // 이번 게임에서 말을 굶겨 죽인 횟수 — 한 번도 없어야 새드엔딩이 안 옵니다
 function ponyFedToday() { return lastFedDay >= dayCount; }
 function hungerDays() { return Math.max(0, dayCount - lastFedDay); }
 
@@ -4075,6 +4099,7 @@ function morningNotice() {
   if (h >= 7) {
     // 7일을 굶겼습니다 — 마구간이 빕니다
     ponyAlive = false;
+    ponyDeaths++;
     applyPonyAlive();
     saveGame(true);
     spawnMoneyPopup(px, py, pz, '💔 조랑말이 굶어 죽었습니다…', 8);
@@ -4127,6 +4152,9 @@ const ENDING_SAD = [
   '이 집을 4,000만 원에 판 사람. …이장님이었다.',
   '"미안하게 됐네. 카페 개업하면… 음료는 한 잔 서비스함세."',
   '4,000만 원에 사서, 1억을 들여 고치고 꾸민 내 집이… 루루는 눈앞이 캄캄해졌다. ㅠㅠ',
+  '서울에는, 내가 살 수 있는 집이 없었다.',
+  '…제주에도, 내 집은 없었다.',
+  '— 끝 —',
 ];
 // 아침마다 엔딩 차례가 됐는지 확인합니다. 엔딩이 나오는 아침에는 다른 알림을 쉽니다.
 function checkEndingMorning() {
@@ -4136,7 +4164,9 @@ function checkEndingMorning() {
     startTalk('루루의 이야기', ENDING_HAPPY, () => { checkAchievements(); saveGame(true); });
     return true;
   }
-  if (endingState === 1 && dayCount >= happyDay + 3) {
+  // 말을 한 번도 굶겨 죽이지 않고 여기까지 왔다면 — 땅주인은 나타나지 않습니다.
+  // 생명을 끝까지 지킨 루루에게는 해피엔딩이 그대로 남습니다.
+  if (endingState === 1 && dayCount >= happyDay + 3 && ponyDeaths > 0) {
     endingState = 2;
     startTalk('루루의 이야기', ENDING_SAD, () => saveGame(true));
     return true;
@@ -4321,7 +4351,7 @@ const TUTOR_LINES = [
   '안녕하세요! 저는 이 섬을 지키는 돌하르방입니다. 섬에서 사는 법을 알려드릴게요.',
   '🍊 귤나무 앞에서 🐾(F)를 누르면 귤을 딸 수 있어요. 상자를 가득 채워 택배사에 가져가면 한 박스 10,000원에 팔립니다.',
   '🏪 상점 문 앞에 서면 안으로 들어갑니다. 당근을 사서 말에게 매일 한 개씩 먹여주세요 — 굶기면 위험해요!',
-  '🤿 물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가세요. 숨이 다하면 죽을 위험이 있어요!',
+  '🤿 물질을 하려면 상점에서 망사리를 사고, 포구 축대 끝까지 걸어가세요. 물속에서는 ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄이에요. 숨이 다하면 죽을 위험이 있어요!',
   '🏠 남쪽 언덕의 돌집이 루루의 집입니다. 문 앞에 서면 들어가지고, 가구를 사서 꾸밀 수도 있어요.',
   '🏇 말과 애정이 쌓이면 마구간 옆 팻말에서 경마에 나갈 수 있습니다. 좋은 하루 되세요!',
 ];
@@ -4423,7 +4453,7 @@ function saveGame(quiet) {
       tools, basketCount, cap: BASKET_CAP, x: outX, z: outZ,
       hasNet, netCarried, netX: netObj.position.x, netZ: netObj.position.z,
       furn: furnitureOwned,
-      gameT, dayCount, lastFedDay, ponyAlive, tutorialSeen, introSeen, dayEvent,
+      gameT, dayCount, lastFedDay, ponyAlive, ponyDeaths, tutorialSeen, introSeen, dayEvent,
       endingState, happyDay,
       floorC: houseFloorColor, wallC: houseWallColor,
       stat, achieved,
@@ -4463,6 +4493,7 @@ function loadGame() {
   dayCount = d.dayCount || 1;
   lastFedDay = d.lastFedDay || 0;
   ponyAlive = d.ponyAlive !== false;
+  ponyDeaths = d.ponyDeaths || 0;
   tutorialSeen = !!d.tutorialSeen;
   introSeen = !!d.introSeen;
   dayEvent = d.dayEvent || null;
@@ -4986,12 +5017,12 @@ bindTouchButton('btnJump',   (down) => { touchJump = down; });
 const WALK = 4.2, RUN = 8.0, GRAVITY = 22, JUMP = 8.9;
 // 물속 움직임 — 「인사이드」의 물속 구간을 참고했습니다.
 // 몸에 부력이 있어서 가만히 있으면 가라앉지 않고 살며시 떠오르고,
-// 방향키로는 느리고 묵직하게 헤엄칩니다. 내려가려면 Shift(💨 버튼)를 눌러 잠수합니다.
+// 방향키는 화면에 보이는 그대로: ↑ 떠오르기 · ↓ 잠수 · ← → 좌우 헤엄.
 const SWIM_ACCEL = 8.0;     // 물을 밀어내며 붙는 속도 (천천히 붙습니다)
 const SWIM_DRAG = 2.4;      // 손을 놨을 때 물이 잡아주는 정도
 const SWIM_MAX = 2.6;       // 물속 최고 속도 — 뭍 걷기(4.2)보다 한참 느립니다
-const SWIM_UP = 7.0;        // 위로 헤엄치는 힘 (Space·⤴ 버튼)
-const SWIM_DOWN = 7.0;      // 아래로 잠수하는 힘 (Shift·💨 버튼)
+const SWIM_UP = 7.0;        // 위아래로 헤엄치는 힘 (↑↓ 방향키 · ⤴ 버튼)
+const SWIM_DOWN = 7.0;      // (지금은 위와 같은 힘 — 따로 조절하고 싶을 때를 위해 남겨둠)
 const BUOYANCY = 0.9;       // 부력 — 아무것도 안 누르면 이 힘으로 살며시 떠오릅니다
 const swimVel = { x: 0, z: 0 };   // 물속에서만 쓰는 좌우 관성
 const moveDir = new THREE.Vector3();
@@ -5028,21 +5059,16 @@ function updateLulu(dt) {
   const spd = (running ? RUN : WALK) * tilt;
 
   if (state.diving) {
-    // 물속 조작은 버튼 그대로: ↑ 앞으로 · ↓ 아래로 잠수 · ← → 좌우.
-    // 위로는 ⤴(점프 버튼)이고, 아무것도 안 누르면 부력으로 천천히 떠오릅니다.
-    const fwdIn = Math.max(0, f);          // ↑ — 앞으로 (수평)
-    const downIn = Math.max(0, -f);        // ↓ — 곧장 잠수
-    moveDir.set(
-      fwdX * fwdIn + rgtX * r,
-      -downIn,
-      fwdZ * fwdIn + rgtZ * r
-    );
+    // 물속 조작(최종): 화면에 보이는 그대로 움직입니다.
+    // ↑ 부상(위로) · ↓ 잠수(아래로) · ← → 좌우로 헤엄 · ⤴(점프 버튼)도 부상.
+    // 아무것도 안 누르면 부력으로 천천히 떠오릅니다.
+    moveDir.set(rgtX * r, f, rgtZ * r);
     const swimTilt = Math.min(1, Math.hypot(f, r));
     if (moveDir.lengthSq() > 0.0001) {
       moveDir.normalize();
       swimVel.x += moveDir.x * SWIM_ACCEL * swimTilt * dt;
       swimVel.z += moveDir.z * SWIM_ACCEL * swimTilt * dt;
-      state.vy += moveDir.y * SWIM_UP * swimTilt * dt;   // 상하 성분은 여기서 바로 밉니다
+      state.vy += moveDir.y * SWIM_UP * swimTilt * dt;   // ↑는 위로, ↓는 아래로 바로 밉니다
       state.idleTime = 0;
     } else {
       state.idleTime += dt;
@@ -5226,8 +5252,10 @@ function updateSpriteLulu(groundY) {
       // 전복을 따는 중 — 손을 뻗어 떼어내는 동작이 한 방향으로 재생됩니다
       sheet = SHEETS.divePick;
       cell = Math.min(sheet.frames - 1, Math.floor((state.pickT / PICK_DURATION) * sheet.frames));
-    } else if (lulu.position.y > SEA_Y - 1.2 && SHEETS.diveFloat) {
-      // 수면에 떠서 숨 고르는 중
+    } else if (lulu.position.y > SEA_Y - 1.2 && SHEETS.diveFloat && sp <= 0.4) {
+      // 수면에 떠서 숨 고르는 중.
+      // (좌우로 헤엄칠 땐 이 정면 그림 대신 아래의 옆헤엄 그림을 씁니다 —
+      //  예전엔 수면에서 무조건 이 그림이라, 옆으로 가도 그림이 안 변해 "키가 안 먹는" 것처럼 보였습니다)
       sheet = SHEETS.diveFloat;
       cell = Math.floor(t * 6) % sheet.frames;
     } else if (state.vy > 0.5 || surfacing > 0) {
