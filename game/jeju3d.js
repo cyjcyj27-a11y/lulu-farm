@@ -3151,7 +3151,7 @@ scene.add(basket);
 // 상자에 실제로 쌓이는 귤 — 딴 귤이 날아와 떨어지면 한 알씩 눈에 보이게 채워집니다.
 // 자리를 미리 아래층부터 순서대로 만들어두고, 담긴 개수만큼만 보이게 켜는 방식입니다.
 // (매번 새 귤을 만들지 않아서 가볍고, 상자의 자식이라 상자를 끌면 귤도 같이 따라갑니다)
-let BASKET_CAP = 36;            // 이만큼 담으면 가득 참. 집을 다 고치면 창고가 생겨 48로 늘어납니다
+let BASKET_CAP = 20;            // 이만큼 담으면 가득 참(한 박스 10,000원). 집을 다 고치면 창고가 생겨 30으로 늘어납니다
 const filledFruits = [];        // { mesh, pop } — pop은 방금 담겨서 통 튀어오르는 정도(1→0)
 let basketCount = 0;
 {
@@ -3720,7 +3720,7 @@ const TOOL_INFO = {
 
 function houseBadgeText() {
   if (endingState >= 2) return '🏚 곧 카페가 들어선다는 내 집… · 문 앞에 서면 안으로';
-  if (houseStage >= 3) return '🏡 내 집! 창고(48알) · 문 앞에 서면 안으로 들어갑니다';
+  if (houseStage >= 3) return '🏡 내 집! 창고(30알) · 문 앞에 서면 안으로 들어갑니다';
   const t = TOOL_INFO[STAGE_TOOLS[houseStage]];
   if (!tools[STAGE_TOOLS[houseStage]]) {
     return `🏚 ${t.work}에는 ${t.name}이 필요해요 — 이장님 상점에서 (${TOOL_PRICE.toLocaleString()}원)`;
@@ -3781,10 +3781,10 @@ function updateHouse(dt) {
   houseStage++;
   applyHouseLook();
   if (houseStage >= 3) {
-    BASKET_CAP = 48;
+    BASKET_CAP = 30;
     updateBasketBadge();
     playShipSound();
-    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 완성! 창고가 생겨 상자가 48알로 커졌어요');
+    spawnMoneyPopup(HOUSE.x, py, HOUSE.z, '🏡 완성! 창고가 생겨 상자가 30알로 커졌어요');
   } else {
     spawnMoneyPopup(HOUSE.x, py, HOUSE.z, `${TOOL_INFO[STAGE_TOOLS[houseStage - 1]].work} 끝!`);
   }
@@ -4252,7 +4252,7 @@ function loadGame() {
   houseStage = (d.houseStage === undefined) ? 0 : Math.max(0, d.houseStage);   // 집은 처음부터 루루의 것
   fixSwings = d.fixSwings || 0;
   if (d.tools) Object.assign(tools, d.tools);
-  BASKET_CAP = d.cap || 36;
+  BASKET_CAP = houseStage >= 3 ? 30 : 20;   // 예전 저장(36/48)도 새 기준으로 맞춥니다
   applyHouseLook();
   for (let i = 0; i < (d.basketCount || 0); i++) addFruitToBasket();
   // 망사리 — 메고 있었으면 다시 등에, 내려놨었으면 그 자리에 그대로
