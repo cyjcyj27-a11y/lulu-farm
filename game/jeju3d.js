@@ -3368,13 +3368,14 @@ function updateFlyingFruits(dt) {
       // 날아온 귤이 여기서 비로소 "상자 안에 쌓인 귤" 한 알로 바뀝니다
       if (addFruitToBasket()) {
         playDropSound();                            // 나무통에 툭 떨어지는 소리
-        // 황금향이 열리는 날엔 열 알에 하나꼴로 황금향이 섞여 있습니다 — 일반 귤 세 배 값!
+        // 황금향이 열리는 날엔 열 알에 하나꼴로 황금향이 섞여 있습니다.
+        // 황금향은 일반 귤의 세 배 값이라, 상자에 세 알 몫으로 담깁니다.
         if (dayEvent === 'gold' && Math.random() < 0.10) {
-          coins += 1000;
+          addFruitToBasket();   // 이미 한 알 담겼으니 두 알을 더 얹으면 세 알 몫
+          addFruitToBasket();
           stat.gold++;
-          updateCoinBadge();
           playShipSound();
-          spawnMoneyPopup(p.x, p.y + 1.1, p.z, '✨ 황금향! +1,000원', 3);
+          spawnMoneyPopup(p.x, p.y + 1.1, p.z, '✨ 황금향! 귤 3알 몫으로 담았어요', 3);
         } else {
           spawnMoneyPopup(p.x, p.y + 0.9, p.z, '🍊 +1');   // 한 알 담겼습니다 (돈은 박스로 팔 때 한꺼번에)
         }
@@ -3909,7 +3910,7 @@ function dayEventNotice() {
   if (!dayEvent) return;
   const msg = {
     storm:  '🌀 태풍이 와요! 오늘은 물질을 쉽니다',
-    gold:   '✨ 황금향이 열리는 날! 열 알에 하나는 세 배 값이래요',
+    gold:   '✨ 황금향이 열리는 날! 황금향 하나는 귤 3알 몫으로 담깁니다',
     haul:   '🌊 물반 고기반! 오늘 물질 채집물은 1.5배 값',
     market: '🎪 오늘은 장날! 상점 물건이 전부 반값',
   }[dayEvent];
