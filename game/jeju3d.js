@@ -2573,15 +2573,28 @@ const CAM_PITCH = 1.1;   // 초당 올려다보기/내려다보기 속도
 const CAM_ZOOM = 9.0;    // 초당 줌 속도
 
 // 키를 누르고 있는 동안 매 프레임 조금씩 돌립니다 (톡톡 끊기지 않고 부드럽게 돕니다)
+let camManualT = -99;   // 마지막으로 직접 카메라를 돌린 시각 — 그 직후엔 자동 추적이 양보합니다
 function updateCamera(dt) {
-  if (keys['KeyA']) camYaw += CAM_TURN * dt;
-  if (keys['KeyD']) camYaw -= CAM_TURN * dt;
-  if (keys['KeyW']) camPitch -= CAM_PITCH * dt;     // W = 시선을 눕혀 멀리 보기
-  if (keys['KeyS']) camPitch += CAM_PITCH * dt;     // S = 위에서 내려다보기
+  const now = performance.now() / 1000;
+  if (keys['KeyA']) { camYaw += CAM_TURN * dt; camManualT = now; }
+  if (keys['KeyD']) { camYaw -= CAM_TURN * dt; camManualT = now; }
+  if (keys['KeyW']) { camPitch -= CAM_PITCH * dt; camManualT = now; }
+  if (keys['KeyS']) { camPitch += CAM_PITCH * dt; camManualT = now; }
   if (keys['KeyZ']) camDist += CAM_ZOOM * dt;       // 멀리
   if (keys['KeyX']) camDist -= CAM_ZOOM * dt;       // 가까이
   camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch));
   camDist = Math.max(4, Math.min(22, camDist));
+
+  // 걷는 방향의 등 뒤로 카메라가 스르륵 따라 돕니다.
+  // - 직접 돌린 직후 1.5초는 양보 (플레이어 뜻이 우선)
+  // - 물속에서는 끔 (시선 방향으로 헤엄치는 조작과 서로 꼬입니다)
+  // - 카메라를 정면으로 마주 보고 걸어올 때는 억지로 돌리지 않습니다
+  if (!state.diving && state.speed > 0.15 && now - camManualT > 1.5) {
+    let diff = (state.facing + Math.PI) - camYaw;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    if (Math.abs(diff) < 2.6) camYaw += diff * Math.min(1, dt * 1.8);
+  }
 }
 
 // 물속에서는 위를 올려다볼 수 있어야 "보는 방향으로 헤엄"이 됩니다. 뭍에서는 예전 그대로.
@@ -2601,6 +2614,7 @@ addEventListener('mousemove', (e) => {
   if (!dragging) return;
   camYaw -= (e.clientX - lastX) * 0.005;
   camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch + (e.clientY - lastY) * 0.003));
+  camManualT = performance.now() / 1000;
   lastX = e.clientX; lastY = e.clientY;
 });
 addEventListener('wheel', (e) => {
@@ -2660,6 +2674,7 @@ function handleTouchMove(e) {
     } else if (t.identifier === lookId) {
       camYaw -= (t.clientX - lookX) * 0.006;
       camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch + (t.clientY - lookY) * 0.004));
+      camManualT = performance.now() / 1000;
       lookX = t.clientX; lookY = t.clientY;
     }
   }
