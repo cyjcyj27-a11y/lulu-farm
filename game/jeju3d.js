@@ -1434,14 +1434,29 @@ buildRoom(SHOP_ROOM, 0x9a7748, 0xd3b97e);                    // 상점 안 — �
 
 // ---------- 8-2h-2. 가구 (상점에서 사서 집을 꾸밉니다) ----------
 // 처음엔 집이 텅 비어서 맨땅에서 잡니다. 상점 안에서 가구를 사면 집 안에 놓입니다.
-const FURN_ORDER = ['bed', 'chair', 'table', 'closet'];
+const FURN_ORDER = ['bed', 'chair', 'table', 'closet', 'rug', 'lamp', 'plant', 'shelf', 'painting', 'window', 'tv', 'kitchen'];
+// 집공사 총액은 딱 1억 원입니다: 가구·소품 9,000만 + 바닥 400만 + 벽지 600만.
+// 서울의 20억 아파트 대신, 제주에서 1억으로 완성하는 내 집 — 루루의 꿈의 가격표입니다.
 const FURNITURE = {
-  bed:    { name: '침대', price: 100000 },
-  chair:  { name: '의자', price: 60000 },
-  table:  { name: '식탁', price: 120000 },
-  closet: { name: '옷장', price: 200000 },
+  bed:      { name: '침대',        price: 8000000 },
+  chair:    { name: '의자',        price: 3000000 },
+  table:    { name: '식탁',        price: 6000000 },
+  closet:   { name: '옷장',        price: 10000000 },
+  rug:      { name: '러그',        price: 2000000 },
+  lamp:     { name: '스탠드 조명', price: 4000000 },
+  plant:    { name: '화분',        price: 1000000 },
+  shelf:    { name: '책장',        price: 7000000 },
+  painting: { name: '벽걸이 그림', price: 5000000 },
+  window:   { name: '창문',        price: 12000000 },
+  tv:       { name: '텔레비전',    price: 15000000 },
+  kitchen:  { name: '부엌 찬장',   price: 17000000 },
 };
-let furnitureOwned = { bed: false, chair: false, table: false, closet: false };
+function emptyFurnOwned() {
+  const o = {};
+  for (const k of FURN_ORDER) o[k] = false;
+  return o;
+}
+let furnitureOwned = emptyFurnOwned();
 
 // 가구 만들기 — 집 배치용과 상점 진열용 양쪽에서 씁니다
 const furnWoodMat = new THREE.MeshLambertMaterial({ color: 0x8a6038, flatShading: true });
@@ -1506,16 +1521,155 @@ function makeClosetMesh() {
   });
   return g;
 }
-const FURN_BUILDERS = { bed: makeBedMesh, chair: makeChairMesh, table: makeTableMesh, closet: makeClosetMesh };
+function makeRugMesh() {
+  const g = new THREE.Group();
+  const outer = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.04, 20),
+    new THREE.MeshLambertMaterial({ color: 0xc96a4a }));
+  outer.position.y = 0.02;
+  g.add(outer);
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.05, 20),
+    new THREE.MeshLambertMaterial({ color: 0xe8b88a }));
+  inner.position.y = 0.025;
+  g.add(inner);
+  return g;
+}
+function makeLampMesh() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.08, 10), furnDarkMat);
+  base.position.y = 0.04;
+  g.add(base);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.5, 6), furnDarkMat);
+  pole.position.y = 0.8;
+  g.add(pole);
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.45, 10, 1, true),
+    new THREE.MeshLambertMaterial({ color: 0xf2d8a0, side: THREE.DoubleSide }));
+  shade.position.y = 1.65;
+  g.add(shade);
+  const glow = new THREE.PointLight(0xffe0b0, 0.7, 7);
+  glow.position.y = 1.5;
+  g.add(glow);
+  return g;
+}
+function makePlantMesh() {
+  const g = new THREE.Group();
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.2, 0.4, 10),
+    new THREE.MeshLambertMaterial({ color: 0xb56a3c, flatShading: true }));
+  pot.position.y = 0.2;
+  g.add(pot);
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x4f8a3c, flatShading: true });
+  [[0, 0.75, 0, 0.34], [-0.18, 0.6, 0.1, 0.22], [0.16, 0.62, -0.12, 0.24]].forEach(([x, y, z, r]) => {
+    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), leafMat);
+    leaf.position.set(x, y, z);
+    g.add(leaf);
+  });
+  return g;
+}
+function makeShelfMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.0, 0.45), furnWoodMat);
+  body.position.y = 1.0;
+  g.add(body);
+  const bookCols = [0xc0574f, 0x4f7ac0, 0x5a9a55, 0xd9a441, 0x8a5fa0];
+  for (let row = 0; row < 3; row++) {
+    for (let i = 0; i < 5; i++) {
+      const book = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.4, 0.3),
+        new THREE.MeshLambertMaterial({ color: bookCols[(row * 2 + i) % 5] }));
+      book.position.set(-0.55 + i * 0.27, 0.5 + row * 0.6, 0.1);
+      g.add(book);
+    }
+  }
+  return g;
+}
+function makePaintingMesh() {
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 0.08), furnDarkMat);
+  frame.position.y = 2.0;
+  g.add(frame);
+  const canvasMat = CAN_USE_IMAGES
+    ? new THREE.MeshLambertMaterial({ map: loadTexture('../assets/farmcat/scene_farm.webp') })
+    : new THREE.MeshLambertMaterial({ color: 0xf6ebd8 });
+  const art = new THREE.Mesh(new THREE.PlaneGeometry(1.32, 0.94), canvasMat);
+  art.position.set(0, 2.0, 0.05);
+  g.add(art);
+  return g;
+}
+function makeWindowMesh() {
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 0.1), furnWoodMat);
+  frame.position.y = 1.9;
+  g.add(frame);
+  const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.1),
+    new THREE.MeshBasicMaterial({ color: 0xa9d3ea }));
+  pane.position.set(0, 1.9, 0.06);
+  g.add(pane);
+  const barV = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.15, 0.04), furnWoodMat);
+  barV.position.set(0, 1.9, 0.08);
+  g.add(barV);
+  const barH = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.06, 0.04), furnWoodMat);
+  barH.position.set(0, 1.9, 0.08);
+  g.add(barH);
+  return g;
+}
+function makeTvMesh() {
+  const g = new THREE.Group();
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.5, 0.5), furnDarkMat);
+  stand.position.y = 0.25;
+  g.add(stand);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 0.12),
+    new THREE.MeshLambertMaterial({ color: 0x22242a, flatShading: true }));
+  body.position.y = 1.05;
+  g.add(body);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.34, 0.76),
+    new THREE.MeshBasicMaterial({ color: 0x3a5a7a }));
+  screen.position.set(0, 1.05, 0.07);
+  g.add(screen);
+  return g;
+}
+function makeKitchenMesh() {
+  const g = new THREE.Group();
+  const lower = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.9, 0.7), furnWoodMat);
+  lower.position.y = 0.45;
+  g.add(lower);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.08, 0.78),
+    new THREE.MeshLambertMaterial({ color: 0x8d8b85 }));
+  top.position.y = 0.94;
+  g.add(top);
+  const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.06, 12),
+    new THREE.MeshLambertMaterial({ color: 0xc9ccd0 }));
+  sink.position.set(-0.5, 0.99, 0);
+  g.add(sink);
+  const upper = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.6, 0.4), furnWoodMat);
+  upper.position.set(0, 2.0, -0.15);
+  g.add(upper);
+  [-0.5, 0.5].forEach((x) => {
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 5), furnDarkMat);
+    knob.position.set(x, 0.55, 0.36);
+    g.add(knob);
+  });
+  return g;
+}
+const FURN_BUILDERS = {
+  bed: makeBedMesh, chair: makeChairMesh, table: makeTableMesh, closet: makeClosetMesh,
+  rug: makeRugMesh, lamp: makeLampMesh, plant: makePlantMesh, shelf: makeShelfMesh,
+  painting: makePaintingMesh, window: makeWindowMesh, tv: makeTvMesh, kitchen: makeKitchenMesh,
+};
 
 // 집 안에 실제로 놓이는 가구 — 사기 전에는 숨겨져 있습니다
 const furnitureMeshes = {};
 {
   const spots = {
-    bed:    [ROOM.cx - 4.2, ROOM.cz - 2.4, 0],
-    chair:  [ROOM.cx + 1.6, ROOM.cz + 0.6, 0],
-    table:  [ROOM.cx + 1.6, ROOM.cz - 0.8, 0],
-    closet: [ROOM.cx + 4.4, ROOM.cz - 3.7, 0],
+    bed:      [ROOM.cx - 4.2, ROOM.cz - 2.4, 0],
+    chair:    [ROOM.cx + 1.6, ROOM.cz + 0.6, 0],
+    table:    [ROOM.cx + 1.6, ROOM.cz - 0.8, 0],
+    closet:   [ROOM.cx + 4.4, ROOM.cz - 3.7, 0],
+    rug:      [ROOM.cx + 1.6, ROOM.cz + 0.0, 0],           // 식탁 아래 깔개
+    lamp:     [ROOM.cx - 4.6, ROOM.cz + 2.6, 0],           // 남서쪽 구석
+    plant:    [ROOM.cx + 4.8, ROOM.cz + 2.8, 0],           // 남동쪽 구석
+    shelf:    [ROOM.cx - 1.4, ROOM.cz - 3.9, 0],           // 북쪽 벽
+    painting: [ROOM.cx - 3.2, ROOM.cz - 4.4, 0],           // 북쪽 벽에 걸림
+    window:   [ROOM.cx + 1.0, ROOM.cz - 4.4, 0],           // 북쪽 벽 창문
+    tv:       [ROOM.cx + 4.9, ROOM.cz + 0.8, -Math.PI / 2],// 동쪽 벽을 등지고
+    kitchen:  [ROOM.cx - 4.5, ROOM.cz - 3.9, 0],           // 북서쪽 부엌 자리
   };
   for (const k of FURN_ORDER) {
     const g = FURN_BUILDERS[k]();
@@ -1637,6 +1791,23 @@ const SHOP_GOODS = [
     x: SHOP_ROOM.cx + 3.9, z: SHOP_ROOM.cz - 3.3 },
   { key: 'closet', name: '옷장',   emoji: '🚪', get price() { return FURNITURE.closet.price; },
     x: SHOP_ROOM.cx + 5.3, z: SHOP_ROOM.cz - 3.3 },
+  // ----- 동쪽 벽 — 집꾸미기 소품 코너 -----
+  { key: 'rug',      name: '러그',        emoji: '🧶', get price() { return FURNITURE.rug.price; },
+    x: SHOP_ROOM.cx + 5.5, z: SHOP_ROOM.cz - 2.2, rot: -Math.PI / 2 },
+  { key: 'lamp',     name: '스탠드 조명', emoji: '💡', get price() { return FURNITURE.lamp.price; },
+    x: SHOP_ROOM.cx + 5.5, z: SHOP_ROOM.cz - 1.25, rot: -Math.PI / 2 },
+  { key: 'plant',    name: '화분',        emoji: '🪴', get price() { return FURNITURE.plant.price; },
+    x: SHOP_ROOM.cx + 5.5, z: SHOP_ROOM.cz - 0.3, rot: -Math.PI / 2 },
+  { key: 'shelf',    name: '책장',        emoji: '📚', get price() { return FURNITURE.shelf.price; },
+    x: SHOP_ROOM.cx + 5.5, z: SHOP_ROOM.cz + 0.65, rot: -Math.PI / 2 },
+  { key: 'painting', name: '벽걸이 그림', emoji: '🖼', get price() { return FURNITURE.painting.price; },
+    x: SHOP_ROOM.cx + 5.5, z: SHOP_ROOM.cz + 1.6, rot: -Math.PI / 2 },
+  { key: 'window',   name: '창문',        emoji: '🪟', get price() { return FURNITURE.window.price; },
+    x: SHOP_ROOM.cx + 5.5, z: SHOP_ROOM.cz + 2.55, rot: -Math.PI / 2 },
+  { key: 'tv',       name: '텔레비전',    emoji: '📺', get price() { return FURNITURE.tv.price; },
+    x: SHOP_ROOM.cx + 5.5, z: SHOP_ROOM.cz + 3.5, rot: -Math.PI / 2 },
+  { key: 'kitchen',  name: '부엌 찬장',   emoji: '🍳', get price() { return FURNITURE.kitchen.price; },
+    x: SHOP_ROOM.cx + 4.2, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
 ];
 
 // 진열: 받침대 + 물건 + 가격표
@@ -1675,11 +1846,15 @@ const SHOP_GOODS = [
       item.scale.setScalar(0.55);   // 진열용은 아담하게
     }
     item.position.set(good.x, y0 + 0.16, good.z);
+    if (good.rot) item.rotation.y = good.rot;
     scene.add(item);
-    // 가격표 — 물건 위에 걸린 나무 팻말
+    // 가격표 — 물건 위에 걸린 나무 팻말 (벽 방향에 맞춰 돌립니다)
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.58),
       new THREE.MeshBasicMaterial({ map: makePriceSign(good.name, good.price) }));
-    sign.position.set(good.x, y0 + 2.0, good.z + 0.1);
+    const sdx = good.rot === -Math.PI / 2 ? -0.1 : 0;
+    const sdz = good.rot ? (good.rot === Math.PI ? -0.1 : 0) : 0.1;
+    sign.position.set(good.x + sdx, y0 + 2.0, good.z + sdz);
+    if (good.rot) sign.rotation.y = good.rot;
     scene.add(sign);
   }
 }
@@ -1688,13 +1863,13 @@ const SHOP_GOODS = [
 // 서쪽 벽을 따라 색 견본이 줄지어 있고, 마음에 드는 색 앞에서 F를 누르면
 // 그 색으로 집 안 바닥/벽이 바로 바뀝니다. (바꿀 때마다 시공비를 냅니다)
 const RENO_GOODS = [
-  { type: 'floor', name: '바닥', price: 50000,  colorName: '원목',     color: 0x9a7748, dz: -2.7 },
-  { type: 'floor', name: '바닥', price: 50000,  colorName: '밝은나무', color: 0xc9a86a, dz: -1.8 },
-  { type: 'floor', name: '바닥', price: 50000,  colorName: '현무암',   color: 0x8d8b85, dz: -0.9 },
-  { type: 'floor', name: '바닥', price: 50000,  colorName: '붉은흙',   color: 0x9a6a4d, dz: 0.0 },
-  { type: 'wall',  name: '벽지', price: 100000, colorName: '크림',     color: 0xf0e4c8, dz: 1.2 },
-  { type: 'wall',  name: '벽지', price: 100000, colorName: '하늘',     color: 0xa8c8e0, dz: 2.1 },
-  { type: 'wall',  name: '벽지', price: 100000, colorName: '연분홍',   color: 0xe8b8c0, dz: 3.0 },
+  { type: 'floor', name: '바닥', price: 4000000, colorName: '원목',     color: 0x9a7748, dz: -2.7 },
+  { type: 'floor', name: '바닥', price: 4000000, colorName: '밝은나무', color: 0xc9a86a, dz: -1.8 },
+  { type: 'floor', name: '바닥', price: 4000000, colorName: '현무암',   color: 0x8d8b85, dz: -0.9 },
+  { type: 'floor', name: '바닥', price: 4000000, colorName: '붉은흙',   color: 0x9a6a4d, dz: 0.0 },
+  { type: 'wall',  name: '벽지', price: 6000000, colorName: '크림',     color: 0xf0e4c8, dz: 1.2 },
+  { type: 'wall',  name: '벽지', price: 6000000, colorName: '하늘',     color: 0xa8c8e0, dz: 2.1 },
+  { type: 'wall',  name: '벽지', price: 6000000, colorName: '연분홍',   color: 0xe8b8c0, dz: 3.0 },
 ];
 let houseFloorColor = 0;   // 0 = 아직 기본 (폐가 흙바닥·돌벽)
 let houseWallColor = 0;
@@ -3948,7 +4123,10 @@ const ENDING_SAD = [
   '어느 아침, 낯선 고양이가 서류 가방을 들고 찾아왔다.',
   '"여기, 무허가 건물인 거 아시죠? 제가 이 땅 주인입니다."',
   '"비워주세요. 여기다 카페를 지을 겁니다. …오션뷰 카페요."',
-  '4,000만 원에 사서, 열심히 고치고 꾸민 내 집이… 루루는 눈앞이 캄캄해졌다. ㅠㅠ',
+  '그리고 그 뒤에 — 낯익은 밀짚모자가 서 있었다.',
+  '이 집을 4,000만 원에 판 사람. …이장님이었다.',
+  '"미안하게 됐네. 카페 개업하면… 음료는 한 잔 서비스함세."',
+  '4,000만 원에 사서, 1억을 들여 고치고 꾸민 내 집이… 루루는 눈앞이 캄캄해졌다. ㅠㅠ',
 ];
 // 아침마다 엔딩 차례가 됐는지 확인합니다. 엔딩이 나오는 아침에는 다른 알림을 쉽니다.
 function checkEndingMorning() {
@@ -4096,6 +4274,7 @@ function mayorTalkLines() {
     ['집은 좀 고쳐놨는가? 다 고치면 창고가 생겨 상자가 커진다네.'],
     ['자네 말, 요즘 눈빛이 다르던데? 경마에 한번 내보내 보게.'],
     ['바닥재랑 벽지도 들여놨네. 상점 왼쪽을 둘러보게.'],
+    ['자네 집 말인가? …좋은 집이지. 아무렴, 좋은 집이고말고.', '(이장님은 왠지 눈을 피했다)'],
   ];
   return idle[Math.floor(Math.random() * idle.length)];
 }
@@ -4128,7 +4307,7 @@ const INTRO_LINES = [
   '스무 살의 루루가 눈여겨본 서울의 작은 아파트는 5억이었다. "10년만 열심히 모으면, 대출 끼고 살 수 있을 거야."',
   '10년을 쉬지 않고 일하고, 아끼고, 모았다. 서른 살이 된 루루의 전 재산은 — 4,000만 원.',
   '그사이 그 아파트는 20억이 되어 있었다. 집값은 월급보다, 저축보다, 꿈보다 훨씬 빨랐다.',
-  '루루는 꿈을 접었다. 그리고 마지막 희망을 품고 — 전 재산을 털어, 제주 외딴 마을의 빈집 하나를 샀다.',
+  '루루는 꿈을 접었다. 그리고 마지막 희망을 품고 — 마을 이장이 소개해 준 제주 외딴 마을의 빈집 하나를, 전 재산을 털어 샀다. 서류가 좀 이상했지만… 가격만은 확실했다.',
   '집은 비가 새고, 전기는 끊겼고, 잡초는 허리까지 자라 있었다. 하지만 루루는 웃었다.',
   '"적어도… 여긴 내 집이다."',
   '서른 살, 루루의 두 번째 인생이 시작된다. 언젠가 이 낡은 집을 제주 최고의 집으로 만드는 것 — 그것이 루루의 새로운 꿈이다. 🍊',
@@ -4168,7 +4347,7 @@ const ACHIEVEMENTS = [
   { id: 'race5',   name: '경마왕',      desc: '경마 5승' },
   { id: 'love100', name: '단짝',        desc: '조랑말 애정 100 달성' },
   { id: 'house',   name: '내 집 마련',  desc: '돌집 수리를 끝냈다' },
-  { id: 'furn',    name: '아늑한 집',   desc: '가구 네 가지를 모두 들여놓았다' },
+  { id: 'furn',    name: '아늑한 집',   desc: '가구와 소품 12가지를 모두 들여놓았다' },
   { id: 'gold1',   name: '황금향!',     desc: '황금향을 처음 발견했다' },
   { id: 'octo1',   name: '문어 한탕',   desc: '문어를 처음 잡았다 (한 마리 5만원!)' },
   { id: 'rich',    name: '백만장자',    desc: '돈 1,000,000원 모으기' },
@@ -4277,7 +4456,7 @@ function loadGame() {
     }
   }
   // 가구 — 산 것들을 집 안에 다시 놓습니다
-  furnitureOwned = Object.assign({ bed: false, chair: false, table: false, closet: false }, d.furn || {});
+  furnitureOwned = Object.assign(emptyFurnOwned(), d.furn || {});
   applyFurniture();
   // 게임 시간과 말의 끼니
   if (typeof d.gameT === 'number') gameT = d.gameT;
