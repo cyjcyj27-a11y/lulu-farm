@@ -2458,6 +2458,7 @@ function doBuyShopGood(good, price, px, py, pz) {
       : good.key === 'window' ? '창문 구입! 시커먼 구멍에 창을 달았어요'
       : YARD_KEYS.has(good.key) ? `${good.name} 구입! 집 마당에 심어뒀어요`
       : `${good.name} 구입! 집 안에 놓아뒀어요`);
+    lonelyCheck();   // 집이 채워질수록 혼자라는 게 더 크게 느껴집니다
   }
 }
 // 지금 서 있는 자리에서 살 수 있는 물건 (없으면 null)
@@ -3621,6 +3622,17 @@ function updateRopeBadge() {
   if (typeof HALMANG_SPOT !== 'undefined' &&
       Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < HALMANG_RANGE) {
     ropeBadge.textContent = `해녀 할망과 이야기 (${KEY_ACTION})`;
+    return;
+  }
+  // 무남이 — 집 앞에서 마주쳤을 때
+  if (typeof munam !== 'undefined' &&
+      Math.hypot(state.x - munam.x, state.z - munam.z) < MUNAM_RANGE) {
+    const ignoring = romanceStage === 0 && coins < MUNAM_MIN_COINS;
+    ropeBadge.textContent = ignoring
+      ? `무남이에게 인사하기 (${KEY_ACTION})`
+      : (romanceUnlocked() > romanceStage
+        ? `무남이가 할 말이 있어 보여요 (${KEY_ACTION})`
+        : `무남이와 이야기 (${KEY_ACTION})`);
     return;
   }
   // 포구 가까이 오면 물질하러 들어가는 법을 알려줍니다 (망사리가 없으면 그것부터)
@@ -4857,6 +4869,339 @@ function updateMayor(dt, t) {
   mayorCard.scale.set(mirrorM ? -Wp : Wp, Hp, 1);
 }
 
+// ---------- 12-1f-2z. 무남이 (마을길의 백수 한량) ----------
+// 하는 일은 없는데 이상하게 품격이 있어 보이는 남자. 제주 촌구석에서도 매일 수트 차림입니다.
+// 루루가 집을 꾸며갈수록 한 단계씩 가까워지는데, 처음엔 젠틀하다가 갈수록
+// "오늘은 물질 안 가냐"는 재촉만 늘어납니다. 그래도 곁에 있으면 묘하게 기분이 좋습니다.
+// 무남이네 집 — 마을길 동쪽 끝. 백수인데 집은 그럴듯합니다.
+// 무남이는 이 집 앞을 좀처럼 벗어나지 않습니다 (갈 데가 없으니까).
+const MUNAM_HOUSE = { x: 26.0, z: 33.0 };
+const MUNAM_PATH = [                 // 자기 집 앞마당을 천천히 왕복합니다
+  { x: MUNAM_HOUSE.x - 3.4, z: MUNAM_HOUSE.z + 4.2 },
+  { x: MUNAM_HOUSE.x + 3.6, z: MUNAM_HOUSE.z + 4.6 },
+];
+const munam = {
+  x: MUNAM_PATH[0].x, z: MUNAM_PATH[0].z,
+  target: 1,
+  facing: 0,
+  pause: 0,        // 가끔 멈춰 서서 하늘을 봅니다 (하는 일이 없으니까)
+  group: null,
+};
+// 무남이가 대꾸를 해주기 시작하는 돈 — 이만큼은 모아야 사람 취급을 해줍니다.
+// (돈이 없으면 인사를 해도 "....." 하고 만다. 야박하지만 그게 이 남자입니다)
+const MUNAM_MIN_COINS = 10000000;
+let munamIgnored = 0;                // 몇 번이나 무시당했나 — 루루의 속마음이 조금씩 바뀝니다
+
+// 무남이네 돌집 — 루루의 헌집과 달리 처음부터 멀쩡합니다
+function buildMunamHouse() {
+  const g = new THREE.Group();
+  const y = groundHeight(MUNAM_HOUSE.x, MUNAM_HOUSE.z);
+  g.position.set(MUNAM_HOUSE.x, y, MUNAM_HOUSE.z);
+  const add = (mesh, px, py, pz) => {
+    mesh.position.set(px, py, pz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    g.add(mesh);
+    return mesh;
+  };
+  const W = 5.0, D = 3.6, H = 2.7;
+  add(new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.36), shopStoneMat), 0, H / 2, -D / 2);
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.36, H, D), shopStoneMat), -W / 2, H / 2, 0);
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.36, H, D), shopStoneMat), W / 2, H / 2, 0);
+  add(new THREE.Mesh(new THREE.BoxGeometry(1.5, H, 0.36), shopStoneMat), -1.75, H / 2, D / 2);
+  add(new THREE.Mesh(new THREE.BoxGeometry(1.5, H, 0.36), shopStoneMat), 1.75, H / 2, D / 2);
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.55, 0.36), shopStoneMat), 0, H - 0.28, D / 2);
+  // 닫힌 문 — 안이 들여다보이지 않습니다
+  add(new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.05, 0.12), shopWoodMat), 0, 1.03, D / 2 + 0.02);
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6),
+    new THREE.MeshLambertMaterial({ color: 0xb8892e, flatShading: true })), 0.62, 1.05, D / 2 + 0.1);
+  // 초가지붕
+  [[0.30, 3.55, 3.10, 0.78], [0.98, 2.95, 2.20, 0.72], [1.56, 2.00, 0.90, 0.78]].forEach(
+    ([dy, rBot, rTop, h]) => {
+      const tier = add(new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 8), shopThatchMat), 0, H + dy, 0);
+      tier.rotation.y = Math.PI / 8;
+    });
+  // 마당의 낡은 접이의자 — 무남이가 하루 종일 앉아 있는 자리
+  const chair = new THREE.Group();
+  chair.position.set(2.2, 0, D / 2 + 1.4);
+  g.add(chair);
+  const canvasMat = new THREE.MeshLambertMaterial({ color: 0x4a6a7a, flatShading: true });
+  const frameMat = new THREE.MeshLambertMaterial({ color: 0x8a6038, flatShading: true });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.07, 0.6), canvasMat);
+  seat.position.y = 0.42;
+  chair.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.6, 0.07), canvasMat);
+  back.position.set(0, 0.68, -0.28);
+  back.rotation.x = -0.34;
+  chair.add(back);
+  [[-0.28, -0.26], [0.28, -0.26], [-0.28, 0.26], [0.28, 0.26]].forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.42, 6), frameMat);
+    leg.position.set(lx, 0.21, lz);
+    chair.add(leg);
+  });
+  scene.add(g);
+  obstacles.push({ x: MUNAM_HOUSE.x, z: MUNAM_HOUSE.z, r: 3.2, topY: NO_JUMP });
+}
+buildMunamHouse();
+const MUNAM_SPEED = 1.15;            // 서두를 일이 없는 걸음
+const MUNAM_RANGE = 2.0;
+let romanceStage = 0;                // 0 = 아직 못 만남, 6 = 프로포즈까지
+let romanceSeen = {};                // 단계별 이벤트를 봤는지
+let lonelySeen = {};                 // 외로움 독백을 봤는지
+
+// 수트 입은 미남 — 갈색 줄무늬 고양이에 검은 쓰리피스, 흰 셔츠, 감색 넥타이.
+// (assets/farmcat/munam_idle.webp 를 넣으면 아래 3D 대신 그 그림이 쓰입니다)
+function buildMunam() {
+  const g = new THREE.Group();
+  const suit = new THREE.MeshLambertMaterial({ color: 0x232630, flatShading: true });
+  const shirt = new THREE.MeshLambertMaterial({ color: 0xf4f2ec, flatShading: true });
+  const tie = new THREE.MeshLambertMaterial({ color: 0x33455e, flatShading: true });
+  const fur = new THREE.MeshLambertMaterial({ color: 0x9c8a72, flatShading: true });      // 갈색 줄무늬
+  const cream = new THREE.MeshLambertMaterial({ color: 0xeae2d4, flatShading: true });    // 얼굴·발 흰 부분
+  const dark = new THREE.MeshLambertMaterial({ color: 0x1b1d24, flatShading: true });
+  const add = (mesh, px, py, pz, parent) => {
+    mesh.position.set(px, py, pz);
+    mesh.castShadow = true;
+    (parent || g).add(mesh);
+    return mesh;
+  };
+  // 다리 — 잘 빠진 정장 바지에 흰 양말 같은 발
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.1, 0.74, 8), suit), -0.13, 0.42, 0);
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.1, 0.74, 8), suit), 0.13, 0.42, 0);
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.11, 0.3), cream), -0.13, 0.06, 0.04);
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.11, 0.3), cream), 0.13, 0.06, 0.04);
+  // 상체 — 어깨가 넓은 재킷
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.72, 0.3), suit), 0, 1.13, 0);
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 0.12), shirt), 0, 1.17, 0.15);
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.34, 0.05), tie), 0, 1.23, 0.21);
+  // 팔 — 늘 주머니에 손을 꽂은 듯 느긋하게
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.08, 0.64, 8), suit), -0.34, 1.12, 0.02).rotation.z = 0.14;
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.08, 0.64, 8), suit), 0.34, 1.12, 0.02).rotation.z = -0.14;
+  // 꼬리 — 줄무늬 꼬리를 뒤로 늘어뜨립니다
+  const tail = new THREE.Group();
+  tail.position.set(0, 0.82, -0.16);
+  tail.rotation.x = -0.5;
+  g.add(tail);
+  for (let i = 0; i < 4; i++) {
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.045, 0.17, 6), i % 2 ? dark : fur),
+      0, -0.09 - i * 0.16, 0, tail);
+  }
+  // 머리 — 몸에 견주어 아담하게. 고양이 얼굴에 무쌍 눈매입니다
+  const head = new THREE.Group();
+  head.position.y = 1.62;
+  g.add(head);
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 12), fur), 0, 0, 0, head);
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), cream), 0, -0.05, 0.11, head).scale.set(1, 0.8, 0.55);
+  add(new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.15, 6), fur), -0.12, 0.2, 0, head).rotation.z = 0.28;
+  add(new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.15, 6), fur), 0.12, 0.2, 0, head).rotation.z = -0.28;
+  // 무쌍 — 쌍꺼풀 없이 가로로 길게 그은 눈
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.02, 0.02), dark), -0.075, 0.03, 0.2, head);
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.02, 0.02), dark), 0.075, 0.03, 0.2, head);
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), dark), 0, -0.04, 0.21, head);
+  // 살짝 넘긴 앞머리 — 품격은 여기서 나옵니다
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.213, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), dark), 0, 0.015, 0, head);
+  const blob = new THREE.Mesh(
+    new THREE.CircleGeometry(0.42, 20),
+    new THREE.MeshBasicMaterial({ color: 0x1d2b17, transparent: true, opacity: 0.36, depthWrite: false })
+  );
+  blob.rotation.x = -Math.PI / 2;
+  blob.position.y = 0.05;
+  g.add(blob);
+  g.userData.head = head;
+  scene.add(g);
+  return g;
+}
+munam.group = buildMunam();
+
+// 무남이 그림(스프라이트)이 준비되면 3D 대신 그 그림을 세웁니다.
+// assets/farmcat/munam_idle.webp 를 넣기만 하면 이 코드가 알아서 바꿔 답니다.
+const MUNAM_H = 1.85;
+let munamCard = null;
+(function tryMunamSheet() {
+  const img = new Image();
+  img.onload = () => {
+    // 그림 한 장이면 그대로, 가로로 긴 시트면 8칸짜리 애니메이션으로 봅니다
+    // (다른 캐릭터 시트도 전부 8칸이라 규격을 맞췄습니다)
+    const frames = img.width / img.height >= 2.4 ? 8 : 1;
+    loadSheet('munamIdle', 'munam_idle.webp', frames, img.width / frames);
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.translate(0, 0.5, 0);
+    munamCard = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      map: SHEETS.munamIdle.tex, transparent: true, alphaTest: 0.08,
+    }));
+    munamCard.userData.planeH = MUNAM_H * CELL_H / (CELL_H - CELL_PAD * 2);
+    munamCard.position.y = -(CELL_PAD / CELL_H) * munamCard.userData.planeH;
+    munam.group.add(munamCard);
+    // 그림이 붙었으니 3D 몸은 감춥니다 (그림자만 남깁니다)
+    for (const c of munam.group.children) {
+      if (c !== munamCard && c.type === 'Mesh' && c.geometry.type !== 'CircleGeometry') c.visible = false;
+      if (c.type === 'Group') c.visible = false;
+    }
+  };
+  img.onerror = () => {};   // 그림이 아직 없으면 3D 무남이 그대로
+  img.src = '../assets/farmcat/munam_idle.webp';
+})();
+
+// 집이 어디까지 꾸며졌는지로 만남의 단계가 열립니다
+function romanceUnlocked() {
+  const has = (k) => !!furnitureOwned[k];
+  if (!has('bed')) return 1;                                        // 아직 맨바닥 — 마을길에서 스치기만
+  if (!(has('kitchen') || has('sink'))) return 2;                   // 침대·식탁 — 집 앞까지 옵니다
+  if (!(has('sofa') && has('tv'))) return 3;                        // 부엌 — 밥을 얻어먹습니다
+  if (!YARD_KEYS.has('palm') || !has('palm') || !has('lawn')) return 4;  // 거실 — 눌러앉습니다
+  if (!dreamDone()) return 5;                                       // 마당 — 바닷가에 데려갑니다
+  return 6;                                                         // 다 갖춘 집 — 프로포즈
+}
+
+const MUNAM_LINES = {
+  // 1. 마을길에서 처음 스칠 때 — 아직 이름도 모릅니다
+  1: ['루루: 안녕하세요.',
+      '"…음."',
+      '(처음으로 대답이 돌아왔다)',
+      '"인생 뭐 있냥…\n오늘도 바람 좋네."',
+      '루루: 잘생겼다.',
+      '루루: 근데 왜 이제 와서 아는 척이지.'],
+  // 2. 집 앞에 찾아옵니다 — 여기서부터 젠틀합니다
+  2: ['"이 집에 사는 사람이 당신이오?"',
+      '"혼자 고치는 모양이던데. 대단하군."',
+      '"나는 무남이라 하오.\n하는 일은… 뭐, 특별히 없소."',
+      '(마을 사람들도 무남이가 무슨 일을 하는지 모른다고 했다)',
+      '루루: 백수면 어때.\n나도 혼자 살고 있는데.'],
+  // 3. 부엌이 생기자 밥을 얻어먹습니다
+  3: ['"부엌이 훌륭하군. 이런 건 아무나 못 갖추지."',
+      '"…배가 좀 고픈데."',
+      '(무남이는 루루가 차린 밥상을 아주 맛있게 먹었다)',
+      '"잘 먹었소. 손맛이 좋군."',
+      '루루: 얻어먹으면서 저렇게 당당할 일인가.\n…근데 왜 기분이 좋지.'],
+  // 4. 거실이 생기자 눌러앉습니다
+  4: ['"소파가 편안하군. 낮잠 자기 딱 좋겠어."',
+      '(무남이는 정말로 낮잠을 잤다)',
+      '"…그런데 너 오늘은 물질하러 안 가냐?"',
+      '루루: 방금 자고 일어난 사람이 할 말인가.',
+      '루루: 그런데 이 집에 누가 있다는 게…\n생각보다 나쁘지 않다.'],
+  // 5. 마당이 완성되자 바닷가로 데려갑니다
+  5: ['"오늘은 바다나 보러 가지."',
+      '(둘은 말없이 바닷가를 걸었다)',
+      '"…나는 가진 게 없소."',
+      '"그래도 옆에 있는 건 할 수 있지."',
+      '(무남이가 루루의 이마에 입을 맞췄다)',
+      '루루: 포장이 저 정도면……\n한 번 만나볼 만하지 않나?'],
+  // 6. 집이 완성되자 프로포즈합니다
+  6: ['"집이 다 됐군. 참 좋은 집이오."',
+      '"…이 집에서, 나랑 같이 살지 않겠소?"',
+      '(무남이는 반지 대신 귤 하나를 내밀었다)',
+      '"반지는… 다음 달에 사주겠소."',
+      '루루: 다음 달에 무슨 돈이 생기는데.',
+      '루루: 그래도… 좋다고 해버렸다.'],
+};
+// 단계가 열린 뒤 말을 걸면 나오는 잡담 — 갈수록 재촉만 늘어납니다
+const MUNAM_IDLE = {
+  1: ['"좋은 날씨군."'],
+  2: ['"오늘 날씨가 참 좋군."', '"이런 날은 아무것도 안 하기 좋지."'],
+  3: ['"밥은 먹었소?"', '"…나는 아직인데."'],
+  4: ['"너 오늘은 물질하러 안 가냐?"', '"말밥은 줬니."'],
+  5: ['"경마 우승상금이 얼마라 그랬지?"', '"아니, 그냥 궁금해서 물어본 거요."'],
+  6: ['"오늘 귤은 몇 상자 부쳤소?"', '"…사랑하오. 그건 그거고."'],
+};
+
+// 무시당할 때 — 인사를 해도 대답이 없습니다. 거절당하는 장면입니다.
+const MUNAM_IGNORE = [
+  ['루루: 안녕하세요.',
+   '"....."',
+   '(무남이는 대답하지 않았다)'],
+  ['루루: …안녕하세요.',
+   '"....."',
+   '(들리지 않는 걸까)'],
+  ['루루: 저기, 안녕하세요.',
+   '"....."',
+   '(무남이는 하늘만 보고 있었다)',
+   '루루: 내가 뭐가 부족해서.'],
+  ['루루: (오늘은 그냥 지나가자)',
+   '"....."',
+   '루루: 돈부터 벌어야겠다.'],
+];
+
+function munamTalk() {
+  // 돈이 없으면 인사를 해도 받아주지 않습니다.
+  // 야박하지만, 루루가 돈을 벌어야 할 이유가 하나 더 생기는 셈입니다.
+  if (romanceStage === 0 && coins < MUNAM_MIN_COINS) {
+    const lines = MUNAM_IGNORE[Math.min(munamIgnored, MUNAM_IGNORE.length - 1)];
+    munamIgnored++;
+    startTalk('무남이', lines, () => saveGame(true));
+    return;
+  }
+  const open = romanceUnlocked();
+  // 아직 못 본 단계가 있으면 그 이야기부터 들려줍니다
+  if (open > romanceStage) {
+    const next = romanceStage + 1;
+    romanceStage = next;
+    romanceSeen[next] = true;
+    startTalk('무남이', MUNAM_LINES[next] || ['"…"'], () => {
+      saveGame(true);
+      checkAchievements();
+    });
+    return;
+  }
+  const lines = MUNAM_IDLE[Math.max(1, romanceStage)] || ['"…"'];
+  startTalk('무남이', lines);
+}
+
+function updateMunam(dt, t) {
+  if (!munam.group) return;
+  // 집 안이나 물속에 있으면 굳이 그리지 않습니다
+  munam.group.visible = !state.inside && !state.inShop && !state.diving;
+  if (!munam.group.visible) return;
+  const dest = MUNAM_PATH[munam.target];
+  const dx = dest.x - munam.x, dz = dest.z - munam.z;
+  const d = Math.hypot(dx, dz);
+  // 루루가 가까이 오면 멈춰 서서 마주 봅니다
+  const near = Math.hypot(state.x - munam.x, state.z - munam.z) < 4.5;
+  if (near) {
+    munam.facing = Math.atan2(state.x - munam.x, state.z - munam.z);
+  } else if (munam.pause > 0) {
+    munam.pause -= dt;                       // 하늘을 보는 중입니다
+  } else if (d < 0.6) {
+    munam.target = (munam.target + 1) % MUNAM_PATH.length;
+    munam.pause = 2.5 + Math.random() * 3.5;
+  } else {
+    munam.x += dx / d * MUNAM_SPEED * dt;
+    munam.z += dz / d * MUNAM_SPEED * dt;
+    munam.facing = Math.atan2(dx, dz);
+  }
+  const gy = groundHeight(munam.x, munam.z);
+  munam.group.position.set(munam.x, gy, munam.z);
+  munam.group.rotation.y = munam.facing;
+  // 걸을 때 몸이 살짝 오르내리고, 서 있을 땐 숨 쉬듯 아주 조금 움직입니다
+  const moving = !near && munam.pause <= 0 && d >= 0.6;
+  munam.group.position.y = gy + (moving ? Math.abs(Math.sin(t * 4.4)) * 0.045 : Math.sin(t * 1.5) * 0.012);
+  if (munam.group.userData.head) {
+    munam.group.userData.head.rotation.x = moving ? 0 : Math.sin(t * 0.5) * 0.12;   // 가끔 하늘을 봅니다
+  }
+  // 그림을 붙였으면 칸을 넘겨 움직이게 하고, 카메라를 향해 세워둡니다
+  if (munamCard) {
+    const sheet = SHEETS.munamIdle;
+    if (sheet.frames > 1) setCell(sheet, Math.floor(t * 6) % sheet.frames);
+    const Hp = munamCard.userData.planeH;
+    munamCard.scale.set(Hp * sheet.frameW / CELL_H, Hp, 1);
+    munam.group.rotation.y = camYaw;   // 판이 늘 정면으로 보이게
+  }
+}
+
+// 집을 꾸며갈수록 혼자라는 게 더 크게 느껴집니다 — 가구를 살 때마다 가끔 새어 나오는 속마음
+const LONELY_LINES = {
+  3: '이 큰 집에 나 혼자.',
+  6: '밥상을 차려도\n마주 앉을 사람이 없다.',
+  10: '집은 점점 좋아지는데\n어쩐지 더 조용해진다.',
+  14: '언제까지 혼자 살 순 없잖아.',
+};
+function lonelyCheck() {
+  const owned = FURN_ORDER.filter((k) => furnitureOwned[k]).length;
+  const line = LONELY_LINES[owned];
+  if (!line || lonelySeen[owned]) return;
+  lonelySeen[owned] = true;
+  setTimeout(() => spawnMoneyPopup(state.x, lulu.position.y + 2.2, state.z, line, 5, 'big'), 1200);
+}
+
 // ---------- 12-1f-2a. 게임 시간 — 해가 뜨고 지는 하루, 그리고 말의 끼니 ----------
 // 하루는 10분. 해뜰녘에 하루가 바뀌면서 "말에게 당근을 주세요" 알림이 옵니다.
 // 당근은 얼마든지 줘도 되지만, 하루에 한 번은 꼭 줘야 합니다:
@@ -5410,6 +5755,7 @@ function saveGame(quiet) {
       endingState, happyDay,
       floorC: houseFloorColor, wallC: houseWallColor, paintC: housePaintColor,
       stat, achieved,
+      romanceStage, romanceSeen, lonelySeen, munamIgnored,
     }));
     if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '저장했어요');
   } catch (e) { /* 시크릿 창 등에서는 저장이 막힐 수 있습니다 */ }
@@ -5441,6 +5787,11 @@ function loadGame() {
   // 가구 — 산 것들을 집 안에 다시 놓습니다
   furnitureOwned = Object.assign(emptyFurnOwned(), d.furn || {});
   applyFurniture();
+  // 무남이와 어디까지 왔는지
+  romanceStage = d.romanceStage || 0;
+  romanceSeen = d.romanceSeen || {};
+  lonelySeen = d.lonelySeen || {};
+  munamIgnored = d.munamIgnored || 0;
   // 게임 시간과 말의 끼니
   if (typeof d.gameT === 'number') gameT = d.gameT;
   dayCount = d.dayCount || 1;
@@ -5567,6 +5918,7 @@ function buildMapBase() {
   label(STABLE.x, STABLE.z, '🐴', '마구간');
   label(HOUSE.x, HOUSE.z, '🏠', houseStage >= 3 ? '내 집' : '헌집');
   label(PORT.x, PORT.z, '⚓', '포구');
+  label(MUNAM_HOUSE.x, MUNAM_HOUSE.z, '🤵', '무남이네');
   return c;
 }
 
@@ -5871,6 +6223,11 @@ function handleActionKey() {
   }
   if (Math.hypot(state.x - HALMANG_SPOT.x, state.z - HALMANG_SPOT.z) < HALMANG_RANGE) {
     halmangTalk();
+    return;
+  }
+  if (!state.inside && !state.inShop &&
+      Math.hypot(state.x - munam.x, state.z - munam.z) < MUNAM_RANGE) {
+    munamTalk();
     return;
   }
   const carrotDist = Math.hypot(state.x - CARROT_SPOT.x, state.z - CARROT_SPOT.z);
@@ -6368,6 +6725,7 @@ function animate() {
   updateDayNight(dt); // 해가 뜨고 지고, 아침마다 하루가 바뀝니다
   updatePony(t);      // 조랑말 — 오늘 먹였으면 웃고, 굶었으면 웁니다
   updateHalmang();    // 해녀 할망 — 포구 옆에 앉아 있습니다
+  updateMunam(dt, t); // 무남이 — 마을길을 느긋하게 왕복합니다
   updateHouse(dt);    // 집 고치는 동작이 끝나면 수리 단계를 올립니다
   updateMayor(dt, t); // 이장님이 상점과 택배사 사이를 오갑니다
   updateCarrotFx(dt); // 먹인 당근이 조랑말 입가에서 냠냠 사라집니다
