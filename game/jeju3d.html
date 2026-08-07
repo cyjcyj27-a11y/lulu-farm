@@ -174,6 +174,22 @@
   #bookList .ach.on { background: rgba(217,121,60,.14); }
   #bookList .ach.on b { color: #b3541e; }
   #bookList .ach.on span { color: #6b5537; }
+  /* ---- 가방(아이템) — 가진 것만 작은 아이콘 + 개수로 ---- */
+  #bookList .bagMoney {
+    text-align: center; font-size: 19px; font-weight: 800;
+    color: #7a5c1e; text-shadow: none; margin-bottom: 12px;
+  }
+  #bookList .bagGrid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  #bookList .bagItem {
+    width: 66px; padding: 9px 2px 7px; position: relative;
+    background: rgba(217,121,60,.14); border-radius: 12px; text-align: center;
+  }
+  #bookList .bagItem .em { font-size: 27px; line-height: 1; }
+  #bookList .bagItem .nm { font-size: 10.5px; color: #6b5537; text-shadow: none; margin-top: 5px; }
+  #bookList .bagItem .ct {
+    position: absolute; top: 2px; right: 5px;
+    font-size: 12px; font-weight: 800; color: #b3541e; text-shadow: none;
+  }
 
   /* ---- 대화 카드 — 이장님·돌하르방과 이야기 ---- */
   #talkBox {
@@ -452,7 +468,7 @@
 
   <div id="iconRow">
     <button class="ibtn" id="btnSave" title="저장하기">💾</button>
-    <button class="ibtn" id="bookBadge" title="가방 (갖고 있는 아이템)">🎒</button>
+    <button class="ibtn" id="bookBadge" title="자산 (갖고 있는 아이템)">🎒</button>
     <button class="ibtn" id="mapBadge" title="지도 (M)">
       <!-- 제주도를 단순화한 모양: 동서로 길쭉한 섬 가운데에 한라산이 볼록 -->
       <svg width="24" height="15" viewBox="0 0 48 30" aria-hidden="true">
@@ -541,6 +557,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=106"></script>
+<script src="jeju3d.js?v=107"></script>
 </body>
 </html>
