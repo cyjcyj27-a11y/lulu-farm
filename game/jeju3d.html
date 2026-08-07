@@ -50,6 +50,8 @@
      글자를 키우고, 바탕을 진하게, 노란 테두리로 상태 배지들과 구분합니다. */
   #ropeBadge {
     bottom: 66px;
+    /* 안내 글 속의 줄바꿈(\n)이 화면에서도 보이고, 단어 중간에서 줄이 끊기지 않게 */
+    white-space: pre-line; word-break: keep-all;
     font-size: 15.5px; font-weight: 600; line-height: 1.45;
     color: #fff8ea;
     background: rgba(10, 18, 28, .78);
@@ -598,6 +600,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=125"></script>
+<script src="jeju3d.js?v=126"></script>
 </body>
 </html>

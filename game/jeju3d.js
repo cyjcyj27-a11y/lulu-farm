@@ -3607,7 +3607,8 @@ function updateRopeBadge() {
       ropeBadge.textContent = '🤿 축대 끝까지 걸어나가면 물질하러 들어갈 수 있어요';
     } else {
       ropeBadge.textContent = netCarried
-        ? `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다`
+        ? `🤿 ${KEY_ACTION}을 누르면 바다로 물질하러 들어갑니다` +
+          (isNight() ? '\n밤 물질은 수확 2배! 대신 숨이 빨리 차요' : '')
         : (hasNet
           ? '🧺 망사리를 두고 왔어요 — 메고 와야 물질할 수 있어요'
           : `🧺 망사리가 있어야 물질합니다 — 상점 안에서 ${NET_PRICE.toLocaleString()}원`);
@@ -4315,7 +4316,9 @@ function enterDive() {
   state.idleTime = 0; state.sit = 0;
   applyDiveLook();
   updateDiveUI();
-  spawnMoneyPopup(state.x, SEA_Y + 1.5, state.z, '🤿 물질 시작! 숨 조심하세요');
+  spawnMoneyPopup(state.x, SEA_Y + 1.5, state.z, isNight()
+    ? '밤 물질 시작! 수확은 2배\n대신 숨이 더 빨리 차올라요'
+    : '🤿 물질 시작! 숨 조심하세요');
 }
 
 // 뭍으로 나오면서 딴 것을 전부 팝니다.
@@ -4425,9 +4428,13 @@ function tryCollect() {
   state.pickT = 0;                       // 손 뻗어 떼어내는 동작 시작
   hideCatch(i);
   net.push(s.kind);
+  // 밤 물질 보너스 — 같은 것을 한 번에 두 개 땁니다 (망사리에 자리가 남았을 때만)
+  const nightDouble = isNight() && net.length < NET_CAP;
+  if (nightDouble) net.push(s.kind);
   playPickSound();
   updateDiveUI();
-  spawnMoneyPopup(s.x, s.y + 0.6, s.z, CATCH_KINDS[s.kind].name);
+  spawnMoneyPopup(s.x, s.y + 0.6, s.z,
+    nightDouble ? `${CATCH_KINDS[s.kind].name} ×2 (밤 물질)` : CATCH_KINDS[s.kind].name);
   state.idleTime = 0;
 }
 
@@ -4494,7 +4501,8 @@ function updateDiving(dt) {
       if (state.vy > 0.3) state.vy = 0.3;
     }
   } else {
-    breath -= dt;
+    // 밤에는 물이 차고 어두워 숨이 1.5배 빨리 닳습니다 (밤 물질 2배 수확의 대가)
+    breath -= dt * (isNight() ? 1.5 : 1);
     if (breath <= 0) {
       breath = 0;
       drowning = 4.2;                                   // 정신을 잃습니다 — 문구를 읽을 만큼 천천히 가라앉습니다
