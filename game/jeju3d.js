@@ -4257,17 +4257,20 @@ function updateDiveUI() {
 
 // 물속과 뭍은 안개 색과 빛만 바꿔도 완전히 다른 곳처럼 보입니다
 const LAND_FOG = { color: 0xd2e6ee, near: 150, far: 700, sun: 2.1 };
+// 물빛 — 수면 가까이는 볕이 들어 밝은 청록, 깊이 내려갈수록 짙푸르게 잠깁니다
+const SEA_SHALLOW = new THREE.Color(0x1d7d92);
+const SEA_DEEP = new THREE.Color(0x093243);
 function applyDiveLook() {
   if (state.diving) {
-    scene.fog.color.setHex(0x0e4356);   // 짙은 물빛
+    scene.fog.color.copy(SEA_SHALLOW);
     scene.fog.near = 1;
-    scene.fog.far = 34;                 // 멀리 못 보게 해서 물속 답답함을 냅니다
-    sun.intensity = 0.45;               // 물속은 볕이 잘 안 듭니다
-    hemi.intensity = 0.75;
+    scene.fog.far = 40;                 // 멀리 못 보게 해서 물속 답답함을 냅니다
+    sun.intensity = 0.75;               // 물속은 볕이 잘 안 들지만, 아주 캄캄하면 아무것도 안 보입니다
+    hemi.intensity = 1.0;
     // 하늘·구름·나비·성산일출봉을 감춥니다. 물속에서 이것들이 비치면
     // 물이 유리처럼 투명해 보여서 "잠수했다"는 느낌이 사라집니다.
     // 하늘을 그냥 끄면 그 자리가 시커먼 빈 공간으로 남으므로, 화면 바탕을 물빛으로 칠해둡니다.
-    scene.background = new THREE.Color(0x0e4356);
+    scene.background = SEA_SHALLOW.clone();
     sky.visible = false;
     for (const o of skyStuff) o.visible = false;
     for (const c of clouds) c.visible = false;
@@ -4451,6 +4454,24 @@ const deathOverlay = document.getElementById('deathOverlay');
 // 아무 변화가 없어서 "키가 안 먹는다"고 느껴집니다. 작은 티끌들이 곁을
 // 스쳐 지나가면 내가 어느 쪽으로 얼마나 움직이는지 눈에 보입니다.
 let motes = null;
+// 점(Points)은 그냥 두면 네모로 그려집니다. 물속 티끌·기포가 흰 사각형으로 보이면
+// 아주 어색하므로, 가장자리가 부드럽게 흐려지는 동그란 그림을 만들어 씌웁니다.
+function makeRoundSprite() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.45, 'rgba(255,255,255,0.85)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.beginPath();
+  g.arc(32, 32, 32, 0, Math.PI * 2);
+  g.fill();
+  const t = new THREE.CanvasTexture(c);
+  return t;
+}
+const ROUND_SPRITE = makeRoundSprite();
 function buildMotes() {
   const n = 140, pos = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
@@ -4462,12 +4483,149 @@ function buildMotes() {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   motes = new THREE.Points(g, new THREE.PointsMaterial({
-    color: 0xcdeae6, size: 0.11, transparent: true, opacity: 0.5, sizeAttenuation: true,
+    color: 0xcdeae6, size: 0.15, transparent: true, opacity: 0.6,
+    map: ROUND_SPRITE, alphaTest: 0.02,
+    sizeAttenuation: true, depthWrite: false,
   }));
   motes.visible = false;
   scene.add(motes);
 }
 buildMotes();
+
+// ---------- 물속 풍경 — 빛줄기·기포·해초 ----------
+// 안개 색 하나만으로는 "불 꺼진 방"처럼 보입니다. 물속답게 보이려면 겹이 필요합니다:
+// 수면에서 비스듬히 내려오는 빛줄기, 떠오르는 기포, 앞뒤로 겹친 해초.
+// 폰에서도 돌아가도록 전부 단순한 판·점으로만 만듭니다.
+let seaRays = null, bubbles = null, weeds = null;
+const bubbleData = [];
+const weedData = [];
+
+function buildSeaRays() {
+  seaRays = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xbdf0f4, transparent: true, opacity: 0.16,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
+  });
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + Math.random() * 0.4;
+    const rr = 3 + Math.random() * (DIVE.r - 5);
+    // 위는 넓고 아래는 좁은 사다리꼴 판 — 수면에서 쏟아지는 빛기둥
+    const w = 1.6 + Math.random() * 2.4;
+    const g = new THREE.PlaneGeometry(w, DIVE_DEPTH + 3);
+    const p = g.attributes.position;
+    for (let v = 0; v < p.count; v++) {
+      if (p.getY(v) < 0) p.setX(v, p.getX(v) * 0.35);   // 아래쪽을 좁혀 빛기둥 모양으로
+    }
+    p.needsUpdate = true;
+    // 빛줄기마다 따로 일렁이게 하려면 재질을 각자 하나씩 가져야 합니다
+    const m = new THREE.Mesh(g, mat.clone());
+    m.position.set(DIVE.x + Math.cos(a) * rr, SEA_Y - DIVE_DEPTH * 0.45, DIVE.z + Math.sin(a) * rr);
+    m.rotation.set(0.22 + Math.random() * 0.1, a, 0);   // 비스듬히 기울여 내리꽂히게
+    m.userData.spin = a;
+    seaRays.add(m);
+  }
+  seaRays.visible = false;
+  scene.add(seaRays);
+}
+
+function buildBubbles() {
+  const n = 90, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * DIVE.r;
+    const x = DIVE.x + Math.cos(a) * rr, z = DIVE.z + Math.sin(a) * rr;
+    const y = SEA_Y - Math.random() * DIVE_DEPTH;
+    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+    bubbleData.push({ x, z, speed: 0.35 + Math.random() * 0.75, sway: Math.random() * Math.PI * 2 });
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  bubbles = new THREE.Points(g, new THREE.PointsMaterial({
+    color: 0xdff4f8, size: 0.2, transparent: true, opacity: 0.55,
+    map: ROUND_SPRITE, alphaTest: 0.02,
+    sizeAttenuation: true, depthWrite: false, fog: false,
+  }));
+  bubbles.visible = false;
+  scene.add(bubbles);
+}
+
+function buildWeeds() {
+  weeds = new THREE.Group();
+  // 물속은 볕이 약해 그림자 지는 재질을 쓰면 새까맣게 묻힙니다.
+  // 빛을 안 타는 재질에 밝은 물풀 색을 직접 입혀야 형체가 보입니다.
+  const mats = [
+    new THREE.MeshBasicMaterial({ color: 0x1f6b57, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ color: 0x2a7a48, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ color: 0x4a7a33, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
+  ];
+  // 미역 잎 한 장 — 밑동은 넓고 끝으로 갈수록 가늘어지며 살짝 휩니다.
+  // (그냥 네모 판을 세우면 초록 막대기처럼 보여서 물풀로 안 보입니다)
+  function makeBlade(w, h) {
+    const g = new THREE.PlaneGeometry(w, h, 1, 6);
+    const p = g.attributes.position;
+    for (let v = 0; v < p.count; v++) {
+      const ratio = (p.getY(v) + h / 2) / h;          // 0 = 밑동, 1 = 잎끝
+      p.setX(v, p.getX(v) * (1 - ratio * 0.82));      // 끝으로 갈수록 가늘게
+      p.setY(v, p.getY(v) + h / 2);                   // 밑동을 원점에 맞춥니다
+      p.setZ(v, p.getZ(v) + ratio * ratio * h * 0.18); // 물살에 밀린 듯 살짝 휘게
+    }
+    p.needsUpdate = true;
+    g.computeVertexNormals();
+    return g;
+  }
+  for (let i = 0; i < 34; i++) {
+    const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * (DIVE.r - 3);
+    const x = DIVE.x + Math.cos(a) * rr, z = DIVE.z + Math.sin(a) * rr;
+    const gy = groundHeight(x, z);
+    if (gy > SEA_Y - 2.5) continue;   // 물이 얕은 가장자리에는 심지 않습니다 (수면 위로 솟아 보입니다)
+    // 한 포기에서 잎 서너 장이 부챗살처럼 뻗어 나옵니다
+    const clump = new THREE.Group();
+    clump.position.set(x, gy, z);
+    const mat = mats[i % mats.length];
+    const blades = 3 + Math.floor(Math.random() * 2);
+    for (let b = 0; b < blades; b++) {
+      const h = 1.2 + Math.random() * 2.2;
+      const m = new THREE.Mesh(makeBlade(0.3 + Math.random() * 0.22, h), mat);
+      m.rotation.y = (b / blades) * Math.PI * 2 + Math.random() * 0.5;
+      m.rotation.z = (Math.random() - 0.5) * 0.4;     // 제각기 다른 쪽으로 기울어지게
+      clump.add(m);
+    }
+    weeds.add(clump);
+    weedData.push({ mesh: clump, phase: Math.random() * Math.PI * 2, amp: 0.08 + Math.random() * 0.13 });
+  }
+  weeds.visible = false;
+  scene.add(weeds);
+}
+buildSeaRays();
+buildBubbles();
+buildWeeds();
+
+// 물속 풍경을 살아 움직이게 합니다 — 기포는 떠오르고, 해초는 물결에 흔들리고,
+// 빛줄기는 수면 물결처럼 아주 천천히 일렁입니다.
+function updateSeaScenery(dt, t) {
+  if (bubbles) {
+    const p = bubbles.geometry.attributes.position;
+    for (let i = 0; i < bubbleData.length; i++) {
+      const b = bubbleData[i];
+      let y = p.getY(i) + b.speed * dt;
+      if (y > SEA_Y - 0.15) {                       // 수면에 닿으면 바닥에서 다시 올라옵니다
+        y = SEA_Y - DIVE_DEPTH + Math.random() * 0.8;
+      }
+      p.setY(i, y);
+      p.setX(i, b.x + Math.sin(t * 0.8 + b.sway) * 0.12);   // 오르며 살랑살랑
+      p.setZ(i, b.z + Math.cos(t * 0.7 + b.sway) * 0.12);
+    }
+    p.needsUpdate = true;
+  }
+  for (const w of weedData) {
+    w.mesh.rotation.z = Math.sin(t * 0.9 + w.phase) * w.amp;
+    w.mesh.rotation.x = Math.cos(t * 0.6 + w.phase) * w.amp * 0.5;
+  }
+  if (seaRays) {
+    for (const m of seaRays.children) {
+      m.material.opacity = 0.12 + (Math.sin(t * 0.55 + m.userData.spin) + 1) * 0.045;
+    }
+  }
+}
 
 function updateDiving(dt) {
   if (state.pickT >= 0) {
@@ -4475,6 +4633,10 @@ function updateDiving(dt) {
     if (state.pickT >= PICK_DURATION) state.pickT = -1;
   }
   if (motes) motes.visible = state.diving;
+  if (seaRays) seaRays.visible = state.diving;
+  if (bubbles) bubbles.visible = state.diving;
+  if (weeds) weeds.visible = state.diving;
+  if (state.diving) updateSeaScenery(dt, performance.now() * 0.001);
   if (!state.diving) { if (vignette) vignette.style.opacity = 0; return; }
   const atSurface = lulu.position.y > SEA_Y - 1.2;
 
@@ -4523,10 +4685,15 @@ function updateDiving(dt) {
     for (const o of skyStuff) o.visible = true;
     for (const c of clouds) c.visible = true;
   } else {
-    // 물속으로 들어가면 다시 짙고 답답한 물빛으로
-    scene.fog.color.setHex(0x0e4356);
+    // 물속 — 얕은 곳은 볕이 들어 밝고, 깊이 내려갈수록 짙푸르게 잠깁니다.
+    // 이 깊이 그라데이션이 "얼마나 깊이 왔는지"를 눈으로 알려줍니다.
+    const depth = Math.min(1, Math.max(0, (SEA_Y - lulu.position.y) / DIVE_DEPTH));
+    scene.fog.color.copy(SEA_SHALLOW).lerp(SEA_DEEP, depth);
+    if (scene.background && scene.background.copy) {
+      scene.background.copy(SEA_SHALLOW).lerp(SEA_DEEP, depth);
+    }
     scene.fog.near = 1;
-    scene.fog.far = 34 - (breathLow ? (1 - ratio / BREATH_LOW) * 16 : 0);
+    scene.fog.far = (40 - depth * 12) - (breathLow ? (1 - ratio / BREATH_LOW) * 16 : 0);
     for (const o of skyStuff) o.visible = false;
     for (const c of clouds) c.visible = false;
   }
