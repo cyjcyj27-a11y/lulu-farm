@@ -2766,7 +2766,8 @@ const LULU_MODEL_YAW = 0;                 // 모델 원본이 보는 방향 보�
 async function loadLuluModel() {
   try {
     // 모델 파일을 갈아끼우면 뒤의 ?v= 숫자도 올려야 합니다 (서비스워커가 옛것을 물고 있지 않게)
-    const buf = await (await fetch('../assets/lulu.glb?v=7')).arrayBuffer();
+    // 지금 입은 옷: 스팀펑크 탐험가. 농부 차림으로 되돌리려면 'lulu.glb?v=7'로 바꾸면 됩니다.
+    const buf = await (await fetch('../assets/lulu_steampunk.glb')).arrayBuffer();
     const dv = new DataView(buf);
     if (dv.getUint32(0, true) !== 0x46546c67) return;       // 'glTF' 서명 확인
     const jsonLen = dv.getUint32(12, true);
