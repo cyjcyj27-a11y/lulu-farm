@@ -2795,7 +2795,10 @@ async function loadLuluModel() {
     tex.flipY = false;                       // GLB의 그림 좌표는 위아래 기준이 반대입니다
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
-    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
+    // 이 텍스처는 명암(그림자·음영)이 이미 그려져 있습니다. 게임 조명을 또 얹으면
+    // 음영이 두 번 겹쳐 때 묻은 것처럼 보여서, 종이 인형들과 똑같이 "조명 없이 원색 그대로" 그립니다.
+    // (생성 도구의 미리보기와 같은 방식입니다)
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
     mesh.castShadow = true;                  // 모델은 종이 인형과 달리 진짜 그림자를 드리웁니다
     // 발끝이 y=0에 닿고 키가 SPRITE_H가 되게 맞춥니다
     geo.computeBoundingBox();
