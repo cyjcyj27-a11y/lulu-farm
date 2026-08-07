@@ -4323,6 +4323,12 @@ function leaveDive(reason) {
     const lostCoins = coins;
     coins = 0;
     stat.drowns++;
+    // 망사리도 바다에 놓칩니다 — 물질을 다시 하려면 상점에서 새로 사야 합니다.
+    // 돈까지 잃은 판이라, 그 돈은 귤을 따서 벌 수밖에 없습니다.
+    const lostNet = hasNet;
+    hasNet = false;
+    netCarried = false;
+    if (netObj) netObj.visible = false;
     updateCoinBadge();
     saveGame(true);
     checkAchievements();
@@ -4335,6 +4341,10 @@ function leaveDive(reason) {
     if (lost > 0) {
       setTimeout(() => spawnMoneyPopup(BULTEOK.x, py + 0.9, BULTEOK.z,
         `망사리에 담았던 ${lost}개도 바다에 흘렸습니다`, 5), 2600);
+    }
+    if (lostNet) {
+      setTimeout(() => spawnMoneyPopup(BULTEOK.x, py + 1.8, BULTEOK.z,
+        `망사리도 놓쳤어요\n다시 물질하려면 상점에서 사야 해요 (${formatWon(NET_PRICE)})`, 6), 4200);
     }
   } else if (caught > 0) {
     coins += pay;
