@@ -2323,8 +2323,8 @@ const conchMat = new THREE.MeshLambertMaterial({ color: 0xd9b98c, flatShading: t
     g2.fillStyle = '#f0e4c8'; g2.fillRect(0, 0, 320, 110);
     g2.strokeStyle = '#8a6038'; g2.lineWidth = 8; g2.strokeRect(4, 4, 312, 102);
     g2.fillStyle = '#2b1a0c'; g2.textAlign = 'center';
-    g2.font = '900 56px "맑은 고딕", Malgun Gothic, sans-serif';
-    g2.fillText('🤿 물질', 160, 74);
+    g2.font = '900 44px "맑은 고딕", Malgun Gothic, sans-serif';
+    g2.fillText('🤿 해녀물질', 160, 70);
   }
   const signTex = new THREE.CanvasTexture(signC);
   signTex.colorSpace = THREE.SRGBColorSpace;
@@ -4679,14 +4679,16 @@ function buildMapBase() {
   const c = document.createElement('canvas');
   c.width = S; c.height = S;
   const g = c.getContext('2d');
-  // 게임에서는 +z가 북쪽(위)인데 캔버스 y는 아래로 갈수록 커지므로, 세로를 뒤집어야 방향이 맞습니다
-  const w2m = (wx, wz) => [(wx + MAP_WORLD) / (MAP_WORLD * 2) * S, (1 - (wz + MAP_WORLD) / (MAP_WORLD * 2)) * S];
+  // 게임에서는 +z가 북쪽(위)인데 캔버스 y는 아래로 갈수록 커지므로, 세로를 뒤집어야 방향이 맞습니다.
+  // 가로도 뒤집습니다 — 바다(북쪽)를 바라보고 섰을 때 내 오른손 방향(-x)이 동쪽이므로,
+  // 지도에서도 그쪽이 오른쪽에 와야 "바다 보고 오른쪽으로 갔는데 지도에선 왼쪽으로 가네"가 안 생깁니다.
+  const w2m = (wx, wz) => [(1 - (wx + MAP_WORLD) / (MAP_WORLD * 2)) * S, (1 - (wz + MAP_WORLD) / (MAP_WORLD * 2)) * S];
 
   // 지형 — 픽셀마다 땅 높이를 재서 바다/모래/풀밭/오름 색을 칠합니다
   const img = g.createImageData(S, S);
   for (let py = 0; py < S; py++) {
     for (let px = 0; px < S; px++) {
-      const wx = px / S * MAP_WORLD * 2 - MAP_WORLD;
+      const wx = (1 - px / S) * MAP_WORLD * 2 - MAP_WORLD;   // 가로 뒤집기 (동쪽 = -x)
       const wz = (1 - py / S) * MAP_WORLD * 2 - MAP_WORLD;
       const h = groundHeight(wx, wz);
       let r, gg, b;
@@ -4766,7 +4768,7 @@ function drawMap() {
   g.drawImage(mapBase, 0, 0);
   // 루루의 현재 위치 — 주황 점과 이름
   const S = mapBase.width;
-  const px = (state.x + MAP_WORLD) / (MAP_WORLD * 2) * S;
+  const px = (1 - (state.x + MAP_WORLD) / (MAP_WORLD * 2)) * S;   // 바탕 지도와 같은 방향 (가로 뒤집기)
   const py = (1 - (state.z + MAP_WORLD) / (MAP_WORLD * 2)) * S;
   g.fillStyle = '#ff8c1a';
   g.strokeStyle = '#fff';

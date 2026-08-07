@@ -52,7 +52,21 @@
     background: rgba(0,0,0,.45); border-radius: 999px;
     padding: 9px 16px; font-size: 13.5px;
   }
-  #ropeBadge { bottom: 66px; }
+  /* 할 일 안내(상황 안내) 배지 — 지금 뭘 하면 되는지 알려주는 문구라 눈에 잘 띄어야 합니다.
+     글자를 키우고, 바탕을 진하게, 노란 테두리로 상태 배지들과 구분합니다. */
+  #ropeBadge {
+    bottom: 66px;
+    font-size: 15.5px; font-weight: 600; line-height: 1.45;
+    color: #fff8ea;
+    background: rgba(10, 18, 28, .78);
+    border: 1px solid rgba(255, 214, 130, .55);
+    border-radius: 14px;
+    padding: 11px 18px;
+    max-width: min(78vw, 560px);
+    text-shadow: 0 1px 2px rgba(0,0,0,.6);
+    backdrop-filter: blur(3px);
+  }
+  body.touch #ropeBadge { font-size: 14px; padding: 10px 14px; }
   #boxBadge { left: auto; right: 14px; bottom: 14px; font-size: 11.5px; padding: 6px 11px; }
 
   /* 누를 수 있는 배지 — #ui 전체가 손가락 입력을 막고 있어서 이것만 다시 열어줍니다 */
@@ -409,7 +423,7 @@
     <b>줌</b> Z 멀리 / X 가까이<br>
     <b>달리기</b> Shift<br>
     <b>점프</b> Space<br>
-    <b>상호작용</b> F 하나로 전부 (따기·사기·택배·수리·먹이기·상자·물질)<br>
+    <b>상호작용</b> F (E도 됩니다)<br>
     <b>물속에서</b> F 채집 · ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄 · 수면에서 F 나가기<br>
     <b>전체 지도</b> M (또는 🗺 배지)<br>
     <b>왼쪽 아래</b> 💾 저장 · 🗺 지도 · 🎵 음악<br>
@@ -453,7 +467,8 @@
   <div class="badge" id="netBadge">🧺 망사리 0/24</div>
   <div class="badge" id="boxBadge">📦 상자 0/20</div>
   <div class="badge" id="ropeBadge">📦 상자에 가까이 가면 E로 잡을 수 있어요</div>
-  <div id="hint">F 하나로 다 됩니다: 귤 따고, 상자 잡아 끌고, 사고 팔고 · 상자를 가득 채우면 <b>택배사의 이장님</b>이 한 박스 10,000원에 사 줍니다 · M키로 전체 지도</div>
+  <!-- (아래 상시 안내줄은 뺐습니다 — "F로 상호작용"은 게이머라면 다 아는 것이고,
+       박스값·지도는 배지와 돌하르방 튜토리얼이 이미 알려줍니다) -->
 
   <!-- 시작 화면: 아무 데나 누르면 사라지면서 배경음악이 시작됩니다 -->
   <div id="start">
@@ -526,6 +541,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=101"></script>
+<script src="jeju3d.js?v=103"></script>
 </body>
 </html>
