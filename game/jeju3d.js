@@ -4606,32 +4606,51 @@ const ACH_TESTS = {
   rich: () => coins >= 1000000,
 };
 let achieved = {};
+// 업적 기능은 뺐습니다 (사용자 결정) — 그 자리는 🎒 아이템 보기가 대신합니다.
+// 달성 기록(achieved)은 저장 파일에 그대로 남겨둬서, 나중에 되살리고 싶으면 이 함수만 복구하면 됩니다.
 function checkAchievements() {
   for (const a of ACHIEVEMENTS) {
-    if (!achieved[a.id] && ACH_TESTS[a.id]()) {
-      achieved[a.id] = true;
-      spawnMoneyPopup(state.x, lulu.position.y + 2.6, state.z, `🏅 업적 달성 — ${a.name}!`, 5);
-      playShipSound();
-      saveGame(true);
-    }
+    if (!achieved[a.id] && ACH_TESTS[a.id]()) achieved[a.id] = true;   // 조용히 기록만
   }
 }
-// 도감 화면 (📖 버튼)
+// 가방 화면 (🎒 버튼) — 예전의 업적 도감 자리를 "갖고 있는 아이템 보기"로 바꿨습니다
 const bookWrap = document.getElementById('bookWrap');
 const bookList = document.getElementById('bookList');
 const bookBadge = document.getElementById('bookBadge');
-function openBook() {
+function openBag() {
   if (!bookWrap || !bookList) return;
-  const done = ACHIEVEMENTS.filter((a) => achieved[a.id]).length;
-  bookList.innerHTML =
-    `<div class="bookHead">🏅 업적 ${done} / ${ACHIEVEMENTS.length}</div>` +
-    `<div class="bookTip">위아래로 스크롤 · 바깥을 누르면 닫힘</div>` +
-    ACHIEVEMENTS.map((a) =>
-      `<div class="ach${achieved[a.id] ? ' on' : ''}"><b>${achieved[a.id] ? '🏅' : '🔒'} ${a.name}</b><span>${a.desc}</span></div>`
-    ).join('');
+  const row = (own, emoji, name, desc) =>
+    `<div class="ach${own ? ' on' : ''}"><b>${emoji} ${name}</b><span>${desc}</span></div>`;
+  let html =
+    `<div class="bookHead">🎒 갖고 있는 것</div>` +
+    `<div class="bookTip">위아래로 스크롤 · 바깥을 누르면 닫힘</div>`;
+  html += row(true, '🍊', `귤 상자 ${basketCount}/${BASKET_CAP}알`, '가득 채워 택배사에 가져가면 한 박스 10,000원');
+  html += row(carrots > 0, '🥕', `당근 ${carrots}개`, carrots > 0 ? '말에게 하루 한 개는 꼭!' : '없음 — 상점에서 1,000원');
+  html += row(hasNet, '🧺', '망사리',
+    hasNet ? (netCarried ? '등에 메고 있어요 — 포구 축대 끝에서 물질!' : '어딘가에 내려놨어요 (주우면 다시 멜 수 있음)')
+           : '없음 — 상점에서 10,000원 (물질 필수품)');
+  html += row(hasTank, '🤿', '산소통', hasTank ? '숨이 3분으로 늘었어요' : '없음 — 상점에서 100,000원 (숨 60초→3분)');
+  const toolNames = { hammer: ['🔨', '망치'], saw: ['🪚', '톱'], paint: ['🖌', '페인트'] };
+  for (const k of Object.keys(toolNames)) {
+    html += row(tools[k], toolNames[k][0], toolNames[k][1],
+      tools[k] ? '집 고치기 공구' : '없음 — 상점에서');
+  }
+  if (state.diving && net.length) {
+    const cnt = {};
+    for (const k of net) cnt[k] = (cnt[k] || 0) + 1;
+    html += row(true, '🌊', '망사리 속 채집물',
+      Object.entries(cnt).map(([k, n]) => `${CATCH_KINDS[k].name} ${n}마리`).join(' · ') + ' — 뭍에 나가면 팔려요');
+  }
+  const ownedF = FURN_ORDER.filter((k) => furnitureOwned[k]);
+  const fname = (k) => (SHOP_GOODS.find((g) => g.key === k) || { name: k }).name;
+  html += row(ownedF.length > 0, '🛋', `가구·소품 ${ownedF.length}/${FURN_ORDER.length}종`,
+    ownedF.length ? ownedF.map(fname).join(' · ') : '상점에서 사면 집 안에 놓입니다');
+  html += row(houseFloorColor !== 0, '🟫', '바닥재', houseFloorColor !== 0 ? '집에 시공했어요' : '아직 — 상점 왼쪽에서');
+  html += row(houseWallColor !== 0, '🎨', '벽지', houseWallColor !== 0 ? '집에 시공했어요' : '아직 — 상점 왼쪽에서');
+  bookList.innerHTML = html;
   bookWrap.style.display = 'flex';
 }
-if (bookBadge) bookBadge.addEventListener('pointerdown', (e) => { e.preventDefault(); openBook(); });
+if (bookBadge) bookBadge.addEventListener('pointerdown', (e) => { e.preventDefault(); openBag(); });
 // 목록 안을 만지면 스크롤, 바깥(어두운 곳)을 누르면 닫기
 if (bookWrap) bookWrap.addEventListener('pointerdown', (e) => {
   if (bookList && bookList.contains(e.target)) return;   // 목록 안 — 스크롤하게 둡니다
