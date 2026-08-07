@@ -4984,11 +4984,10 @@ function updateSpriteLulu(groundY) {
       cell = 0;
     }
   } else if (SHEETS.wetsuitLand && inWetsuitZone()) {
-    // 포구 구역 — 해녀 시트에서 오린 잠수복 차림. 걸을 땐 옆모습 두 컷을 번갈아 딛습니다
+    // 포구 구역 — 해녀 시트에서 오린 잠수복 차림.
+    // (2번 컷은 고개가 어깨 너머를 보는 자세라 걷기에 쓰면 목이 돌아가 보여서 안 씁니다)
     sheet = SHEETS.wetsuitLand;
-    cell = view === 'back' ? 0
-         : view === 'front' ? 4
-         : (walking ? 2 + (Math.floor(state.walkPhase) % 2) : 3);
+    cell = view === 'back' ? 0 : view === 'front' ? 4 : 3;
   } else if (SHEETS.diveIdle && inWetsuitZone()) {
     // (시트가 없을 때의 예비 — 물속 대기 자세)
     sheet = SHEETS.diveIdle;
