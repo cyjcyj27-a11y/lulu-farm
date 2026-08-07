@@ -229,7 +229,8 @@
     user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
   #talkBox b { display: block; color: #b3541e; font-size: 13px; margin-bottom: 4px; text-shadow: none; }
-  #talkBox p { font-size: 15px; line-height: 1.6; text-shadow: none; }
+  /* pre-line: 글 속의 줄바꿈(\n)이 화면에서도 줄바꿈으로 보입니다 */
+  #talkBox p { font-size: 15px; line-height: 1.6; text-shadow: none; white-space: pre-line; }
   #talkBox .next { text-align: right; font-size: 11.5px; color: #6b5537; margin-top: 6px; text-shadow: none; }
 
   /* ---- 경마 — 직접 뽑으신 경주 영상이 전체 화면으로 나옵니다 ---- */
@@ -594,6 +595,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=122"></script>
+<script src="jeju3d.js?v=123"></script>
 </body>
 </html>
