@@ -285,6 +285,11 @@
   .ibtn:active { background: rgba(255,190,80,.7); }
   /* 버튼 속 그림(제주도 지도 아이콘)이 손가락 입력을 가로채지 않게 합니다 */
   .ibtn svg { pointer-events: none; display: block; }
+  /* 폰에서는 왼쪽 아이콘을 작게 만들어 왼쪽 구석에 붙입니다 —
+     오른쪽 행동 버튼을 누를 때 손가락이 걸리지 않게 멀찍이 띄우는 것입니다 */
+  body.touch #iconRow { left: 6px; bottom: 20px; gap: 5px; }
+  body.touch .ibtn { width: 32px; height: 32px; font-size: 14px; }
+  body.touch .ibtn svg { width: 20px; height: 13px; }
 
   /* ---- 전체 지도 (M키 / 🗺 배지) ---- */
   #mapWrap {
