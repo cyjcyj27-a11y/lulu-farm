@@ -192,7 +192,9 @@ const seabedHeight = groundHeight;
 // 어디를 가든 수평선이 자연스럽게 흐려집니다.
 const sea = new THREE.Mesh(
   new THREE.PlaneGeometry(1700, 1700, 70, 70),
-  new THREE.MeshPhongMaterial({ color: 0xffffff, vertexColors: true, shininess: 80, transparent: true, opacity: 0.94 })
+  // 양면(DoubleSide)으로 그려야 합니다 — 한쪽 면만 그리면 수면에 떠 있을 때
+  // 카메라가 물보다 조금만 낮아져도 바다가 사라져서, 루루가 허공에 서 있는 것처럼 보입니다.
+  new THREE.MeshPhongMaterial({ color: 0xffffff, vertexColors: true, shininess: 80, transparent: true, opacity: 0.94, side: THREE.DoubleSide })
 );
 sea.geometry.rotateX(-Math.PI / 2);
 {
@@ -3887,7 +3889,8 @@ function updateDiving(dt) {
     // 그림의 물결선(가슴께)이 실제 수면과 맞도록, 떠 있으면 그 높이에 살며시 붙습니다
     const goingDown = keys['ArrowDown'] || touchMove.f < -0.3;
     if (!goingDown && drowning <= 0) {
-      const floatY = SEA_Y - 0.8;
+      // 물결 따라 몸이 천천히 오르내려야 "떠 있다"는 느낌이 납니다 (붙박이면 서 있는 것처럼 보입니다)
+      const floatY = SEA_Y - 0.8 + Math.sin(performance.now() * 0.0016) * 0.09;
       lulu.position.y += (floatY - lulu.position.y) * Math.min(1, dt * 5);
       if (state.vy > 0.3) state.vy = 0.3;
     }
