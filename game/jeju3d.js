@@ -5353,12 +5353,12 @@ function tryBuyCarrot() {
 const RACE_LOVE = 100;        // 애정이 이만큼이면 승률이 최고치에 닿습니다
 const RACE_MIN_LOVE = 10;     // 최소 이만큼은 정이 들어야 출전합니다
 const RACE_FEE = 20000;
-// 1등 상금은 당근을 먹인 횟수(애정)에 따라 10번마다 두 배씩, 끝없이 커집니다.
-// 10번대 10만 → 20번대 20만 → 30번대 40만 → 40번대 80만 → … (10번 미만은 5만)
+// 1등 상금은 당근을 먹인 횟수(애정)에 따라 10번마다 두 배씩 커집니다 — 최대 1억.
+// 10번대 10만 → 20번대 20만 → 30번대 40만 → … → 110번대 1억(최대) (10번 미만은 5만)
 function racePrize() {
   const tier = Math.floor(ponyLove / 10);
   if (tier <= 0) return 50000;
-  return 100000 * Math.pow(2, tier - 1);
+  return Math.min(100000000, 100000 * Math.pow(2, tier - 1));
 }
 const RACE_SPOT = { x: STABLE.x + 3.5, z: STABLE.z + 5.5 };
 const RACE_RANGE = 2.2;
