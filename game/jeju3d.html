@@ -88,6 +88,8 @@
     background: rgba(0,0,0,.45); border-radius: 999px;
     padding: 8px 16px; font-size: 15px; font-weight: 700; color: #ffe08a;
   }
+  /* 빚진 상태 — 붉게 물들여 한눈에 알아보게 */
+  #coinBadge.debt { color: #ff9a8a; background: rgba(90, 20, 16, .6); }
   /* 떠오르는 알림 문구 — 어두운 틀에 감싸야 밝은 하늘·풀밭 어디서든 또렷이 읽힙니다 */
   .moneyPopup {
     position: absolute; transform: translate(-50%, 0);
@@ -641,6 +643,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=163"></script>
+<script src="jeju3d.js?v=165"></script>
 </body>
 </html>

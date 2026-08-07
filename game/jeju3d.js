@@ -3486,7 +3486,10 @@ const coinBadge = document.getElementById('coinBadge');
 const ropeBadge = document.getElementById('ropeBadge');
 const boxBadge = document.getElementById('boxBadge');
 function updateCoinBadge() {
-  if (coinBadge) coinBadge.textContent = `💵 ${formatWon(coins)}`;
+  if (!coinBadge) return;
+  // 빚을 지면 '빚'이라고 못박아 보여줍니다 — 마이너스 부호만으로는 잘 안 보입니다
+  coinBadge.textContent = coins < 0 ? `💸 빚 ${formatWon(-coins)}` : `💵 ${formatWon(coins)}`;
+  coinBadge.classList.toggle('debt', coins < 0);
 }
 // 상자에 귤이 몇 개 담겼는지 (가득 차면 색이 바뀌어 배송할 때가 됐음을 알립니다)
 // basketCount·BASKET_CAP은 아래 12-1b에서 만들어지지만, 이 함수는 그 뒤에야 불리므로 괜찮습니다.
@@ -4261,6 +4264,10 @@ function applyDiveLook() {
   sea.material.needsUpdate = true;
 }
 
+// 물질하다 정신을 잃으면 닥터헬기가 실어 갑니다. 병원비는 늘 이만큼 나가고,
+// 가진 돈이 모자라면 그만큼 빚으로 남습니다 (자산이 마이너스가 됩니다).
+const HOSPITAL_FEE = 3000000;
+
 function enterDive() {
   stat.dives++;
   checkAchievements();
@@ -4318,10 +4325,10 @@ function leaveDive(reason) {
 
   const py = groundHeight(BULTEOK.x, BULTEOK.z) + 2.2;
   if (reason === 'drown') {
-    // 정신을 잃고 뭍에 떠밀려 왔습니다 — 기절한 사이 도둑이 들어 돈이 전부 사라졌습니다.
+    // 정신을 잃으면 닥터헬기가 실어 갑니다 — 병원비는 3백만원, 모자라면 빚으로 남습니다.
     // 그게 숨을 아껴야 하는 진짜 이유입니다. (죽는 순간 바로 저장해 새로고침 꼼수도 안 통합니다)
-    const lostCoins = coins;
-    coins = 0;
+    coins -= HOSPITAL_FEE;
+    const inDebt = coins < 0;
     stat.drowns++;
     // 망사리도 바다에 놓칩니다 — 물질을 다시 하려면 상점에서 새로 사야 합니다.
     // 돈까지 잃은 판이라, 그 돈은 귤을 따서 벌 수밖에 없습니다.
@@ -4335,9 +4342,9 @@ function leaveDive(reason) {
     // DIE 화면은 뭍에서 깨어난 뒤에도 한동안 머물다가 천천히 걷힙니다
     if (deathOverlay) setTimeout(() => deathOverlay.classList.remove('show'), 2800);
     spawnMoneyPopup(BULTEOK.x, py, BULTEOK.z,
-      lostCoins > 0
-        ? '의식을 잃은 사이 누군가 집에 들어와 돈을 다 훔쳐갔습니다'
-        : '정신을 잃고 떠밀려 왔어요', 5.5);
+      inDebt
+        ? `의식을 잃고 닥터헬기가 나를 구조해줬다.\n병원비 ${formatWon(HOSPITAL_FEE)}이 없어 빚을 졌다.`
+        : `의식을 잃고 닥터헬기가 나를 구조해줬다.\n병원비로 ${formatWon(HOSPITAL_FEE)}이 나갔다.`, 5.5);
     if (lost > 0) {
       setTimeout(() => spawnMoneyPopup(BULTEOK.x, py + 0.9, BULTEOK.z,
         `망사리에 담았던 ${lost}개도 바다에 흘렸습니다`, 5), 2600);
