@@ -2584,29 +2584,16 @@ const CAM_PITCH = 1.1;   // 초당 올려다보기/내려다보기 속도
 const CAM_ZOOM = 9.0;    // 초당 줌 속도
 
 // 키를 누르고 있는 동안 매 프레임 조금씩 돌립니다 (톡톡 끊기지 않고 부드럽게 돕니다)
-let camManualT = -99;   // 마지막으로 직접 카메라를 돌린 시각 — 그 직후엔 자동 추적이 양보합니다
+// (걷는 방향을 따라 도는 자동 추적은 써봤다가 뺐습니다 — 시야는 온전히 플레이어의 것)
 function updateCamera(dt) {
-  const now = performance.now() / 1000;
-  if (keys['KeyA']) { camYaw += CAM_TURN * dt; camManualT = now; }
-  if (keys['KeyD']) { camYaw -= CAM_TURN * dt; camManualT = now; }
-  if (keys['KeyW']) { camPitch -= CAM_PITCH * dt; camManualT = now; }
-  if (keys['KeyS']) { camPitch += CAM_PITCH * dt; camManualT = now; }
+  if (keys['KeyA']) camYaw += CAM_TURN * dt;
+  if (keys['KeyD']) camYaw -= CAM_TURN * dt;
+  if (keys['KeyW']) camPitch -= CAM_PITCH * dt;     // W = 시선을 눕혀 멀리 보기
+  if (keys['KeyS']) camPitch += CAM_PITCH * dt;     // S = 위에서 내려다보기
   if (keys['KeyZ']) camDist += CAM_ZOOM * dt;       // 멀리
   if (keys['KeyX']) camDist -= CAM_ZOOM * dt;       // 가까이
   camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch));
   camDist = Math.max(4, Math.min(22, camDist));
-
-  // 걷는 방향의 등 뒤로 카메라가 스르륵 따라 돕니다.
-  // - 직접 돌린 직후 1.5초는 양보 (플레이어 뜻이 우선)
-  // - 물속에서는 끔 (시선 방향으로 헤엄치는 조작과 서로 꼬입니다)
-  // - 상자를 끄는 동안도 끔 (루루가 상자만 바라봐서 카메라가 빙글빙글 돌게 됩니다)
-  // - 카메라를 정면으로 마주 보고 걸어올 때는 억지로 돌리지 않습니다
-  if (!state.diving && !state.grabbing && !hasRope && state.speed > 0.15 && now - camManualT > 1.5) {
-    let diff = (state.facing + Math.PI) - camYaw;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    if (Math.abs(diff) < 2.6) camYaw += diff * Math.min(1, dt * 1.8);
-  }
 }
 
 // 물속에서는 위를 올려다볼 수 있어야 "보는 방향으로 헤엄"이 됩니다. 뭍에서는 예전 그대로.
@@ -2626,7 +2613,6 @@ addEventListener('mousemove', (e) => {
   if (!dragging) return;
   camYaw -= (e.clientX - lastX) * 0.005;
   camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch + (e.clientY - lastY) * 0.003));
-  camManualT = performance.now() / 1000;
   lastX = e.clientX; lastY = e.clientY;
 });
 addEventListener('wheel', (e) => {
@@ -2686,7 +2672,6 @@ function handleTouchMove(e) {
     } else if (t.identifier === lookId) {
       camYaw -= (t.clientX - lookX) * 0.006;
       camPitch = Math.max(pitchMin(), Math.min(1.0, camPitch + (t.clientY - lookY) * 0.004));
-      camManualT = performance.now() / 1000;
       lookX = t.clientX; lookY = t.clientY;
     }
   }
@@ -2785,8 +2770,8 @@ function updateRopeBadge() {
   // 물속에서는 상자 안내 대신 물질 안내를 보여줍니다
   if (state.diving) {
     ropeBadge.textContent = IS_TOUCH
-      ? '🤿 🐾 채집 · 오른쪽 화면으로 시선을 돌리고, 조이스틱 ↑로 그쪽으로 헤엄 · 수면에서 🐾 나가기'
-      : '🤿 F 채집 · ↑ 보는 방향으로 헤엄 (W S로 위아래 보기) · 수면에서 F 나가기';
+      ? '🤿 🐾 채집 · 조이스틱 ↓ 잠수 · ↑ 보는 쪽으로 헤엄 · 수면에서 🐾 나가기'
+      : '🤿 F 채집 · ↓ 잠수 · ↑ 보는 방향으로 헤엄 · 수면에서 F 나가기';
     return;
   }
   // 상점 안: 앞에 있는 물건의 이름·가격을 알려줍니다
@@ -3700,7 +3685,21 @@ function updateDiving(dt) {
   breathLow = ratio < BREATH_LOW;
   // 숨이 줄수록 화면 가장자리가 조여오고 물빛이 어두워집니다
   if (vignette) vignette.style.opacity = breathLow ? (1 - ratio / BREATH_LOW) * 0.75 : 0;
-  scene.fog.far = 34 - (breathLow ? (1 - ratio / BREATH_LOW) * 16 : 0);
+  if (atSurface) {
+    // 수면에 떠 있을 때는 멀리까지 보여야 물과 하늘의 경계(수평선)가 삽니다
+    scene.fog.color.setHex(0xd2e6ee);
+    scene.fog.near = 150;
+    scene.fog.far = 700;
+    for (const o of skyStuff) o.visible = true;
+    for (const c of clouds) c.visible = true;
+  } else {
+    // 물속으로 들어가면 다시 짙고 답답한 물빛으로
+    scene.fog.color.setHex(0x0e4356);
+    scene.fog.near = 1;
+    scene.fog.far = 34 - (breathLow ? (1 - ratio / BREATH_LOW) * 16 : 0);
+    for (const o of skyStuff) o.visible = false;
+    for (const c of clouds) c.visible = false;
+  }
   updateDiveUI();
 }
 
@@ -4838,13 +4837,15 @@ function updateLulu(dt) {
   const spd = (running ? RUN : WALK) * tilt;
 
   if (state.diving) {
-    // 시선 방향 수영: ↑는 카메라가 보는 쪽으로 헤엄칩니다 — 아래를 내려다보며 ↑면 잠수,
-    // 위를 올려다보며 ↑면 상승. ↓는 그 반대(뒤로), ← →는 옆으로.
+    // ↑는 카메라가 보는 쪽으로 헤엄치고(위를 보면 상승·아래를 보면 하강),
+    // ↓는 시야와 상관없이 곧장 아래로 잠수합니다. ← →는 옆으로.
     const cosP = Math.cos(camPitch);
+    const fwdIn = Math.max(0, f);          // ↑ — 시선 방향 전진
+    const downIn = Math.max(0, -f);        // ↓ — 곧장 잠수
     moveDir.set(
-      fwdX * cosP * f + rgtX * r,
-      -Math.sin(camPitch) * f,
-      fwdZ * cosP * f + rgtZ * r
+      fwdX * cosP * fwdIn + rgtX * r,
+      -Math.sin(camPitch) * fwdIn - downIn,
+      fwdZ * cosP * fwdIn + rgtZ * r
     );
     const swimTilt = Math.min(1, Math.hypot(f, r));
     if (moveDir.lengthSq() > 0.0001) {
