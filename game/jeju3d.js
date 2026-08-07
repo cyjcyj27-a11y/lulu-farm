@@ -5164,7 +5164,8 @@ function pullCameraIn(target, wanted) {
   let maxT = segLen;
   for (const o of obstacles) {
     if (o.topY < 3) continue;                 // 돌담처럼 낮은 것은 카메라가 넘겨다봅니다
-    const rr = o.r + 1.2;                     // 나뭇잎·바위 덩치만큼 여유
+    if (o.r < 0.9) continue;                  // 귤나무 같은 홀쭉한 것도 무시 — 잎 사이로 잠깐 가리는 건 자연스럽습니다
+    const rr = o.r + 0.8;                     // 바위·건물 덩치만큼만 여유
     const ox = o.x - target.x, oz = o.z - target.z;
     const proj = ox * ux + oz * uz;           // 시선 선 위에 투영한 거리
     if (proj < 0.5 || proj > maxT) continue;  // 루루 뒤쪽이거나 카메라보다 멀면 무시
