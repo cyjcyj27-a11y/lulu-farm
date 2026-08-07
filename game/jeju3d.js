@@ -1001,26 +1001,102 @@ const HOUSE = { x: 58, z: -72 };
 const HOUSE_RANGE = 5.5;
 const HOUSE_W = 8.5, HOUSE_H = 8.5 * 520 / 1110;   // 그림 비율 그대로
 let houseStage = 0;    // 루루가 처음부터 살고 있는 집입니다. 0~2 = 수리 중(허름함), 3 = 완성
-const houseTex = [];
 const house = (() => {
   const g = new THREE.Group();
-  // 언덕 비탈에 서 있으므로, 집 높이는 마당(북쪽 접근로) 쪽 땅에 맞춥니다.
-  // 집 한가운데 땅높이에 맞추면 앞쪽 비탈이 집 아랫도리를 절반쯤 가려버립니다.
-  const y = groundHeight(HOUSE.x, HOUSE.z + 3);
-  g.position.set(HOUSE.x, y, HOUSE.z);
+  // 절벽 비탈 위의 집 — 발밑 네 귀퉁이 땅높이 중 "가장 높은 곳"에 바닥을 맞추고,
+  // 낮은 쪽으로 생기는 틈은 현무암 기단으로 받칩니다. (가운데 높이에 맞추면
+  // 내리막 쪽 벽이 공중에 둥둥 떠서, 집이 절벽에서 날아가는 것처럼 보였습니다)
+  let floorY = -Infinity, lowY = Infinity;
+  for (const [dx, dz] of [[-3.9, -2.8], [3.9, -2.8], [-3.9, 2.8], [3.9, 2.8], [0, 0]]) {
+    const h = groundHeight(HOUSE.x + dx, HOUSE.z + dz);
+    floorY = Math.max(floorY, h); lowY = Math.min(lowY, h);
+  }
+  floorY += 0.05;
+  g.position.set(HOUSE.x, floorY, HOUSE.z);
 
-  let plane = null;
-  if (CAN_USE_IMAGES) {
-    for (let i = 0; i < 4; i++) houseTex.push(loadTexture(`../assets/farmcat/old_house_${i}.webp`));
-    plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(HOUSE_W, HOUSE_H),
-      // 양면으로 그려야 뒤로 돌아가도 집이 사라지지 않습니다 (뒤에서는 좌우가 뒤집혀 보일 뿐)
-      new THREE.MeshLambertMaterial({ map: houseTex[0], transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })
-    );
-    plane.position.y = HOUSE_H / 2;
-    // 집은 남쪽 언덕 끝에서 뭍(북쪽)을 바라봅니다 — 돌담길을 내려온 사람을 맞는 방향
-    plane.castShadow = true;
-    g.add(plane);
+  // ----- 제주 돌집 본채 (그림판 대신 진짜 입체) -----
+  // 현무암 몸통 + 초가 맞배지붕 + 북쪽(마을 쪽)으로 문과 창 둘.
+  // 수리 단계에 따라: 0 허름(어두운 벽·주저앉은 지붕·삐딱한 문) → 1 벽 고침(밝아짐)
+  // → 2 지붕 고침(반듯한 새 지붕) → 3 완성(칠한 문·창틀).
+  const W = 7.4, D = 5.2, WALL = 2.55;
+
+  // 기단 — 집보다 한 뼘 넓은 현무암 받침. 비탈 아래쪽까지 내려가 땅에 닿습니다.
+  const fh = (floorY - lowY) + 1.4;
+  const foundation = new THREE.Mesh(new THREE.BoxGeometry(W + 0.7, fh, D + 0.7), shopStoneMat);
+  foundation.position.y = -fh / 2 + 0.06;
+  foundation.castShadow = true;
+  g.add(foundation);
+
+  // 현무암 몸통 — 허름할 때는 그을린 듯 어두운 재질을 씁니다
+  const wallDarkMat = shopStoneMat.clone();
+  wallDarkMat.color = new THREE.Color(0x9a9a9a);   // 곱하기 색이라 어둡게 눌립니다
+  const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(W, WALL, D), shopStoneMat);
+  wallMesh.position.y = WALL / 2;
+  wallMesh.castShadow = true;
+  g.add(wallMesh);
+
+  // 반듯한 새 지붕 (수리 2단계부터)
+  const roofFine = makeGableRoof(W + 1.3, D + 0.9, 1.5, shopThatchMat);
+  roofFine.position.y = WALL;
+  g.add(roofFine);
+  // 주저앉은 옛 지붕 — 살짝 기울고, 마루가 처지고, 군데군데 뚫려 있습니다
+  const roofBad = new THREE.Group();
+  const rb = makeGableRoof(W + 1.3, D + 0.9, 1.15, shopThatchMat);
+  rb.rotation.z = 0.055;                       // 한쪽으로 살짝 주저앉음
+  rb.position.y = -0.12;
+  roofBad.add(rb);
+  [[-2.2, 0.72, -1.1], [1.6, 0.8, 1.2], [3.0, 0.55, -0.4]].forEach(([px, py, pz]) => {
+    const hole = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.3, 0.9),
+      new THREE.MeshLambertMaterial({ color: 0x17130e }));
+    hole.position.set(px, py, pz);
+    hole.rotation.set(0.2, 0.4, 0.15);
+    roofBad.add(hole);
+  });
+  roofBad.position.y = WALL;
+  g.add(roofBad);
+
+  // 문 — 북쪽(+z, 마을 쪽) 한가운데. 허름할 때는 삐딱하게 걸려 있습니다
+  const doorBad = new THREE.Mesh(new THREE.BoxGeometry(1.25, 2.0, 0.1), shopWoodDarkMat);
+  doorBad.position.set(0, 0.95, D / 2 + 0.06);
+  doorBad.rotation.z = 0.09;
+  g.add(doorBad);
+  const doorFine = new THREE.Mesh(new THREE.BoxGeometry(1.25, 2.05, 0.1), shopWoodMat);
+  doorFine.position.set(0, 1.02, D / 2 + 0.06);
+  g.add(doorFine);
+  // 문 위 처마 그늘 띠 — 문이 벽에 묻히지 않게
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.16, 0.2), shopWoodDarkMat);
+  lintel.position.set(0, 2.14, D / 2 + 0.08);
+  g.add(lintel);
+
+  // 창 두 짝 — 나무 틀 + 유리. 완성되면 틀이 밝은 칠로 바뀝니다
+  const winFrames = [];
+  [-2.35, 2.35].forEach((wx) => {
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.1, 0.12), shopWoodDarkMat);
+    frame.position.set(wx, 1.45, D / 2 + 0.05);
+    g.add(frame);
+    winFrames.push(frame);
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.85, 0.1), truckGlassMat);
+    glass.position.set(wx, 1.45, D / 2 + 0.08);
+    g.add(glass);
+    // 창살 十자
+    const barV = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.85, 0.12), shopWoodDarkMat);
+    barV.position.set(wx, 1.45, D / 2 + 0.09);
+    g.add(barV);
+    const barH = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.07, 0.12), shopWoodDarkMat);
+    barH.position.set(wx, 1.45, D / 2 + 0.09);
+    g.add(barH);
+  });
+
+  // 문 앞 돌계단 — 기단 위의 문과 마당 땅 사이를 잇습니다
+  {
+    const gy = groundHeight(HOUSE.x, HOUSE.z + 3.4) - floorY;   // 마당이 바닥보다 얼마나 낮은가 (음수)
+    const steps = Math.max(1, Math.min(3, Math.round(-gy / 0.35)));
+    for (let i = 0; i < steps; i++) {
+      const st = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.22, 0.55), shopStoneMat);
+      st.position.set(0, -0.11 - i * 0.24, D / 2 + 0.45 + i * 0.5);
+      st.castShadow = true;
+      g.add(st);
+    }
   }
 
   // 앞마당의 버려진 세간 — 폐가 시절에만 보이고, 다 고치면 치워집니다
@@ -1065,30 +1141,23 @@ const house = (() => {
 
   scene.add(g);
   obstacles.push({ x: HOUSE.x, z: HOUSE.z, r: 3.4, topY: NO_JUMP });
-  return { group: g, plane, junk, sale };
+  return { group: g, wallMesh, wallDarkMat, roofFine, roofBad, doorFine, doorBad, winFrames, junk, sale };
 })();
+// (예전의 "그림판 + 뒤채 몸통" 조합은 뺐습니다 — 옆·뒤에서 보면 그림 위로 뒤채 지붕이
+//  뚫고 나와 보였고, 비탈에서 뒤채가 공중에 떠 보였습니다. 이제 위의 진짜 돌집 하나입니다)
 
 function applyHouseLook() {
-  if (house.plane) house.plane.material.map = houseTex[Math.max(0, houseStage)];
-  house.junk.visible = houseStage < 3;    // 다 고치면 마당의 잡동사니가 치워집니다
-  house.sale.visible = houseStage < 0;    // 처음부터 루루의 집이라 팻말은 안 보입니다
+  const s = houseStage;
+  house.wallMesh.material = s >= 1 ? shopStoneMat : house.wallDarkMat;   // 1단계: 벽 고침
+  house.roofFine.visible = s >= 2;                                       // 2단계: 새 지붕
+  house.roofBad.visible = s < 2;
+  house.doorFine.visible = s >= 3;                                       // 3단계: 칠한 문·창틀
+  house.doorBad.visible = s < 3;
+  for (const f of house.winFrames) f.material = s >= 3 ? shopWoodMat : shopWoodDarkMat;
+  house.junk.visible = s < 3;             // 다 고치면 마당의 잡동사니가 치워집니다
+  house.sale.visible = s < 0;             // 처음부터 루루의 집이라 팻말은 안 보입니다
 }
 applyHouseLook();
-
-// 헌집 입체 몸통 — 정면은 직접 그리신 그림 그대로, 뒤로는 돌벽과 초가지붕이 이어집니다.
-// (옆이나 뒤에서 봐도 종이처럼 얇아 보이지 않게)
-{
-  const body = new THREE.Mesh(new THREE.BoxGeometry(7.4, 2.6, 4.0), shopStoneMat);
-  body.position.set(0, 1.3, -2.2);
-  body.castShadow = true;
-  body.receiveShadow = true;
-  house.group.add(body);
-  const roof = makeGableRoof(8.6, 5.2, 1.7, shopThatchMat);
-  roof.position.set(0, 2.55, -2.1);
-  house.group.add(roof);
-  // 뒤채에도 부딪히게
-  obstacles.push({ x: HOUSE.x, z: HOUSE.z - 2.4, r: 3.0, topY: NO_JUMP });
-}
 
 // ---------- 8-2e. 마구간과 조랑말 ----------
 // 서쪽 벌판에 초가 마구간이 있고, 안에 제주 조랑말이 서 있습니다 (직접 그리신 그림).
