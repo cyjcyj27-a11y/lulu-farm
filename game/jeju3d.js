@@ -3634,8 +3634,8 @@ function updateRopeBadge() {
   // 마구간 안내 (당근·산소통은 상점 안에서 삽니다)
   if (typeof RACE_SPOT !== 'undefined' &&
       Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z) < RACE_RANGE) {
-    ropeBadge.textContent = (!stat.races && ponyLove < RACE_LOVE)
-      ? `경마\n첫 출전은 애정 ${RACE_LOVE}이 되어야 해요 (지금 ${ponyLove})`
+    ropeBadge.textContent = ponyLove < RACE_LOVE
+      ? `경마\n애정 ${RACE_LOVE} 이상부터 출전 (지금 ${ponyLove})`
       : `경마 출전 ${formatWon(raceFee())}\n1등 상금 ${formatWon(racePrize())} · 승률은 반반 (${KEY_ACTION})`;
     return;
   }
@@ -5197,14 +5197,19 @@ function lonelyCheck() {
 
 // ---------- 12-1f-2a. 게임 시간 — 해가 뜨고 지는 하루, 그리고 말의 끼니 ----------
 // 하루는 10분. 해뜰녘에 하루가 바뀌면서 "말에게 당근을 주세요" 알림이 옵니다.
-// 당근은 얼마든지 줘도 되지만, 하루에 한 번은 꼭 줘야 합니다:
-// 하루라도 거르면 말이 울고, 3일째·6일째엔 경고가 오고, 7일을 굶기면 죽습니다.
+// 당근은 하루 세 개까지만 줄 수 있고, 하루라도 거르면 말이 울고 애정이 식습니다.
+// 3일째·6일째엔 경고가 오고, 7일을 굶기면 죽습니다.
 const DAY_LEN = 600;                 // 하루 길이 (초)
 let gameT = DAY_LEN * 0.06;          // 아침 직후에서 시작
 let dayCount = 1;
 let lastFedDay = 0;                  // 마지막으로 당근을 준 날 (0 = 아직 한 번도 안 줌)
 let ponyAlive = true;
 let ponyDeaths = 0;   // 이번 게임에서 말을 굶겨 죽인 횟수 — 한 번도 없어야 새드엔딩이 안 옵니다
+// 애정은 하루아침에 쌓이지 않습니다 — 하루에 세 개까지만 먹일 수 있고,
+// 하루라도 거르면 그만큼 도로 식습니다. 경마에 계속 나가려면 매일 챙겨야 합니다.
+const FEED_PER_DAY = 3;              // 하루에 줄 수 있는 당근
+const LOVE_DECAY = 10;               // 하루 굶길 때마다 식는 애정
+let fedToday = 0;                    // 오늘 몇 개 먹였나
 function ponyFedToday() { return lastFedDay >= dayCount; }
 function hungerDays() { return Math.max(0, dayCount - lastFedDay); }
 
@@ -5215,9 +5220,16 @@ function applyPonyAlive() {
 }
 
 function morningNotice() {
+  fedToday = 0;                      // 새 아침 — 오늘 몫이 다시 채워집니다
   if (!ponyAlive) return;
   const px = state.x, py = lulu.position.y + 2.4, pz = state.z;
   const h = hungerDays();
+  // 어제 한 번도 안 먹였으면 애정이 그만큼 식습니다
+  if (h >= 1 && ponyLove > 0) {
+    ponyLove = Math.max(0, ponyLove - LOVE_DECAY);
+    setTimeout(() => spawnMoneyPopup(px, py + 0.9, pz,
+      `굶긴 만큼 애정이 식었어요\n애정 ${ponyLove}`, 6), 1400);
+  }
   if (h >= 7) {
     // 7일을 굶겼습니다 — 마구간이 빕니다
     ponyAlive = false;
@@ -5744,7 +5756,7 @@ function saveGame(quiet) {
       tools, basketCount, cap: BASKET_CAP, x: outX, z: outZ,
       hasNet, netCarried, netX: netObj.position.x, netZ: netObj.position.z,
       furn: furnitureOwned,
-      gameT, dayCount, lastFedDay, ponyAlive, ponyDeaths, tutorialSeen, introSeen, dayEvent,
+      gameT, dayCount, lastFedDay, fedToday, ponyAlive, ponyDeaths, tutorialSeen, introSeen, dayEvent,
       endingState, happyDay,
       floorC: houseFloorColor, wallC: houseWallColor, paintC: housePaintColor,
       stat, achieved,
@@ -5789,6 +5801,7 @@ function loadGame() {
   if (typeof d.gameT === 'number') gameT = d.gameT;
   dayCount = d.dayCount || 1;
   lastFedDay = d.lastFedDay || 0;
+  fedToday = d.fedToday || 0;
   ponyAlive = d.ponyAlive !== false;
   ponyDeaths = d.ponyDeaths || 0;
   tutorialSeen = !!d.tutorialSeen;
@@ -5999,10 +6012,10 @@ function tryRace() {
     spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z, '조랑말이 있어야 경마에 나갑니다');
     return;
   }
-  // 데뷔전만 애정 100을 봅니다 (당근 100개를 먹여야 닿는 값)
-  if (!stat.races && ponyLove < RACE_LOVE) {
+  // 나갈 때마다 애정 100이 되어야 합니다 — 굶기면 식으니 매일 챙겨야 해요
+  if (ponyLove < RACE_LOVE) {
     spawnMoneyPopup(RACE_SPOT.x, y, RACE_SPOT.z,
-      `첫 출전은 애정 ${RACE_LOVE}이 되어야 해요 (지금 ${ponyLove})\n당근을 먹여주세요`);
+      `애정이 ${RACE_LOVE}은 되어야 출전해요 (지금 ${ponyLove})\n당근을 먹여주세요`);
     return;
   }
   const fee = raceFee();
@@ -6118,23 +6131,31 @@ function tryFeedPony() {
   }
   playPonySfx();   // 말 곁에서 F — 히힝!
   if (carrots <= 0) {
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, '당근이 없어요 · 이장님 상점에서 1,000원');
+    spawnMoneyPopup(STABLE.x, y, STABLE.z, `당근이 없어요\n이장님 상점에서 ${formatWon(CARROT_PRICE)}`);
+    return;
+  }
+  // 하루에 세 개까지 — 한꺼번에 먹인다고 정이 빨리 들지는 않습니다
+  if (fedToday >= FEED_PER_DAY) {
+    spawnMoneyPopup(STABLE.x, y, STABLE.z,
+      `오늘은 배가 불러요 (${FEED_PER_DAY}개)\n내일 또 주세요`);
     return;
   }
   carrots--;
   ponyLove++;
+  fedToday++;
   lastFedDay = dayCount;   // 오늘 끼니를 챙겼습니다 — 말이 웃는 얼굴로 돌아옵니다
   updateCarrotBadge();
   playDropSound();
   state.facing = Math.atan2(STABLE.x - state.x, STABLE.z - state.z);   // 조랑말을 바라보고 먹입니다
   state.idleTime = 0; state.sit = 0;
   if (carrotFx) { carrotFx.visible = true; carrotFxT = 0; }   // 당근 그림이 냠냠 사라집니다
+  const left = FEED_PER_DAY - fedToday;
   if (ponyLove >= RACE_LOVE) {
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, stat.races
-      ? `애정 ${ponyLove}! 조랑말이 아주 신이 났어요`
-      : `애정 ${ponyLove}! 이제 경마에 나갈 수 있어요\n옆 팻말에서 출전!`);
+    spawnMoneyPopup(STABLE.x, y, STABLE.z,
+      `애정 ${ponyLove}! 경마에 나갈 수 있어요\n옆 팻말에서 출전!`);
   } else {
-    spawnMoneyPopup(STABLE.x, y, STABLE.z, `냠냠! 애정 ${ponyLove}/${RACE_LOVE}`);
+    spawnMoneyPopup(STABLE.x, y, STABLE.z,
+      `냠냠! 애정 ${ponyLove}/${RACE_LOVE}` + (left > 0 ? `\n오늘 ${left}개 더 줄 수 있어요` : '\n오늘 몫은 다 줬어요'));
   }
   state.idleTime = 0;
 }
