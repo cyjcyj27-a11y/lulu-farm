@@ -2748,6 +2748,87 @@ function applyLuluMode() {
 }
 applyLuluMode();
 
+// ---------- 10-3. 3D 루루 (직접 만드신 GLB 모델) ----------
+// 그림 판 대신 진짜 입체 루루입니다. 뭍에서는 이 모델이 걸어다니고,
+// 물속·포구(잠수복 구간)는 전용 그림이 있으므로 그대로 그림을 씁니다.
+// 최신 three.js는 옛날처럼 끼워 쓰는 GLTFLoader를 주지 않아서,
+// 이 파일 하나(정지 메시 1개 + PNG 한 장)만 읽는 작은 판독기를 직접 씁니다.
+const luluModel = new THREE.Group();      // 위치 + 진행 방향 회전
+const luluModelInner = new THREE.Group(); // 통통 튀기·기우뚱·숨쉬기는 이 안에서
+luluModel.add(luluModelInner);
+luluModel.visible = false;
+scene.add(luluModel);
+let luluModelReady = false;
+let luluModelYaw = 0;                     // 몸을 홱 돌리지 않고 스르륵 돌기 위한 현재 각도
+const LULU_MODEL_YAW = 0;                 // 모델 원본이 보는 방향 보정 (필요하면 ±Math.PI/2)
+
+async function loadLuluModel() {
+  try {
+    const buf = await (await fetch('../assets/lulu.glb')).arrayBuffer();
+    const dv = new DataView(buf);
+    if (dv.getUint32(0, true) !== 0x46546c67) return;       // 'glTF' 서명 확인
+    const jsonLen = dv.getUint32(12, true);
+    const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
+    const binStart = 20 + jsonLen + 8;                      // JSON 덩어리 다음이 이진 덩어리
+    const prim = gltf.meshes[0].primitives[0];
+    const readAcc = (i) => {
+      const acc = gltf.accessors[i];
+      const bv = gltf.bufferViews[acc.bufferView];
+      const off = binStart + (bv.byteOffset || 0) + (acc.byteOffset || 0);
+      const n = acc.count * ({ SCALAR: 1, VEC2: 2, VEC3: 3 }[acc.type]);
+      return acc.componentType === 5125 ? new Uint32Array(buf.slice(off, off + n * 4))
+           : acc.componentType === 5123 ? new Uint16Array(buf.slice(off, off + n * 2))
+           : new Float32Array(buf.slice(off, off + n * 4));
+    };
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(readAcc(prim.attributes.POSITION), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(readAcc(prim.attributes.TEXCOORD_0), 2));
+    geo.setIndex(new THREE.BufferAttribute(readAcc(prim.indices), 1));
+    geo.computeVertexNormals();
+    // 껴묻어 온 PNG 한 장을 꺼내 입힙니다
+    const imgBv = gltf.bufferViews[gltf.images[0].bufferView];
+    const blob = new Blob([new Uint8Array(buf, binStart + (imgBv.byteOffset || 0), imgBv.byteLength)],
+      { type: gltf.images[0].mimeType || 'image/png' });
+    const bmp = await createImageBitmap(blob);
+    const tex = new THREE.Texture(bmp);
+    tex.flipY = false;                       // GLB의 그림 좌표는 위아래 기준이 반대입니다
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
+    mesh.castShadow = true;                  // 모델은 종이 인형과 달리 진짜 그림자를 드리웁니다
+    // 발끝이 y=0에 닿고 키가 SPRITE_H가 되게 맞춥니다
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox;
+    const s = SPRITE_H / (bb.max.y - bb.min.y);
+    mesh.scale.setScalar(s);
+    mesh.position.y = -bb.min.y * s;
+    luluModelInner.add(mesh);
+    luluModelReady = true;
+  } catch (e) { /* 읽기에 실패하면 그림 루루를 그대로 씁니다 */ }
+}
+if (CAN_USE_IMAGES) loadLuluModel();
+
+// 매 프레임 — 위치·방향·걸음짓. 종이 인형과 달리 카메라가 아니라 "가는 방향"을 봅니다.
+function updateLuluModel() {
+  luluModel.position.copy(lulu.position);
+  // 진행 방향으로 스르륵 돌기 (한 바퀴 넘게 돌지 않게 가까운 쪽으로)
+  let d = state.facing - luluModelYaw;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  luluModelYaw += d * 0.18;
+  luluModel.rotation.y = luluModelYaw + LULU_MODEL_YAW;
+  // 걸을 때 통통 튀며 살짝 기우뚱, 서 있을 때는 숨쉬듯 부풀기
+  const hop = Math.abs(Math.sin(state.walkPhase)) * 0.09 * state.speed;
+  luluModelInner.position.y = hop;
+  luluModelInner.rotation.z = Math.sin(state.walkPhase) * 0.05 * state.speed;
+  const br = 1 + Math.sin(performance.now() * 0.002) * 0.015 * (1 - state.speed);
+  luluModelInner.scale.set(br, 1, br);
+  // 귤 따기·집 고치기 — 절하듯 까딱까딱 (팔 그림이 없으므로 몸짓으로 표현합니다)
+  let bow = 0;
+  if (state.harvestT >= 0) bow = Math.abs(Math.sin((state.harvestT / HARVEST_DURATION) * Math.PI * 3)) * 0.25;
+  else if (state.fixT >= 0) bow = Math.abs(Math.sin((state.fixT / FIX_DURATION) * Math.PI * 2)) * 0.3;
+  luluModelInner.rotation.x = bow;
+}
+
 // 그냥 더블클릭으로 연 경우 안내문을 띄웁니다
 if (!CAN_USE_IMAGES) {
   const warn = document.getElementById('fileWarn');
@@ -5243,6 +5324,14 @@ const camRight = new THREE.Vector3();
 const camFwd = new THREE.Vector3();
 
 function updateSpriteLulu(groundY) {
+  // 뭍에서는 3D 루루 모델, 물속·포구(잠수복 구간)는 전용 그림.
+  // 모델을 아직 못 읽었으면(다운로드 중) 그때까지는 그림이 나옵니다.
+  const useModel = luluModelReady && !state.diving && !inWetsuitZone();
+  luluModel.visible = useModel;
+  spriteLulu.visible = !useModel;
+  if (spriteBlob) spriteBlob.visible = !useModel;   // 모델은 진짜 그림자를 쓰므로 가짜 그림자를 끕니다
+  if (useModel) { updateLuluModel(); return; }
+
   spriteLulu.position.copy(lulu.position);
 
   // 판이 항상 카메라를 정면으로 보게 (좌우로만 돌리고 세로로는 세워둡니다)
