@@ -1854,17 +1854,28 @@ function updateDoors() {
     }
     return;
   }
-  // 밖: 집 문 앞
+  // 밖: 집 문 앞 (내 집이니 자동으로 들어갑니다)
   if (Math.hypot(state.x - HOUSE.x, state.z - (HOUSE.z + 3.6)) < 1.2) {
     const empty = !FURN_ORDER.some((k) => furnitureOwned[k]);
     teleportInto(ROOM, 'inside',
       empty ? '🏚 텅 빈 집… 맨땅이라도 몸 누일 곳은 되네요' : '🏡 내 집에 왔어요');
     return;
   }
-  // 밖: 상점 문 앞
-  if (Math.hypot(state.x - SHOP_DOOR.x, state.z - SHOP_DOOR.z) < 0.9) {
-    teleportInto(SHOP_ROOM, 'inShop', '🏪 어서 오세요! 물건 앞에서 사면 됩니다');
+  // (상점은 자동 입장이 아닙니다 — 이장님이 문 앞에 와서 열어줘야 F로 들어갑니다)
+}
+
+// 상점 문 앞에서 F — 이장님이 계셔야 문을 열어줍니다
+const SHOP_DOOR_RANGE = 1.8;
+function mayorAtShop() {
+  return Math.hypot(mayor.x - MAYOR_POSTS.shop.x, mayor.z - MAYOR_POSTS.shop.z) < 2.5;
+}
+function tryEnterShop() {
+  const y = groundHeight(SHOP_DOOR.x, SHOP_DOOR.z) + 2.2;
+  if (!mayorAtShop()) {
+    spawnMoneyPopup(SHOP_DOOR.x, y, SHOP_DOOR.z, '이장님이 오고 계세요 — 잠깐만요');
+    return;
   }
+  teleportInto(SHOP_ROOM, 'inShop', '🏪 어서 오세요! 물건 앞에서 사면 됩니다');
 }
 
 // 8-3. 감귤나무 (밭담 안에 줄지어 심는 귤밭)
@@ -2588,8 +2599,9 @@ function updateCamera(dt) {
   // 걷는 방향의 등 뒤로 카메라가 스르륵 따라 돕니다.
   // - 직접 돌린 직후 1.5초는 양보 (플레이어 뜻이 우선)
   // - 물속에서는 끔 (시선 방향으로 헤엄치는 조작과 서로 꼬입니다)
+  // - 상자를 끄는 동안도 끔 (루루가 상자만 바라봐서 카메라가 빙글빙글 돌게 됩니다)
   // - 카메라를 정면으로 마주 보고 걸어올 때는 억지로 돌리지 않습니다
-  if (!state.diving && state.speed > 0.15 && now - camManualT > 1.5) {
+  if (!state.diving && !state.grabbing && !hasRope && state.speed > 0.15 && now - camManualT > 1.5) {
     let diff = (state.facing + Math.PI) - camYaw;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
@@ -2835,7 +2847,15 @@ function updateRopeBadge() {
     ropeBadge.textContent = houseBadgeText();
     return;
   }
-  // 이장님·돌하르방 안내
+  // 상점 문 앞 안내 — 이장님이 오셨는지에 따라
+  if (typeof SHOP_DOOR !== 'undefined' &&
+      Math.hypot(state.x - SHOP_DOOR.x, state.z - SHOP_DOOR.z) < SHOP_DOOR_RANGE) {
+    ropeBadge.textContent = mayorAtShop()
+      ? `🏪 ${KEY_ACTION}으로 상점에 들어가기 — 이장님이 문을 열어줍니다`
+      : '🏪 이장님이 오고 계세요 — 문 앞에서 잠깐 기다려주세요';
+    return;
+  }
+  // 이장님·돌하르방 안내 (이장님 바로 곁에서는 이야기가 우선입니다)
   if (typeof mayor !== 'undefined' && mayorGroup &&
       Math.hypot(state.x - mayor.x, state.z - mayor.z) < MAYOR_TALK_RANGE) {
     ropeBadge.textContent = `🧢 이장님과 이야기 (${KEY_ACTION})`;
@@ -2844,6 +2864,17 @@ function updateRopeBadge() {
   if (typeof TUTOR_SPOT !== 'undefined' &&
       Math.hypot(state.x - TUTOR_SPOT.x, state.z - TUTOR_SPOT.z) < TUTOR_RANGE) {
     ropeBadge.textContent = `🗿 돌하르방과 이야기 (${KEY_ACTION})`;
+    return;
+  }
+  // 택배사 앞 안내 — 이장님이 계셔야 정산이 됩니다
+  if (typeof depot !== 'undefined' &&
+      Math.hypot(state.x - depot.group.position.x, state.z - depot.group.position.z) < DEPOT_RANGE) {
+    const mayorHere = Math.hypot(mayor.x - MAYOR_POSTS.depot.x, mayor.z - MAYOR_POSTS.depot.z) < 2.5;
+    ropeBadge.textContent = mayorHere
+      ? (basketCount >= BASKET_CAP
+        ? `🚚 ${KEY_ACTION}으로 귤 박스 부치기 (10,000원) — 이장님이 계세요`
+        : `🚚 택배사 — 상자를 가득 채워 오면 이장님이 사 줍니다 (${basketCount}/${BASKET_CAP})`)
+      : '🚚 이장님이 오고 계세요 — 문 앞에서 잠깐 기다려주세요';
     return;
   }
   // 당근 바구니·산소통·마구간 안내
@@ -4607,7 +4638,20 @@ function handleActionKey() {
     }
     return;
   }
-  if (nearestFruit() >= 0) { tryHarvest(); return; }
+  if (nearestFruit() >= 0) {
+    // 딴 귤은 상자에 담아야 하니, 상자가 곁에 있어야 딸 수 있습니다
+    if (Math.hypot(basketPos.x - state.x, basketPos.z - state.z) > 6) {
+      spawnMoneyPopup(state.x, lulu.position.y + 1.8, state.z, '📦 귤 상자를 옆에 끌고 와야 담을 수 있어요');
+      return;
+    }
+    tryHarvest();
+    return;
+  }
+  // 상점 문 앞 — 이장님이 열어주면 들어갑니다 (문 앞에서는 입장이 대화보다 우선)
+  if (Math.hypot(state.x - SHOP_DOOR.x, state.z - SHOP_DOOR.z) < SHOP_DOOR_RANGE) {
+    tryEnterShop();
+    return;
+  }
   // 이장님·돌하르방과 이야기하기
   if (mayorGroup && Math.hypot(state.x - mayor.x, state.z - mayor.z) < MAYOR_TALK_RANGE) {
     startTalk('이장님', mayorTalkLines());
