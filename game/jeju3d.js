@@ -123,6 +123,72 @@ const DIVE = { x: 0, z: 118, r: 20 };    // 물질장 (포구 앞바다)
 const DIVE_DEPTH = 9;                    // 이만큼 더 파 내려갑니다
 const SEA_Y = -0.5;                      // 바다 표면 높이 (아래 4번에서 만드는 바다 판과 같은 값)
 
+// ---------- 밭 격자와 올레길 ----------
+// 섬은 33미터짜리 네모 칸으로 나뉘고, 칸마다 26미터짜리 밭이 하나씩 들어갑니다.
+// 남는 7미터가 밭과 밭 사이 골목이고, 올레길은 그 골목 한가운데로만 지나갑니다.
+// (밭을 실제로 만드는 곳은 아래 8번입니다. 여기서는 길을 먼저 정해 둡니다 —
+//  풀·꽃·바위를 흩뿌릴 때 길 위를 비워두려면 길이 먼저 있어야 하기 때문입니다)
+const PLOT_CELL = 33;    // 격자 한 칸
+const PLOT_SIZE = 26;    // 밭 한 변
+// 밭을 만들지 않고 비워두는 칸. 마당과, 건물이 들어선 칸들입니다.
+// 밭 한가운데 건물이 박히면 돌담에 갇혀 문 앞까지 갈 수가 없습니다.
+const EMPTY_CELLS = new Set([
+  '0,1',    // 마당 — 상점(동쪽)과 택배사(서쪽)가 이 한 마당을 나란히 씁니다
+  '-2,0',   // 마구간과 경마장
+  '0,-2',   // 무남이네
+  '2,-2',   // 루루의 헌집
+]);
+
+const olleSegs = [];   // 길 한 구간씩 {x1,z1,x2,z2,w}
+function pointOnOlle(x, z, extra) {
+  for (const s of olleSegs) {
+    const vx = s.x2 - s.x1, vz = s.z2 - s.z1;
+    const len2 = vx * vx + vz * vz;
+    let t = len2 ? ((x - s.x1) * vx + (z - s.z1) * vz) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = s.x1 + vx * t, pz = s.z1 + vz * t;
+    if (Math.hypot(x - px, z - pz) < s.w / 2 + (extra || 0)) return true;
+  }
+  return false;
+}
+{
+  // g번 칸과 g+1번 칸 사이 골목의 한가운데
+  const LANE = (g) => g * PLOT_CELL + PLOT_CELL / 2;
+  const YARD = { x: 0, z: 33 };     // 상점·택배사 앞 마당
+  const W = 4.0;                    // 골목(7미터) 한가운데 놓이는 길 너비
+  const NORTH = LANE(1) + 1.5;      // 마당에서 북쪽으로 나갈 수 있는 끝 (그 위는 밭)
+  // 건물 좌표는 한참 아래에서 정해지므로, 길을 먼저 놓는 여기서는 같은 값을 그대로 적습니다
+  const SHOP_AT = { x: 6, z: 45 }, DEPOT_AT = { x: -8, z: 46 };
+  const STABLE_AT = { x: -79, z: 8 }, MUNAM_AT = { x: 12, z: -64 };
+  // 길에는 따로 돌담을 세우지 않습니다.
+  // 밭 사이 골목에는 이미 밭 돌담이 양옆에 서 있고,
+  // 길마다 담을 또 세우면 길이 갈라지는 자리에서 담이 옆길을 가로막습니다.
+  const path = (x1, z1, x2, z2, w) => olleSegs.push({ x1, z1, x2, z2, w: w || 3.4 });
+
+  // 마당 안 — 상점과 택배사 문 앞으로 짧게 두 갈래
+  path(YARD.x, YARD.z + 3, SHOP_AT.x, SHOP_AT.z - 4.5, 3.6);
+  path(YARD.x, YARD.z + 3, DEPOT_AT.x, DEPOT_AT.z - 3.5, 3.6);
+  // 마당 → 포구 (물질 가는 길). 북쪽 밭을 동쪽 골목으로 돌아서 넘어갑니다
+  path(YARD.x, YARD.z + 3, YARD.x, NORTH, W);
+  path(YARD.x, NORTH, LANE(0), NORTH, W);
+  path(LANE(0), NORTH, LANE(0), PORT.z - 6, W);
+  path(LANE(0), PORT.z - 6, PORT.x, PORT.z - 6, W);
+  path(PORT.x, PORT.z - 6, PORT.x, PORT.z - 1, W);
+  // 마당 → 마구간·경마장 (서쪽 골목으로 내려가 서쪽 끝까지)
+  path(YARD.x - 4, YARD.z, LANE(-1), YARD.z, W);
+  path(LANE(-1), YARD.z, LANE(-1), LANE(0), W);
+  path(LANE(-1), LANE(0), STABLE_AT.x, LANE(0), W);
+  path(STABLE_AT.x, LANE(0), STABLE_AT.x, STABLE_AT.z + 6, W);
+  // 마당 → 남쪽 (헌집·무남이네로 갈라지는 큰길)
+  path(YARD.x + 4, YARD.z, LANE(0), YARD.z, W);
+  path(LANE(0), YARD.z, LANE(0), LANE(-2), W);
+  // 남쪽 → 헌집
+  path(LANE(0), LANE(-2), LANE(1), LANE(-2), W);
+  path(LANE(1), LANE(-2), HOUSE_SITE.x, HOUSE_SITE.z + 10, W);
+  // 남쪽 → 무남이네
+  path(LANE(0), LANE(-2), MUNAM_AT.x, MUNAM_AT.z + 6, 3.4);
+}
+
 let pierTopY = null;   // 포구 축대 윗면 높이 (처음 밟을 때 한 번 재서 기억합니다)
 function groundHeight(x, z) {
   // 집 내부·상점 내부는 섬에서 멀리 떨어진 곳에 지은 별도의 방들입니다 — 그 안은 평평한 방바닥
@@ -322,6 +388,8 @@ function scatter(count, maxR, minHeight, callback) {
     // 포구 축대 위는 걸어다니는 길이라 바위·풀을 심지 않습니다
     // (축대 바닥을 평평하게 만든 뒤로 여기가 "땅"으로 인식되어 바위가 길을 막는 일이 있었습니다)
     if (x > -3.4 && x < 3.4 && z > 90.5 && z < 103.5) continue;
+    // 올레길 위도 마찬가지입니다 — 흙길에 풀이 무성하면 길로 보이지 않습니다
+    if (pointOnOlle(x, z, -0.3)) continue;
     const y = groundHeight(x, z);
     if (y < minHeight) continue;
     callback(x, y, z, r);
@@ -463,6 +531,8 @@ function buildStoneWall(x1, z1, x2, z2) {
     const x = x1 + dx * t, z = z1 + dz * t;
     const y = groundHeight(x, z);
     if (y < 1.0) continue;
+    // 올레길이 지나는 자리는 담을 터놓습니다 — 제주 밭담에도 드나드는 어귀가 있습니다
+    if (pointOnOlle(x, z, 0.5)) continue;
 
     const layers = 2 + ((Math.random() * 2) | 0);
     for (let L = 0; L < layers; L++) {
@@ -493,28 +563,32 @@ buildStoneWall(52, -44, 53, -66);
 // 제주 들판은 밭담으로 잘게 나뉜 조각보처럼 생겼습니다. 그 느낌을 내려고 밭을 하나씩
 // 손으로 적지 않고, 섬 전체에 격자를 깔아 한 칸에 밭 하나씩 앉힙니다.
 // 칸(PLOT_CELL)보다 밭(PLOT_SIZE)을 작게 잡은 만큼이 밭과 밭 사이의 길이 됩니다.
-const PLOT_CELL = 33;    // 격자 한 칸
-const PLOT_SIZE = 29;    // 밭 한 변 — 18개쯤 깔리면 걸어다닐 수 있는 땅의 약 절반이 귤밭이 됩니다
-                         // (칸 33 - 밭 29 = 4만큼이 밭과 밭 사이 고샅길)
-// 밭을 만들지 않고 비워두는 칸 — 루루가 시작하는 트인 마당입니다.
-// 상점(동쪽)과 택배사(서쪽)가 이 한 마당을 나란히 씁니다.
-const HOME_GX = 0, HOME_GZ = 1;
-const ORCHARDS = [];
+// (격자 크기 PLOT_CELL·PLOT_SIZE와 비워둘 칸 EMPTY_CELLS는 위쪽 올레길 대목에서 정해 뒀습니다)
+// 밭은 두 가지입니다 — 귤밭과 당근밭. 격자를 번갈아 나눠 절반씩 심습니다.
+// (예전에는 전부 귤밭이라 섬이 온통 귤나무였습니다)
+const ORCHARDS = [];      // 귤밭
+const CARROT_FIELDS = []; // 당근밭
+const ALL_FIELDS = [];    // 돌담은 둘 다 똑같이 두릅니다
 for (let gx = -3; gx <= 3; gx++) {
   for (let gz = -3; gz <= 3; gz++) {
-    if (gx === HOME_GX && gz === HOME_GZ) continue;
-    const cx = gx * PLOT_CELL + (Math.random() - 0.5) * 3;
-    const cz = gz * PLOT_CELL + (Math.random() - 0.5) * 3;
+    if (EMPTY_CELLS.has(gx + ',' + gz)) continue;
+    // 골목이 곧아야 올레길이 지나갈 수 있어서, 칸 안에서 흔들리는 폭은 조금만 둡니다
+    const cx = gx * PLOT_CELL + (Math.random() - 0.5) * 1.2;
+    const cz = gz * PLOT_CELL + (Math.random() - 0.5) * 1.2;
     if (Math.hypot(cx, cz) > 78.5) continue;          // 밭 전체가 걸어다닐 수 있는 범위 안에 들어와야 함
     if (groundHeight(cx, cz) > 11) continue;          // 오름(화산 언덕) 꼭대기는 밭으로 덮지 않고 남겨둡니다
-    ORCHARDS.push({
+    const f = {
       x: cx, z: cz,
       w: PLOT_SIZE, h: PLOT_SIZE,
-      rot: (Math.random() - 0.5) * 0.16,              // 칸마다 살짝 비뚤어야 조각보처럼 보입니다
+      rot: (Math.random() - 0.5) * 0.09,              // 칸마다 살짝 비뚤어야 조각보처럼 보입니다
       gap: 5.3,
       cols: 5, rows: 5,
       open: (Math.random() * 4) | 0,                  // 네 변 중 아무 데나 한 곳을 입구로 터놓기
-    });
+    };
+    // 바둑판처럼 한 칸 걸러 당근밭 — 귤밭이 딱 절반으로 줄어듭니다
+    f.kind = ((gx + gz) & 1) ? 'carrot' : 'citrus';
+    (f.kind === 'carrot' ? CARROT_FIELDS : ORCHARDS).push(f);
+    ALL_FIELDS.push(f);
   }
 }
 
@@ -524,7 +598,7 @@ function fieldCorners(f) {
   return [pt(-f.w / 2, -f.h / 2), pt(f.w / 2, -f.h / 2), pt(f.w / 2, f.h / 2), pt(-f.w / 2, f.h / 2)];
 }
 
-for (const f of ORCHARDS) {
+for (const f of ALL_FIELDS) {
   const p = fieldCorners(f);
   for (let i = 0; i < 4; i++) {
     if (i === f.open) continue;                 // 이 변은 입구로 터놓습니다
@@ -2634,6 +2708,134 @@ function hideFruit(i) {
   fruitMesh.instanceMatrix.needsUpdate = true;
 }
 
+// ---------- 8-3b. 당근밭 ----------
+// 땅에 심긴 당근은 잎만 보입니다. 밭고랑을 따라 줄지어 나 있고,
+// 다가가서 뽑으면 당근 한 개가 손에 들어옵니다 (상점에서 사지 않아도 됩니다).
+const carrotSpots = [];
+const carrotLeafMat = new THREE.MeshLambertMaterial({ color: 0x2f6b2a, flatShading: true });
+const carrotRootMat = new THREE.MeshLambertMaterial({ color: 0xe0721d, flatShading: true });
+{
+  for (const f of CARROT_FIELDS) {
+    const c = Math.cos(f.rot), s = Math.sin(f.rot);
+    // 밭 하나에 고랑 7줄, 줄마다 12포기
+    for (let r = 0; r < 7; r++) {
+      for (let k = 0; k < 12; k++) {
+        const lx = (r - 3) * 3.4 + (Math.random() - 0.5) * 0.5;
+        const lz = (k - 5.5) * 1.9 + (Math.random() - 0.5) * 0.5;
+        const x = f.x + lx * c - lz * s;
+        const z = f.z + lx * s + lz * c;
+        const y = groundHeight(x, z);
+        if (y < 1.5) continue;
+        let blocked = false;
+        for (const o of obstacles) {
+          if (Math.hypot(o.x - x, o.z - z) < o.r + 0.7) { blocked = true; break; }
+        }
+        if (blocked) continue;
+        carrotSpots.push({ x, y, z, rot: Math.random() * Math.PI, picked: false });
+      }
+    }
+  }
+}
+// 잎 — 십자로 세운 판 두 장이면 어느 쪽에서 봐도 수북해 보입니다
+let carrotLeafMesh, carrotRootMesh;
+{
+  // 당근 잎은 밑동에서 여러 갈래가 부챗살처럼 뻗어 올라옵니다.
+  // three에 지오메트리 합치기 도구가 없어서 손으로 엮습니다.
+  const parts = [];
+  for (let k = 0; k < 6; k++) {
+    const blade = new THREE.ConeGeometry(0.045, 0.52 + Math.random() * 0.16, 4);
+    blade.translate(0, 0.26, 0);
+    blade.rotateZ((Math.random() - 0.5) * 0.7);          // 바깥으로 벌어지게
+    blade.rotateY((k / 6) * Math.PI * 2 + Math.random() * 0.4);
+    parts.push(blade);
+  }
+  const tuft = new THREE.BufferGeometry();
+  let pn = 0, inCount = 0;
+  parts.forEach((g) => { pn += g.attributes.position.count; inCount += g.index ? g.index.count : 0; });
+  const pos = new Float32Array(pn * 3);
+  const nor = new Float32Array(pn * 3);
+  const uv = new Float32Array(pn * 2);
+  const idx = [];
+  let vo = 0, po = 0, uo = 0;
+  parts.forEach((g) => {
+    pos.set(g.attributes.position.array, po);
+    nor.set(g.attributes.normal.array, po);
+    uv.set(g.attributes.uv.array, uo);
+    const gi = g.index.array;
+    for (let i = 0; i < gi.length; i++) idx.push(gi[i] + vo);
+    vo += g.attributes.position.count;
+    po += g.attributes.position.array.length;
+    uo += g.attributes.uv.array.length;
+  });
+  tuft.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  tuft.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  tuft.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  tuft.setIndex(idx);
+  carrotLeafMesh = buildInstanced(tuft, carrotLeafMat, carrotSpots, (s) => {
+    dummy.position.set(s.x, s.y, s.z);
+    dummy.rotation.set(0, s.rot, 0);
+    dummy.scale.setScalar(0.9 + Math.random() * 0.3);
+  });
+  carrotLeafMesh.castShadow = true;
+  // 흙 위로 살짝 내민 주황 어깨
+  const root = new THREE.ConeGeometry(0.12, 0.3, 7);
+  root.rotateX(Math.PI);           // 뾰족한 쪽이 땅속으로
+  root.translate(0, 0.1, 0);
+  carrotRootMesh = buildInstanced(root, carrotRootMat, carrotSpots, (s) => {
+    dummy.position.set(s.x, s.y, s.z);
+    dummy.rotation.set(0, s.rot, 0);
+    dummy.scale.setScalar(1);
+  });
+}
+function hideCarrotPlant(i) {
+  const s = carrotSpots[i];
+  s.picked = true;
+  dummy.position.set(s.x, s.y, s.z);
+  dummy.rotation.set(0, 0, 0);
+  dummy.scale.setScalar(0);
+  dummy.updateMatrix();
+  carrotLeafMesh.setMatrixAt(i, dummy.matrix);
+  carrotRootMesh.setMatrixAt(i, dummy.matrix);
+  carrotLeafMesh.instanceMatrix.needsUpdate = true;
+  carrotRootMesh.instanceMatrix.needsUpdate = true;
+}
+
+// ---------- 8-3c. 올레길 — 일터로 이어지는 흙길 ----------
+// 제주 올레는 큰길에서 집으로 들어가는 좁은 골목입니다.
+// 길이 어디로 나는지는 맨 위(밭 격자와 올레길)에서 이미 정해 뒀습니다.
+// 여기서는 그 길을 실제로 깔기만 합니다 — 밟은 흙빛 바닥에, 구간에 따라 양옆 돌담을 세웁니다.
+const OLLE_MAT = new THREE.MeshLambertMaterial({ color: 0xa8906a });
+{
+  // 길바닥은 짧은 판을 이어 붙여 만듭니다.
+  // 판을 그냥 수평으로 놓으면 비탈에서 층계처럼 턱이 지므로,
+  // 판마다 땅 기울기에 맞춰 눕혀서 비탈을 미끄러지듯 따라가게 합니다.
+  const T = new THREE.Vector3(), B = new THREE.Vector3(), N = new THREE.Vector3();
+  for (const s of olleSegs) {
+    const { x1, z1, x2, z2, w } = s;
+    const dx = x2 - x1, dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    const n = Math.max(1, Math.round(len / 1.4));
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n;
+      const ax = x1 + dx * t0, az = z1 + dz * t0;
+      const bx = x1 + dx * t1, bz = z1 + dz * t1;
+      const ay = groundHeight(ax, az), by = groundHeight(bx, bz);
+      const flat = Math.hypot(bx - ax, bz - az);
+      const slope = Math.hypot(flat, by - ay);        // 비탈을 따라 잰 실제 길이
+      T.set(bx - ax, by - ay, bz - az).normalize();   // 길이 나아가는 방향
+      B.set(-(bz - az), 0, bx - ax).normalize();      // 길 폭 방향 (늘 수평)
+      N.crossVectors(B, T).normalize();               // 길바닥이 바라보는 쪽
+      const seg = new THREE.Mesh(new THREE.PlaneGeometry(w, slope + 0.35), OLLE_MAT);
+      seg.matrixAutoUpdate = false;
+      seg.matrix.makeBasis(B, T, N);
+      // 잔디 바로 위에 살짝 얹습니다
+      seg.matrix.setPosition((ax + bx) / 2, (ay + by) / 2 + 0.05, (az + bz) / 2);
+      seg.receiveShadow = true;
+      scene.add(seg);
+    }
+  }
+}
+
 // 8-4. 팽나무 (바람에 한쪽으로 쏠린 제주 들판 나무)
 function buildTree(x, y, z) {
   const g = new THREE.Group();
@@ -2670,6 +2872,7 @@ scatter(16, ISLAND_R - 26, 2.5, (x, y, z) => {
     if (Math.hypot(o.x - x, o.z - z) < o.r + 4.5) return;
   }
   if (plantBlocked(x, z)) return;   // 마구간·헌집 곁은 비워둡니다
+  if (pointOnOlle(x, z, 2.5)) return;   // 올레길 위에는 나무를 심지 않습니다
   buildTree(x, y, z);
 });
 
@@ -3512,6 +3715,8 @@ function updateBasketBadge() {
 // 안내 문구에 쓸 조작 이름. 폰에는 키보드가 없으므로 화면 버튼 이름으로 바꿔 말해줍니다.
 // (예전에는 폰에서도 "F를 누르세요"라고만 해서, 누를 F가 없어 물질하러 못 들어갔습니다)
 const KEY_ACTION = IS_TOUCH ? '행동 버튼' : 'F';
+// "F으로"는 읽기 어색해서 조사까지 붙인 형태를 따로 둡니다
+const KEY_ACTION_RO = IS_TOUCH ? '행동 버튼으로' : 'F로';
 const KEY_GRAB = KEY_ACTION;   // 상호작용 키를 하나로 통일했습니다
 const KEY_UP = IS_TOUCH ? '점프 버튼' : 'Space';
 
@@ -3537,7 +3742,7 @@ function updateRopeBadge() {
     if (rg) {
       ropeBadge.textContent = (rg.type === 'paint' && tools.paint)
         ? '페인트 보유 중\n집 앞에서 칠하세요'
-        : `${rg.name}\n${formatWon(shopPrice(rg.price))}${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION}으로 색 고르기)`;
+        : `${rg.name}\n${formatWon(shopPrice(rg.price))}${dayEvent === 'market' ? ' (장날 반값!)' : ''} (${KEY_ACTION_RO} 색 고르기)`;
       return;
     }
     const good = nearestShopGood();
@@ -3548,7 +3753,7 @@ function updateRopeBadge() {
         (FURNITURE[good.key] && furnitureOwned[good.key]);
       ropeBadge.textContent = owned
         ? `${good.name}\n보유 중`
-        : `${good.name} ${formatWon(shopPrice(good.price))}${dayEvent === 'market' ? ' (장날 반값!)' : ''}\n${KEY_ACTION}으로 구입`;
+        : `${good.name} ${formatWon(shopPrice(good.price))}${dayEvent === 'market' ? ' (장날 반값!)' : ''}\n${KEY_ACTION_RO} 구입`;
     } else {
       ropeBadge.textContent = '상점 안\n물건 앞에 서면 살 수 있어요 (문 쪽으로 가면 밖으로)';
     }
@@ -3607,7 +3812,7 @@ function updateRopeBadge() {
   if (typeof SHOP_DOOR !== 'undefined' &&
       Math.hypot(state.x - SHOP_DOOR.x, state.z - SHOP_DOOR.z) < SHOP_DOOR_RANGE) {
     ropeBadge.textContent = mayorAtShop()
-      ? `${KEY_ACTION}으로 상점에 들어가기\n이장님이 문을 열어줍니다`
+      ? `${KEY_ACTION_RO} 상점에 들어가기\n이장님이 문을 열어줍니다`
       : '이장님이 오고 계세요\n문 앞에서 잠깐 기다려주세요';
     return;
   }
@@ -3628,9 +3833,14 @@ function updateRopeBadge() {
     const mayorHere = Math.hypot(mayor.x - MAYOR_POSTS.depot.x, mayor.z - MAYOR_POSTS.depot.z) < 2.5;
     ropeBadge.textContent = mayorHere
       ? (basketCount >= BASKET_CAP
-        ? `${KEY_ACTION}으로 귤 박스 부치기 (${formatWon(BOX_PRICE)})\n이장님이 계세요`
+        ? `${KEY_ACTION_RO} 귤 박스 부치기 (${formatWon(BOX_PRICE)})\n이장님이 계세요`
         : `택배사\n상자를 가득 채워 오면 이장님이 사 줍니다 (${basketCount}/${BASKET_CAP})`)
       : '이장님이 오고 계세요\n문 앞에서 잠깐 기다려주세요';
+    return;
+  }
+  // 당근밭 — 발밑에 뽑을 게 있으면 알려줍니다
+  if (typeof nearestCarrotPlant === 'function' && nearestCarrotPlant() >= 0) {
+    ropeBadge.textContent = `${KEY_ACTION_RO} 당근 뽑기 (지금 ${carrots}개)`;
     return;
   }
   // 마구간 안내 (당근·산소통은 상점 안에서 삽니다)
@@ -3644,9 +3854,9 @@ function updateRopeBadge() {
   if (typeof STABLE !== 'undefined' &&
       Math.hypot(state.x - STABLE.x, state.z - STABLE.z) < STABLE_RANGE) {
     if (!ponyAlive) {
-      ropeBadge.textContent = `마구간이 비었어요\n${KEY_ACTION}으로 새 조랑말 데려오기 (${formatWon(PONY_PRICE)})`;
+      ropeBadge.textContent = `마구간이 비었어요\n${KEY_ACTION_RO} 새 조랑말 데려오기 (${formatWon(PONY_PRICE)})`;
     } else if (carrots > 0) {
-      ropeBadge.textContent = `${KEY_ACTION}으로 당근 먹이기 (${carrots}개 있음)` +
+      ropeBadge.textContent = `${KEY_ACTION_RO} 당근 먹이기 (${carrots}개 있음)` +
         (ponyFedToday() ? '' : '\n오늘 아직 안 먹였어요');
     } else {
       ropeBadge.textContent = '조랑말한테 당근을 주세요\n당근은 이장님 상점에서';
@@ -3819,11 +4029,44 @@ targetRing.renderOrder = 999;
 targetRing.visible = false;
 scene.add(targetRing);
 
+// 발밑에 뽑을 수 있는 당근이 있는지 (귤보다 가까이 가야 손이 닿습니다)
+const CARROT_PULL_RANGE = 1.5;
+function nearestCarrotPlant() {
+  let best = -1, bestD = CARROT_PULL_RANGE;
+  for (let i = 0; i < carrotSpots.length; i++) {
+    const s = carrotSpots[i];
+    if (s.picked) continue;
+    const d = Math.hypot(s.x - state.x, s.z - state.z);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+function tryPullCarrot() {
+  const i = nearestCarrotPlant();
+  if (i < 0) return false;
+  const s = carrotSpots[i];
+  state.facing = Math.atan2(s.x - state.x, s.z - state.z);
+  state.harvestT = 0;              // 귤 딸 때와 같은 동작을 씁니다
+  hideCarrotPlant(i);
+  carrots++;
+  updateCarrotBadge();
+  playPickSound();
+  spawnMoneyPopup(s.x, s.y + 1.0, s.z, `당근 +1 (${carrots}개)`);
+  state.idleTime = 0;
+  return true;
+}
+
 function updateHarvestTarget(dt, t) {
   if (state.harvestT >= 0) { targetRing.visible = false; return; }   // 따는 중엔 표식 끔
   const i = nearestFruit();
-  if (i < 0) { targetRing.visible = false; return; }
-  const s = fruitSpots[i];
+  let s = null;
+  if (i >= 0) {
+    s = fruitSpots[i];
+  } else {
+    const ci = nearestCarrotPlant();                                 // 귤이 없으면 당근을 봅니다
+    if (ci >= 0) { const c = carrotSpots[ci]; s = { x: c.x, y: c.y + 0.5, z: c.z }; }
+  }
+  if (!s) { targetRing.visible = false; return; }
   targetRing.visible = true;
   targetRing.position.set(s.x, s.y, s.z);
   targetRing.rotation.set(Math.PI / 2, t * 2.2, 0);           // 살짝 돌아가며 반짝이는 느낌
@@ -4697,7 +4940,7 @@ function houseBadgeText() {
   if (!tools.paint) {
     return `외벽 페인트칠을 하려면 공구대에서 페인트를 사 오세요 (${formatWon(PAINT_PRICE)} · 색 고르기)`;
   }
-  return `페인트칠 ${fixSwings}/${SWINGS_PER_STAGE}\n${KEY_ACTION}으로 계속 · 문 앞에 서면 안으로`;
+  return `페인트칠 ${fixSwings}/${SWINGS_PER_STAGE}\n${KEY_ACTION_RO} 계속 · 문 앞에 서면 안으로`;
 }
 
 function tryFixHouse() {
@@ -6210,6 +6453,8 @@ function handleActionKey() {
     tryHarvest();
     return;
   }
+  // 발밑에 당근이 있으면 뽑습니다 (상자가 없어도 됩니다 — 손에 들면 그만이니까)
+  if (tryPullCarrot()) return;
   // 상점 문 앞 — 이장님이 열어주면 들어갑니다 (문 앞에서는 입장이 대화보다 우선)
   if (Math.hypot(state.x - SHOP_DOOR.x, state.z - SHOP_DOOR.z) < SHOP_DOOR_RANGE) {
     tryEnterShop();
