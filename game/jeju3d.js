@@ -392,6 +392,19 @@ for (let gx = -3; gx <= 3; gx++) {
     const cz = gz * PLOT_CELL + (Math.random() - 0.5) * 1.2;
     if (Math.hypot(cx, cz) > 78.5) continue;          // 밭 전체가 걸어다닐 수 있는 범위 안에 들어와야 함
     if (groundHeight(cx, cz) > 11) continue;          // 오름(화산 언덕) 꼭대기는 밭으로 덮지 않고 남겨둡니다
+    // 네 귀퉁이까지 모두 판판한 뭍이어야 밭을 앉힙니다.
+    // 해안 벼랑에 걸치면 땅이 뚝 떨어져서, 밭바닥이 지형에 파묻혀 비뚜름하게 잘려 보입니다.
+    {
+      const half = PLOT_SIZE / 2;
+      let lo = Infinity, hi = -Infinity, dry = true;
+      for (const [dx, dz] of [[-half, -half], [half, -half], [half, half], [-half, half]]) {
+        const h = groundHeight(cx + dx, cz + dz);
+        if (h < 0.9) { dry = false; break; }
+        if (h < lo) lo = h;
+        if (h > hi) hi = h;
+      }
+      if (!dry || hi - lo > 11) continue;
+    }
     const f = {
       x: cx, z: cz,
       w: PLOT_SIZE, h: PLOT_SIZE,
@@ -1466,15 +1479,18 @@ const TANK_BREATH = 180;   // 산소통을 멘 뒤의 숨 — 3분
 // 이장님 땅을 100평씩 빌려 씨앗을 심습니다. 수확할 때마다 절반이 소작료로 나가고,
 // 목돈을 모아 아예 사버리면 그때부터 전부 루루 몫입니다.
 // 씨앗은 상점 진열대에서 벽지 고르듯 종류를 골라 삽니다.
+// 씨앗은 한 봉지가 1킬로그램이고, 밭 한 칸에 딱 맞습니다.
+// 씨앗값은 싸지만 거두기까지가 깁니다. 오래 기다리는 작물일수록 크게 법니다.
+// 차나무만 다릅니다. 벌이는 가장 적어도 한 번 심으면 사흘마다 계속 땁니다.
 const SEEDS = {
-  buckwheat: { name: '메밀',   emoji: '🌾', price: 300000,  days: 3, yield: 2100000,
+  buckwheat: { name: '메밀',   emoji: '🌾', price: 30000,  days: 7,  yield: 3000000,
                tip: '가을이면 밭이 하얗게 됩니다' },
-  potato:    { name: '감자',   emoji: '🥔', price: 500000,  days: 3, yield: 2600000,
+  potato:    { name: '감자',   emoji: '🥔', price: 50000,  days: 10, yield: 5000000,
                tip: '한 포기에 여러 알이 달립니다' },
-  radish:    { name: '월동무', emoji: '🥬', price: 400000,  days: 4, yield: 3200000,
-               tip: '제주 겨울 무. 굵직합니다' },
-  tea:       { name: '차나무', emoji: '🍃', price: 2000000, days: 6, yield: 2400000,
-               tip: '한 번 심으면 베지 않고 계속 땁니다', perennial: true },
+  radish:    { name: '월동무', emoji: '🥬', price: 100000, days: 20, yield: 10000000,
+               tip: '제주 겨울 무. 오래 기다리는 만큼 크게 법니다' },
+  tea:       { name: '차나무', emoji: '🍃', price: 100000, days: 3,  yield: 500000,
+               tip: '한 번 심으면 베지 않고 사흘마다 계속 땁니다', perennial: true },
 };
 const SEED_ORDER = ['buckwheat', 'potato', 'radish', 'tea'];
 let seeds = {};                       // 가지고 있는 씨앗 봉지
@@ -2256,7 +2272,7 @@ function formatWon(n) {
 // ---------- 8-2h-4. 상점 안 진열대 (가격표 달고, F로 구입) ----------
 // 상점 문으로 들어오면 당근·산소통·망사리·가구가 가격표와 함께 진열되어 있습니다.
 // 물건 앞에 서서 F(🐾)를 누르면 삽니다.
-function makePriceSign(name, price) {
+function makePriceSign(name, price, suffix) {
   const c = document.createElement('canvas');
   c.width = 192; c.height = 96;
   const g = c.getContext('2d');
@@ -2267,7 +2283,7 @@ function makePriceSign(name, price) {
   g.fillText(name, 96, 40);
   g.fillStyle = '#b3541e';
   g.font = 'bold 30px "맑은 고딕", Malgun Gothic, sans-serif';
-  g.fillText(formatWon(price), 96, 78);
+  g.fillText(formatWon(price) + (suffix || ''), 96, 78);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -2275,17 +2291,17 @@ function makePriceSign(name, price) {
 
 // 판매 물품 목록 — 진열 위치는 북쪽 벽을 따라 한 줄입니다
 const SHOP_GOODS = [
+  // 당근은 말먹이 소모품이라 구석에 둡니다 (왼쪽 벽 인테리어 견본 팻말과 겹치는 자리)
   { key: 'carrot', name: '당근',   emoji: '🥕', get price() { return CARROT_PRICE; },
-    x: SHOP_ROOM.cx - 4.6, z: SHOP_ROOM.cz - 3.4 },
+    x: SHOP_ROOM.cx - 6.0, z: SHOP_ROOM.cz - 3.4 },
   { key: 'tank',   name: '산소통', emoji: '🤿', get price() { return TANK_PRICE; },
     x: SHOP_ROOM.cx - 3.0, z: SHOP_ROOM.cz - 3.4 },
   { key: 'net',    name: '망사리', emoji: '🧺', get price() { return NET_PRICE; },
     x: SHOP_ROOM.cx - 1.4, z: SHOP_ROOM.cz - 3.4 },
-  { key: 'stall',  name: '당근주스 좌판', emoji: '🥤', get price() { return STALL_PRICE; },
-    x: SHOP_ROOM.cx - 6.0, z: SHOP_ROOM.cz - 3.4 },
-  // 씨앗은 종류가 여럿이라, 누르면 고르는 창이 뜹니다 (벽지·페인트와 같은 방식)
+  // 씨앗은 종류가 여럿이라, 누르면 고르는 창이 뜹니다 (벽지·페인트와 같은 방식).
+  // 농사가 이 섬 살이의 큰 축이라, 들어서면 바로 보이도록 북쪽 진열대 맨 앞에 둡니다.
   { key: 'seeds',  name: '씨앗', emoji: '🌱', seedShelf: true, get price() { return SEEDS.buckwheat.price; },
-    x: SHOP_ROOM.cx - 5.3, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
+    x: SHOP_ROOM.cx - 4.6, z: SHOP_ROOM.cz - 3.4 },
   { key: 'bed',    name: '침대',   emoji: '🛏', get price() { return FURNITURE.bed.price; },
     x: SHOP_ROOM.cx + 0.6, z: SHOP_ROOM.cz - 3.3 },
   { key: 'sofa',   name: '소파',   emoji: '🛋', get price() { return FURNITURE.sofa.price; },
@@ -2391,13 +2407,20 @@ const SHOP_GOODS = [
         new THREE.MeshLambertMaterial({ color: 0x8a6a45, flatShading: true }));
       crate.position.y = 0.21;
       item.add(crate);
-      const bagCols = [0xe8dcc0, 0xd9c48f, 0xcfe0b8, 0xbfd8a8];
+      // 누런 종이봉지 넉 장을 상자에 기대 세웁니다 (작물 넷)
+      const bagCols = [0xd9c48f, 0xcbb47a, 0xe0cd9c, 0xc4ac6f];
       for (let i = 0; i < 4; i++) {
-        const bag = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.26, 0.12),
+        const bag = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.4, 0.14),
           new THREE.MeshLambertMaterial({ color: bagCols[i], flatShading: true }));
-        bag.position.set(-0.3 + i * 0.2, 0.54, 0);
-        bag.rotation.z = (Math.random() - 0.5) * 0.3;
+        bag.position.set(-0.33 + i * 0.22, 0.62, 0);
+        bag.rotation.z = (Math.random() - 0.5) * 0.24;
         item.add(bag);
+        // 봉지 앞면에 붙인 작물 딱지 — 무엇이 든 봉지인지 색으로 알아봅니다
+        const label = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.15, 0.02),
+          new THREE.MeshLambertMaterial({ color: [0xf2efe4, 0xc9a165, 0xe8f0dc, 0x2d5f2c][i], flatShading: true }));
+        label.position.set(bag.position.x, 0.66, 0.08);
+        label.rotation.z = bag.rotation.z;
+        item.add(label);
       }
     } else {
       item = FURN_BUILDERS[good.key]();
@@ -2408,7 +2431,8 @@ const SHOP_GOODS = [
     scene.add(item);
     // 가격표 — 물건 위에 걸린 나무 팻말 (벽 방향에 맞춰 돌립니다)
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.58),
-      new THREE.MeshBasicMaterial({ map: makePriceSign(good.name, good.price) }));
+      // 씨앗은 종류마다 값이 달라서 "부터"를 붙입니다
+      new THREE.MeshBasicMaterial({ map: makePriceSign(good.name, good.price, good.seedShelf ? '부터' : '') }));
     const sdx = good.rot === -Math.PI / 2 ? -0.1 : 0;
     const sdz = good.rot ? (good.rot === Math.PI ? -0.1 : 0) : 0.1;
     sign.position.set(good.x + sdx, y0 + 2.0, good.z + sdz);
@@ -2850,7 +2874,9 @@ const farmSpots = [];              // 모든 농지의 포기 자리를 한 줄�
     // 갈아엎은 맨흙 — 밭 넓이만큼 흙빛 바닥을 깝니다.
     // 비탈에 걸친 밭도 있어서, 평평한 판을 얹으면 땅을 뚫고 나옵니다.
     // 그래서 판을 잘게 나눠 꼭짓점마다 그 자리의 땅 높이를 넣어 지형을 따라 휘게 합니다.
-    const soilGeo = new THREE.PlaneGeometry(f.w - 1.5, f.h - 1.5, 14, 14);
+    // 칸을 잘게 나눠야 굽은 땅을 제대로 따라갑니다.
+    // 성글게 나누면 두 꼭짓점 사이에서 땅이 판 위로 솟아, 밭이 대각선으로 잘려 보입니다.
+    const soilGeo = new THREE.PlaneGeometry(f.w - 1.5, f.h - 1.5, 30, 30);
     soilGeo.rotateX(-Math.PI / 2);
     {
       const pos = soilGeo.attributes.position;
@@ -2858,9 +2884,10 @@ const farmSpots = [];              // 모든 농지의 포기 자리를 한 줄�
         const lx = pos.getX(i), lz = pos.getZ(i);
         const wx = f.x + lx * c - lz * s;
         const wz = f.z + lx * s + lz * c;
-        pos.setY(i, groundHeight(wx, wz) + 0.05);
+        pos.setY(i, groundHeight(wx, wz) + 0.12);
       }
-      soilGeo.computeVertexNormals();
+      // 법선을 모두 위로 세웁니다 — 굽은 땅에서도 흙빛이 고르게 보입니다
+      normalsUp(soilGeo);
     }
     const soil = new THREE.Mesh(soilGeo, FARM_SOIL_MAT);
     soil.position.set(f.x, 0, f.z);
@@ -6665,7 +6692,10 @@ function openSeedShop() {
     const sd = SEEDS[k];
     return {
       emoji: sd.emoji, name: sd.name,
-      note: `${sd.days}일 · ${formatWon(sd.yield)}`,
+      // 다년생은 "며칠마다", 한 해살이는 "며칠 뒤"
+      note: sd.perennial
+        ? `1kg\n${sd.days}일마다 ${formatWon(sd.yield)}`
+        : `1kg\n${sd.days}일 뒤 ${formatWon(sd.yield)}`,
       price: shopPrice(sd.price),
       onPick: () => {
         const price = shopPrice(sd.price);
