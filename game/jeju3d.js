@@ -5040,7 +5040,7 @@ function applyDiveLook() {
 
 // 물질하다 정신을 잃으면 닥터헬기가 실어 갑니다. 병원비는 늘 이만큼 나가고,
 // 가진 돈이 모자라면 그만큼 빚으로 남습니다 (자산이 마이너스가 됩니다).
-const HOSPITAL_FEE = 3000000;
+const HOSPITAL_FEE = 300000;
 
 function enterDive() {
   stat.dives++;
@@ -5099,7 +5099,7 @@ function leaveDive(reason) {
 
   const py = groundHeight(BULTEOK.x, BULTEOK.z) + 2.2;
   if (reason === 'drown') {
-    // 정신을 잃으면 닥터헬기가 실어 갑니다 — 병원비는 3백만원, 모자라면 빚으로 남습니다.
+    // 정신을 잃으면 닥터헬기가 실어 갑니다 — 병원비는 30만원, 모자라면 빚으로 남습니다.
     // 그게 숨을 아껴야 하는 진짜 이유입니다. (죽는 순간 바로 저장해 새로고침 꼼수도 안 통합니다)
     coins -= HOSPITAL_FEE;
     const inDebt = coins < 0;
@@ -5703,7 +5703,8 @@ function applyStall() {
 const MUNAM_HOUSE = { x: 12.0, z: -64.0, rot: Math.PI };   // 정면(마당)이 남쪽 바다를 향합니다
 // 무남이는 걸어다니지 않습니다. 마당 끝에 의자를 내놓고 앉아 바다만 봅니다.
 // 루루가 처음 그를 보는 것도 이 모습입니다 — 하는 일은 없는데 이상하게 품격이 있는 뒷모습.
-const MUNAM_SEAT = { x: MUNAM_HOUSE.x - 0.6, z: MUNAM_HOUSE.z - 7.2 };
+// 집 앞마당 — 돌담으로 두른 안쪽입니다 (집이 남쪽을 보고 있어 마당도 남쪽)
+const MUNAM_SEAT = { x: MUNAM_HOUSE.x - 1.6, z: MUNAM_HOUSE.z - 3.4 };
 const munam = {
   x: MUNAM_SEAT.x, z: MUNAM_SEAT.z,
   facing: Math.PI,   // 남쪽 바다 쪽
@@ -5727,7 +5728,7 @@ function buildMunamHouse() {
     g.add(mesh);
     return mesh;
   };
-  const W = 5.0, D = 3.6, H = 2.7;
+  const W = 6.2, D = 4.4, H = 3.4;   // 무남이 덩치에 맞춘 크기
   add(new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.36), shopStoneMat), 0, H / 2, -D / 2);
   add(new THREE.Mesh(new THREE.BoxGeometry(0.36, H, D), shopStoneMat), -W / 2, H / 2, 0);
   add(new THREE.Mesh(new THREE.BoxGeometry(0.36, H, D), shopStoneMat), W / 2, H / 2, 0);
@@ -5744,24 +5745,7 @@ function buildMunamHouse() {
       const tier = add(new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 8), shopThatchMat), 0, H + dy, 0);
       tier.rotation.y = Math.PI / 8;
     });
-  // 마당의 낡은 접이의자 — 무남이가 하루 종일 앉아 있는 자리
-  const chair = new THREE.Group();
-  chair.position.set(2.2, 0, D / 2 + 1.4);
-  g.add(chair);
-  const canvasMat = new THREE.MeshLambertMaterial({ color: 0x4a6a7a, flatShading: true });
-  const frameMat = new THREE.MeshLambertMaterial({ color: 0x8a6038, flatShading: true });
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.07, 0.6), canvasMat);
-  seat.position.y = 0.42;
-  chair.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.6, 0.07), canvasMat);
-  back.position.set(0, 0.68, -0.28);
-  back.rotation.x = -0.34;
-  chair.add(back);
-  [[-0.28, -0.26], [0.28, -0.26], [-0.28, 0.26], [0.28, 0.26]].forEach(([lx, lz]) => {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.42, 6), frameMat);
-    leg.position.set(lx, 0.21, lz);
-    chair.add(leg);
-  });
+  // (마당에 있던 접이의자는 치웠습니다 — 무남이가 밭담 앞으로 자리를 옮겼거든요)
   scene.add(g);
   return g;   // 집을 막는 충돌은 빈터를 다 치운 뒤에 세웁니다 (아래 참고)
 }
@@ -5819,7 +5803,7 @@ let romanceSeen = {};                // 단계별 이벤트를 봤는지
 let lonelySeen = {};                 // 외로움 독백을 봤는지
 
 // 수트 입은 미남 — 갈색 줄무늬 고양이에 검은 쓰리피스, 흰 셔츠, 감색 넥타이.
-// (assets/farmcat/munam_idle.webp 를 넣으면 아래 3D 대신 그 그림이 쓰입니다)
+// (평소엔 assets/farmcat/munam_sit.webp 그림이 쓰이고, 그림을 못 불러올 때만 아래 3D가 나섭니다)
 function buildMunam() {
   const g = new THREE.Group();
   const suit = new THREE.MeshLambertMaterial({ color: 0x232630, flatShading: true });
@@ -5882,12 +5866,9 @@ function buildMunam() {
 }
 munam.group = buildMunam();
 
-// 무남이가 내놓고 앉은 나무 의자.
-// 무남이 그림은 늘 카메라를 향해 도는 종이 인형이라, 의자도 같이 돌려야
-// 어느 각도에서 봐도 등받이가 그의 등 뒤에 옵니다.
-// 무남이 앞을 가로막는 낮은 밭담.
-// 그림이 허벅지에서 잘려 있어서, 담 뒤에 세우면 잘린 자리가 담에 가려집니다.
-// 담이 그림과 같이 카메라를 향해 돌기 때문에 어느 각도에서 봐도 가려집니다.
+// 무남이를 감싸는 ㄷ자 돌담 — 앞과 양옆을 막고 뒤(집 쪽)만 터놓았습니다.
+// 무릎께까지만 오는 낮은 담입니다. 무남이가 온몸이 다 보이는 그림이라 높이 쌓으면 그를 가립니다.
+// 담이 그림과 함께 카메라를 향해 돌기 때문에 어느 각도에서 봐도 그 안에 쏙 들어가 보입니다.
 let munamWall = null;
 {
   const g = new THREE.Group();
@@ -5896,26 +5877,40 @@ let munamWall = null;
   munamWall = g;
   const dark = new THREE.MeshLambertMaterial({ color: 0x4a4f52, flatShading: true });
   const light = new THREE.MeshLambertMaterial({ color: 0x5d6367, flatShading: true });
-  const rock = new THREE.DodecahedronGeometry(0.26, 0);
-  // 돌을 두 단으로 엇갈려 쌓습니다 (허벅지 높이까지만 — 얼굴이 묻히면 안 되니까요)
-  for (let row = 0; row < 2; row++) {
-    const n = row === 0 ? 8 : 7;
-    for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(rock, (i + row) % 3 === 0 ? light : dark);
-      m.position.set((i - (n - 1) / 2) * 0.42 + (row ? 0.21 : 0), 0.2 + row * 0.32, 0.55);
-      m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
-      m.scale.setScalar(0.85 + Math.random() * 0.3);
-      m.castShadow = true;
-      g.add(m);
+  const rock = new THREE.DodecahedronGeometry(0.25, 0);
+  // 두 단만 쌓아 의자 다리께에서 끊습니다 — 마당의 경계 노릇만 하면 됩니다.
+  const ROWS = 2, STEP = 0.24, GAP = 0.42;
+  // 담 한 줄 쌓기 (단마다 반 칸씩 어긋나게 얹어야 돌담답습니다)
+  const line = (x1, z1, x2, z2) => {
+    const len = Math.hypot(x2 - x1, z2 - z1);
+    const n = Math.max(2, Math.round(len / GAP));
+    for (let row = 0; row < ROWS; row++) {
+      for (let i = 0; i <= n; i++) {
+        const t = (i + (row % 2 ? 0.5 : 0)) / n;
+        if (t > 1) continue;
+        const m = new THREE.Mesh(rock, (i + row) % 3 === 0 ? light : dark);
+        m.position.set(x1 + (x2 - x1) * t, 0.2 + row * STEP, z1 + (z2 - z1) * t);
+        m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        m.scale.setScalar(0.85 + Math.random() * 0.3);
+        m.castShadow = true;
+        g.add(m);
+      }
     }
-  }
+  };
+  const HALF = 1.6, FRONT = 1.35, BACK = -0.8;
+  line(-HALF, FRONT, HALF, FRONT);     // 앞 (루루가 다가오는 쪽)
+  line(-HALF, FRONT, -HALF, BACK);     // 왼쪽 날개
+  line(HALF, FRONT, HALF, BACK);       // 오른쪽 날개
   scene.add(g);
-  obstacles.push({ x: MUNAM_SEAT.x, z: MUNAM_SEAT.z, r: 1.0, topY: y + 0.7 });
+  obstacles.push({ x: MUNAM_SEAT.x, z: MUNAM_SEAT.z, r: 1.4, topY: y + 0.7 });
 }
 
 // 무남이 그림(스프라이트)이 준비되면 3D 대신 그 그림을 세웁니다.
-// 담 너머 의자에 앉아 바다를 보고 있습니다. 칸을 넘기는 움직임은 없습니다.
-const MUNAM_H = 1.36;              // 앉은 키
+// 낮은 담 안쪽 돌에 걸터앉아 바다만 봅니다. 칸을 넘기는 움직임은 없습니다.
+// 루루가 처음 보는 것도 이 뒷모습입니다 — 하는 일은 없는데 이상하게 품격이 있는 뒷모습.
+// 루루는 머리가 그림 키의 45%, 무남이는 42%라 이 값에서 둘의 머리 크기가 같아집니다.
+// (앉은 그림인데도 루루보다 높은 건 그만큼 덩치가 크다는 뜻입니다)
+const MUNAM_H = 1.70;
 let munamCard = null;
 (function tryMunamSheet() {
   const img = new Image();
@@ -5928,6 +5923,7 @@ let munamCard = null;
       side: THREE.DoubleSide,      // 어느 쪽에서 다가와도 보이게
     }));
     munamCard.userData.ratio = img.width / img.height;
+
     munam.group.add(munamCard);
     // 그림이 붙었으니 3D 몸은 감춥니다 (그림자만 남깁니다)
     for (const c of munam.group.children) {
@@ -6052,17 +6048,28 @@ function updateMunam(dt, t) {
   if (!munam.group.visible) return;
   // 무남이는 종일 여기 앉아 바다만 봅니다. 갈 데가 없으니까요.
   const gy = groundHeight(munam.x, munam.z);
-  // 담 뒤 의자에 앉아 있습니다 — 담 위로 상체만 보입니다
-  munam.group.position.set(munam.x, gy + 0.1 + Math.sin(t * 1.4) * 0.008, munam.z);
+  // 의자째로 땅을 딛고 있습니다. 숨 쉬듯 아주 조금만 오르내립니다.
+  munam.group.position.set(munam.x, gy + 0.02 + Math.sin(t * 1.4) * 0.008, munam.z);
   munam.group.rotation.y = munam.facing;
   if (munam.group.userData.head) {
     munam.group.userData.head.rotation.x = Math.sin(t * 0.5) * 0.1;   // 가끔 수평선을 훑습니다
   }
-  // 그림을 붙였으면 카메라를 향해 세워둡니다
+  // 그림은 남쪽 바다를 봅니다. 등이 집 쪽(북)을 향하도록 붙박아 둔 것이 기본입니다.
+  // 다만 종잇장 한 장이라 딱 고정해두면 옆에서 볼 때 선처럼 얇아져 사라집니다.
+  // 그래서 카메라 쪽으로 조금 돌아서되, 바다에서 크게 벗어나지 않을 만큼만 허용합니다.
   if (munamCard) {
     munamCard.scale.set(MUNAM_H * munamCard.userData.ratio, MUNAM_H, 1);
-    munam.group.rotation.y = camYaw;   // 판이 늘 정면으로 보이게
-    if (munamWall) munamWall.rotation.y = camYaw;   // 담도 같이 돌아야 늘 그의 앞을 가립니다
+    // 뒷모습 그림이라, 그림 속 무남이는 늘 "보는 사람의 반대쪽"을 봅니다.
+    // 그 반대쪽이 남쪽 바다가 되도록 판을 세웁니다 — 카메라가 북쪽이면 0도, 남쪽이면 180도.
+    const base = camera.position.z > munam.z ? 0 : Math.PI;
+    // 그대로 두면 동·서에서 볼 때 종잇장이 선처럼 얇아져 사라지므로,
+    // 카메라 쪽으로 조금 돌리되 바다에서 크게 벗어나지 않을 만큼만 허용합니다.
+    const toCam = Math.atan2(camera.position.x - munam.x, camera.position.z - munam.z);
+    const d = toCam - base;
+    const turn = Math.atan2(Math.sin(d), Math.cos(d));   // -180~180도로 접기
+    const LIMIT = 1.0;                                   // 57도까지만
+    munam.group.rotation.y = base + Math.max(-LIMIT, Math.min(LIMIT, turn));
+    if (munamWall) munamWall.rotation.y = Math.PI;   // 담은 그 자리에 붙박이 — 집 쪽만 터놓습니다
   }
 }
 
@@ -7351,7 +7358,7 @@ addEventListener('keydown', (e) => { if (isKey(e, 'KeyF')) handleActionKey(); })
 // (예전에는 글자와 단추가 먼저 뜨고 그림이 하나씩 뒤늦게 튀어나와, 화면이 덜컹거렸습니다)
 {
   const startEl = document.getElementById('start');
-  const imgs = [...document.querySelectorAll('#startJobs img[data-src], #munamHero[data-src]')];
+  const imgs = [...document.querySelectorAll('#start img[data-src]')];
   let waiting = imgs.length;
   let shown = false;
   const showStart = () => {

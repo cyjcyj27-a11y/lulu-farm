@@ -19,7 +19,7 @@
 <link rel="preload" as="image" href="../assets/farmcat/scene_dive.webp">
 <link rel="preload" as="image" href="../assets/farmcat/scene_horse.webp">
 <link rel="preload" as="image" href="../assets/farmcat/scene_house.webp">
-<link rel="preload" as="image" href="../assets/farmcat/munam_hero.webp">
+<link rel="preload" as="image" href="../assets/farmcat/scene_date.webp?v=3">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #a9d3ea; }
@@ -408,10 +408,8 @@
   /* 일거리 카드 — 그림이 들어갈 자리를 미리 잡아둡니다.
      그림이 아직 없어도 자리가 무너지지 않도록 큼직한 이모지를 밑에 깔아둡니다. */
   #startJobs {
-    position: relative;   /* 한가운데 설 무남이의 기준점 */
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    /* 카드 사이를 넉넉히 벌려, 그 십자 자리에 무남이가 들어섭니다 */
-    gap: clamp(46px, 12.5vw, 62px);
+    gap: clamp(8px, 2.6vw, 12px);
     width: min(316px, 92vw, 44vh);
     margin: 0 auto;
   }
@@ -443,26 +441,21 @@
     display: block; margin-top: 3px; color: var(--desc);
     font-size: clamp(10px, 2.4vw, 12.5px); line-height: 1.45;
   }
-  /* 무남이 — 카드 넉 장이 만나는 한가운데에 섭니다 */
-  #munamHero {
-    position: absolute; left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
-    height: clamp(128px, 35vw, 178px);
-    z-index: 2; pointer-events: none;   /* 카드를 누르는 데 걸리지 않게 */
-    filter: drop-shadow(0 7px 16px rgba(0,0,0,.6));
-    opacity: 0; transition: opacity .25s ease;
-  }
-  #munamHero.on { opacity: 1; }
-  #munamHero:not([src]), #munamHero[src=""] { display: none; }
-  /* 글자는 카드 아래에 따로 놓습니다 */
+  /* 루루와 무남이의 데이트 — 일거리 넉 장 아래에 큼직하게 한 장.
+     이 게임에서 돈을 모으는 진짜 이유라 대문 자리를 내줬습니다. */
   #startRomance {
-    margin-top: 8px; text-align: center;
+    position: relative;
+    width: min(316px, 92vw, 44vh);
+    margin: clamp(8px, 2.6vw, 12px) auto 0;
   }
-  #startRomance b {
-    color: #ff9ec2; font-weight: 700;
-    font-size: clamp(12px, 2.9vw, 15.5px);
-    text-shadow: 0 2px 6px rgba(0,0,0,.7);
+  #startRomance .shot { aspect-ratio: 16 / 9; }
+  /* 글자를 그림 위에 얹습니다 — 시작 화면에서 세로 자리를 아끼려고요 */
+  #startRomance .cap {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 20px 8px 6px;
+    background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.66));
   }
+  #startRomance .cap b { color: #ffb3cf; text-shadow: 0 1px 4px rgba(0,0,0,.9); }
   /* 아직 안 만든 일거리에는 "준비 중" 딱지를 붙입니다 */
   .job.soon .cap b::after {
     content: '준비 중'; margin-left: auto;
@@ -618,7 +611,7 @@
     <div id="startJobs">
       <div class="job">
         <div class="shot">🍊<img alt="" data-src="../assets/farmcat/scene_farm.webp"></div>
-        <div class="cap"><b>감귤 농사</b></div>
+        <div class="cap"><b>농사짓기</b></div>
       </div>
       <div class="job">
         <div class="shot">🤿<img alt="" data-src="../assets/farmcat/scene_dive.webp"></div>
@@ -632,12 +625,13 @@
         <div class="shot">🏚<img alt="" data-src="../assets/farmcat/scene_house.webp"></div>
         <div class="cap"><b>헌집 고치기</b></div>
       </div>
-      <!-- 무남이 — 일거리 카드 넉 장 한가운데 서 있습니다.
-           이 게임에서 돈을 모으는 진짜 이유라, 카드 사이를 벌려 그 자리를 냈습니다. -->
-      <img id="munamHero" alt="" data-src="../assets/farmcat/munam_hero.webp">
     </div>
 
-    <div id="startRomance"><b>그리고 설레는 사랑 💕</b></div>
+    <!-- 대문 — 노을 지는 돌담에 나란히 앉은 루루와 무남이 -->
+    <div class="job" id="startRomance">
+      <div class="shot">💕<img alt="" data-src="../assets/farmcat/scene_date.webp?v=3"></div>
+      <div class="cap"><b>그리고 설레는 사랑 💕</b></div>
+    </div>
 
     <div id="startKeys">
       <b class="pc">방향키</b><span class="pc">루루 이동</span>
@@ -681,6 +675,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=213"></script>
+<script src="jeju3d.js?v=236"></script>
 </body>
 </html>
