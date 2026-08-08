@@ -5914,8 +5914,8 @@ let munamWall = null;
 }
 
 // 무남이 그림(스프라이트)이 준비되면 3D 대신 그 그림을 세웁니다.
-// 담 너머로 바다를 보고 선 옆모습입니다. 칸을 넘기는 움직임은 없습니다.
-const MUNAM_H = 1.72;              // 담에 가려지는 아래를 뺀 키
+// 담 너머 의자에 앉아 바다를 보고 있습니다. 칸을 넘기는 움직임은 없습니다.
+const MUNAM_H = 1.36;              // 앉은 키
 let munamCard = null;
 (function tryMunamSheet() {
   const img = new Image();
@@ -5923,7 +5923,7 @@ let munamCard = null;
     const geo = new THREE.PlaneGeometry(1, 1);
     geo.translate(0, 0.5, 0);      // 발밑을 기준으로 세웁니다
     munamCard = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-      map: loadTexture('../assets/farmcat/munam_stand.webp'),
+      map: loadTexture('../assets/farmcat/munam_sit.webp'),
       transparent: true, alphaTest: 0.08,
       side: THREE.DoubleSide,      // 어느 쪽에서 다가와도 보이게
     }));
@@ -5936,7 +5936,7 @@ let munamCard = null;
     }
   };
   img.onerror = () => {};   // 그림이 아직 없으면 3D 무남이 그대로
-  img.src = '../assets/farmcat/munam_stand.webp';
+  img.src = '../assets/farmcat/munam_sit.webp';
 })();
 
 // 집이 어디까지 꾸며졌는지로 만남의 단계가 열립니다
@@ -6052,8 +6052,8 @@ function updateMunam(dt, t) {
   if (!munam.group.visible) return;
   // 무남이는 종일 여기 앉아 바다만 봅니다. 갈 데가 없으니까요.
   const gy = groundHeight(munam.x, munam.z);
-  // 담 뒤에 서 있습니다 — 잘린 아래가 담에 가려지도록 조금 내려 세웁니다
-  munam.group.position.set(munam.x, gy - 0.12 + Math.sin(t * 1.4) * 0.008, munam.z);
+  // 담 뒤 의자에 앉아 있습니다 — 담 위로 상체만 보입니다
+  munam.group.position.set(munam.x, gy + 0.1 + Math.sin(t * 1.4) * 0.008, munam.z);
   munam.group.rotation.y = munam.facing;
   if (munam.group.userData.head) {
     munam.group.userData.head.rotation.x = Math.sin(t * 0.5) * 0.1;   // 가끔 수평선을 훑습니다
