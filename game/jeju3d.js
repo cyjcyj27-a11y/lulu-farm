@@ -2554,9 +2554,11 @@ function buildTangerineTree(x, y, z) {
 // 건물 곁에는 나무를 심지 않습니다 — 걸어다니는 충돌 반경(일부러 좁게 둠)보다
 // 건물 지붕이 훨씬 커서, 그 반경만 피하면 나무가 지붕을 뚫고 자라기 때문입니다.
 const NO_PLANT = [
-  { x: STABLE.x, z: STABLE.z, r: 7.5 },   // 마구간 (지붕 폭 6m + 잎 반경)
-  { x: HOUSE.x, z: HOUSE.z, r: 8 },       // 헌집 (그림 폭 8.5m + 뒤채)
-  { x: 12, z: -64, r: 12 },               // 무남이네 (집 + 바다를 보는 앞마당까지)
+  { x: STABLE.x, z: STABLE.z, r: 9 },              // 마구간 (지붕 폭 6m + 잎 반경)
+  { x: STABLE.x + 1, z: STABLE.z + 8, r: 9 },      // 마구간 앞마당 — 귤나무에 말이 가리면 안 됩니다
+  { x: STABLE.x + 2, z: STABLE.z + 15, r: 7 },     // 마구간으로 걸어오는 길목
+  { x: HOUSE.x, z: HOUSE.z, r: 8 },                // 헌집 (그림 폭 8.5m + 뒤채)
+  { x: 12, z: -64, r: 12 },                        // 무남이네 (집 + 바다를 보는 앞마당까지)
 ];
 function plantBlocked(x, z) {
   for (const n of NO_PLANT) {
