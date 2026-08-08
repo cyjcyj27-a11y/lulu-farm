@@ -377,6 +377,59 @@ function makeWindMaterial(color) {
   return mat;
 }
 
+// 밭은 두 가지입니다 — 루루가 귤을 따는 귤밭과, 이장님 소유의 빈 농지.
+// 농지는 처음엔 아무것도 없는 황무지입니다. 이장님께 100평씩 빌려서 씨앗을 심어야
+// 비로소 루루의 밭이 됩니다. 그마저도 수확의 절반은 소작료로 나갑니다.
+// (서울에서 집값에 밀려 내려왔는데, 여기서도 남의 땅을 빌려 짓습니다)
+const ORCHARDS = [];      // 귤밭
+const FARMS = [];         // 농지 (이장님 땅 → 임대 → 매입)
+const ALL_FIELDS = [];    // 돌담은 둘 다 똑같이 두릅니다
+for (let gx = -3; gx <= 3; gx++) {
+  for (let gz = -3; gz <= 3; gz++) {
+    if (EMPTY_CELLS.has(gx + ',' + gz)) continue;
+    // 골목이 곧아야 올레길이 지나갈 수 있어서, 칸 안에서 흔들리는 폭은 조금만 둡니다
+    const cx = gx * PLOT_CELL + (Math.random() - 0.5) * 1.2;
+    const cz = gz * PLOT_CELL + (Math.random() - 0.5) * 1.2;
+    if (Math.hypot(cx, cz) > 78.5) continue;          // 밭 전체가 걸어다닐 수 있는 범위 안에 들어와야 함
+    if (groundHeight(cx, cz) > 11) continue;          // 오름(화산 언덕) 꼭대기는 밭으로 덮지 않고 남겨둡니다
+    const f = {
+      x: cx, z: cz,
+      w: PLOT_SIZE, h: PLOT_SIZE,
+      rot: (Math.random() - 0.5) * 0.09,              // 칸마다 살짝 비뚤어야 조각보처럼 보입니다
+      gap: 5.3,
+      cols: 5, rows: 5,
+      open: (Math.random() * 4) | 0,                  // 네 변 중 아무 데나 한 곳을 입구로 터놓기
+    };
+    // 바둑판처럼 한 칸 걸러 농지 — 귤밭이 딱 절반으로 줄어듭니다
+    f.kind = ((gx + gz) & 1) ? 'farm' : 'citrus';
+    if (f.kind === 'farm') {
+      f.no = FARMS.length;      // 몇 번째 농지인가 (임대료가 칸마다 오릅니다)
+      f.rented = false;         // 빌렸는가
+      f.owned = false;          // 아예 샀는가
+      f.crop = null;            // 심어둔 씨앗
+      f.planted = 0;            // 심은 날 (dayCount)
+      f.spots = [];             // 포기 자리 (아래 8-3b에서 채웁니다)
+      f.sign = null;            // 밭 앞 팻말
+      FARMS.push(f);
+    } else {
+      ORCHARDS.push(f);
+    }
+    ALL_FIELDS.push(f);
+  }
+}
+
+// 갈아엎은 농지 안인가 — 황무지에 풀이 무성하면 묵정밭으로 보입니다
+function inFarmPlot(x, z, margin) {
+  const m = margin || 0;
+  for (const f of FARMS) {
+    const c = Math.cos(-f.rot), s = Math.sin(-f.rot);
+    const dx = x - f.x, dz = z - f.z;
+    const lx = dx * c - dz * s, lz = dx * s + dz * c;
+    if (Math.abs(lx) < f.w / 2 + m && Math.abs(lz) < f.h / 2 + m) return true;
+  }
+  return false;
+}
+
 // ---------- 7. 들판에 흩뿌리기 (풀·꽃·억새·나무 공통) ----------
 function scatter(count, maxR, minHeight, callback) {
   let placed = 0, guard = 0;
@@ -390,6 +443,8 @@ function scatter(count, maxR, minHeight, callback) {
     if (x > -3.4 && x < 3.4 && z > 90.5 && z < 103.5) continue;
     // 올레길 위도 마찬가지입니다 — 흙길에 풀이 무성하면 길로 보이지 않습니다
     if (pointOnOlle(x, z, -0.3)) continue;
+    // 갈아엎은 농지도 맨흙이어야 합니다
+    if (inFarmPlot(x, z, -0.8)) continue;
     const y = groundHeight(x, z);
     if (y < minHeight) continue;
     callback(x, y, z, r);
@@ -564,33 +619,7 @@ buildStoneWall(52, -44, 53, -66);
 // 손으로 적지 않고, 섬 전체에 격자를 깔아 한 칸에 밭 하나씩 앉힙니다.
 // 칸(PLOT_CELL)보다 밭(PLOT_SIZE)을 작게 잡은 만큼이 밭과 밭 사이의 길이 됩니다.
 // (격자 크기 PLOT_CELL·PLOT_SIZE와 비워둘 칸 EMPTY_CELLS는 위쪽 올레길 대목에서 정해 뒀습니다)
-// 밭은 두 가지입니다 — 귤밭과 당근밭. 격자를 번갈아 나눠 절반씩 심습니다.
-// (예전에는 전부 귤밭이라 섬이 온통 귤나무였습니다)
-const ORCHARDS = [];      // 귤밭
-const CARROT_FIELDS = []; // 당근밭
-const ALL_FIELDS = [];    // 돌담은 둘 다 똑같이 두릅니다
-for (let gx = -3; gx <= 3; gx++) {
-  for (let gz = -3; gz <= 3; gz++) {
-    if (EMPTY_CELLS.has(gx + ',' + gz)) continue;
-    // 골목이 곧아야 올레길이 지나갈 수 있어서, 칸 안에서 흔들리는 폭은 조금만 둡니다
-    const cx = gx * PLOT_CELL + (Math.random() - 0.5) * 1.2;
-    const cz = gz * PLOT_CELL + (Math.random() - 0.5) * 1.2;
-    if (Math.hypot(cx, cz) > 78.5) continue;          // 밭 전체가 걸어다닐 수 있는 범위 안에 들어와야 함
-    if (groundHeight(cx, cz) > 11) continue;          // 오름(화산 언덕) 꼭대기는 밭으로 덮지 않고 남겨둡니다
-    const f = {
-      x: cx, z: cz,
-      w: PLOT_SIZE, h: PLOT_SIZE,
-      rot: (Math.random() - 0.5) * 0.09,              // 칸마다 살짝 비뚤어야 조각보처럼 보입니다
-      gap: 5.3,
-      cols: 5, rows: 5,
-      open: (Math.random() * 4) | 0,                  // 네 변 중 아무 데나 한 곳을 입구로 터놓기
-    };
-    // 바둑판처럼 한 칸 걸러 당근밭 — 귤밭이 딱 절반으로 줄어듭니다
-    f.kind = ((gx + gz) & 1) ? 'carrot' : 'citrus';
-    (f.kind === 'carrot' ? CARROT_FIELDS : ORCHARDS).push(f);
-    ALL_FIELDS.push(f);
-  }
-}
+// (밭 격자는 풀보다 먼저 정해야 해서 위쪽 7번 앞으로 옮겨 두었습니다)
 
 function fieldCorners(f) {
   const c = Math.cos(f.rot), s = Math.sin(f.rot);
@@ -1433,6 +1462,48 @@ const CARROT_PRICE = 1000;
 const TANK_PRICE = 100000;
 const TANK_BREATH = 180;   // 산소통을 멘 뒤의 숨 — 3분
 
+// ----- 농사 -----
+// 이장님 땅을 100평씩 빌려 씨앗을 심습니다. 수확할 때마다 절반이 소작료로 나가고,
+// 목돈을 모아 아예 사버리면 그때부터 전부 루루 몫입니다.
+// 씨앗은 상점 진열대에서 벽지 고르듯 종류를 골라 삽니다.
+const SEEDS = {
+  buckwheat: { name: '메밀',   emoji: '🌾', price: 300000,  days: 3, yield: 2100000,
+               tip: '가을이면 밭이 하얗게 됩니다' },
+  potato:    { name: '감자',   emoji: '🥔', price: 500000,  days: 3, yield: 2600000,
+               tip: '한 포기에 여러 알이 달립니다' },
+  radish:    { name: '월동무', emoji: '🥬', price: 400000,  days: 4, yield: 3200000,
+               tip: '제주 겨울 무. 굵직합니다' },
+  tea:       { name: '차나무', emoji: '🍃', price: 2000000, days: 6, yield: 2400000,
+               tip: '한 번 심으면 베지 않고 계속 땁니다', perennial: true },
+};
+const SEED_ORDER = ['buckwheat', 'potato', 'radish', 'tea'];
+let seeds = {};                       // 가지고 있는 씨앗 봉지
+const RENT_BASE = 500000;             // 첫 100평 임대료. 칸을 늘릴수록 오릅니다
+const FARM_BUY_PRICE = 10000000;      // 100평을 아예 사는 값
+const TENANT_SHARE = 0.5;             // 이장님이 가져가는 몫
+function rentPrice(n) { return RENT_BASE * (n + 1); }   // n = 지금까지 빌린 칸 수
+function rentedCount() { return FARMS.filter((f) => f.rented || f.owned).length; }
+
+// ----- 당근주스 노점 -----
+// 뽑은 당근을 조랑말에게 주는 것 말고도 쓸 데가 있어야죠.
+// 포구 가는 길목은 물질 구경하러 온 관광객이 지나다니는 자리라, 좌판을 펴기 딱 좋습니다.
+// 당근 세 개를 갈면 한 잔이고, 관광지 물가로 받으니 밭에서 뽑아 파는 만큼 남습니다.
+const STALL_PRICE = 1500000;    // 좌판 한 채 값 (상점에서 삽니다)
+const JUICE_CARROTS = 3;        // 한 잔에 드는 당근
+const JUICE_PRICE = 6000;       // 한 잔 값
+const STALL = { x: 9, z: 83, rot: Math.PI };   // 포구 가는 올레길가. 남쪽(손님이 오는 쪽)을 봅니다
+const STALL_RANGE = 3.2;        // 이 안에서 F를 누르면 장사합니다
+let hasStall = false;           // 좌판을 샀는가
+let stallGroup = null;          // 좌판 3D
+// 손님은 루루가 좌판을 지키고 있을 때만 옵니다. 아무도 없는 좌판에 줄을 설 리가 없으니까요.
+const GUEST_MAX_WAIT = 55;      // 이만큼 기다려도 안 주면 그냥 갑니다
+const GUEST_QUEUE = 3;          // 한 번에 줄 설 수 있는 손님
+const GUESTS_PER_DAY = 10;      // 하루에 오는 손님
+let guests = [];                // 지금 줄 서 있는 손님들
+let guestTimer = 0;             // 다음 손님까지 남은 시간
+let guestsToday = 0;            // 오늘 온 손님 수
+let juiceSold = 0;              // 지금까지 판 잔 수
+
 // 가게 앞에 있던 당근 바구니와 산소통 판매대는 치웠습니다.
 // 둘 다 상점 안 진열대에서 사면 되니, 문 앞이 물건으로 어수선할 이유가 없습니다.
 
@@ -2210,6 +2281,11 @@ const SHOP_GOODS = [
     x: SHOP_ROOM.cx - 3.0, z: SHOP_ROOM.cz - 3.4 },
   { key: 'net',    name: '망사리', emoji: '🧺', get price() { return NET_PRICE; },
     x: SHOP_ROOM.cx - 1.4, z: SHOP_ROOM.cz - 3.4 },
+  { key: 'stall',  name: '당근주스 좌판', emoji: '🥤', get price() { return STALL_PRICE; },
+    x: SHOP_ROOM.cx - 6.0, z: SHOP_ROOM.cz - 3.4 },
+  // 씨앗은 종류가 여럿이라, 누르면 고르는 창이 뜹니다 (벽지·페인트와 같은 방식)
+  { key: 'seeds',  name: '씨앗', emoji: '🌱', seedShelf: true, get price() { return SEEDS.buckwheat.price; },
+    x: SHOP_ROOM.cx - 5.3, z: SHOP_ROOM.cz + 3.6, rot: Math.PI },
   { key: 'bed',    name: '침대',   emoji: '🛏', get price() { return FURNITURE.bed.price; },
     x: SHOP_ROOM.cx + 0.6, z: SHOP_ROOM.cz - 3.3 },
   { key: 'sofa',   name: '소파',   emoji: '🛋', get price() { return FURNITURE.sofa.price; },
@@ -2297,6 +2373,32 @@ const SHOP_GOODS = [
     } else if (good.key === 'net') {
       item = makeNetBag();
       item.scale.setScalar(0.9);
+    } else if (good.key === 'stall') {
+      // 접어 세워둔 좌판 — 상판 한 장과 천막 기둥 묶음
+      item = new THREE.Group();
+      const wood = new THREE.MeshLambertMaterial({ color: 0xa97c4e, flatShading: true });
+      const top = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 0.55), wood);
+      top.position.y = 0.62; top.rotation.z = 0.22;
+      item.add(top);
+      const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.34, 0.42),
+        new THREE.MeshLambertMaterial({ color: 0xe0743a, flatShading: true }));
+      cloth.position.y = 0.17;
+      item.add(cloth);
+    } else if (good.key === 'seeds') {
+      // 씨앗 봉지를 담은 나무 상자 (누르면 종류를 고르는 창이 뜹니다)
+      item = new THREE.Group();
+      const crate = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.42, 0.6),
+        new THREE.MeshLambertMaterial({ color: 0x8a6a45, flatShading: true }));
+      crate.position.y = 0.21;
+      item.add(crate);
+      const bagCols = [0xe8dcc0, 0xd9c48f, 0xcfe0b8, 0xbfd8a8];
+      for (let i = 0; i < 4; i++) {
+        const bag = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.26, 0.12),
+          new THREE.MeshLambertMaterial({ color: bagCols[i], flatShading: true }));
+        bag.position.set(-0.3 + i * 0.2, 0.54, 0);
+        bag.rotation.z = (Math.random() - 0.5) * 0.3;
+        item.add(bag);
+      }
     } else {
       item = FURN_BUILDERS[good.key]();
       item.scale.setScalar(0.55);   // 진열용은 아담하게
@@ -2420,9 +2522,11 @@ function buyReno(rg) {
 function buyShopGood(good) {
   const px = state.x, pz = state.z;
   const py = SHOP_ROOM.y + 1.6;
+  if (good.seedShelf) { openSeedShop(); return; }   // 씨앗은 종류부터 고릅니다
   const already =
     (good.key === 'tank' && hasTank) ||
     (good.key === 'net' && hasNet) ||
+    (good.key === 'stall' && hasStall) ||
     (FURNITURE[good.key] && furnitureOwned[good.key]);
   if (already) {
     spawnMoneyPopup(px, py, pz, `이미 ${good.name}${good.key === 'tank' ? '이' : '가'} 있어요`);
@@ -2460,6 +2564,12 @@ function doBuyShopGood(good, price, px, py, pz) {
     netObj.position.set(px, SHOP_ROOM.y + 1, pz);
     playShipSound();
     spawnMoneyPopup(px, py, pz, '망사리 구입! 등에 메고 포구로 가면 물질할 수 있어요');
+  } else if (good.key === 'stall') {
+    hasStall = true;
+    applyStall();
+    playShipSound();
+    spawnMoneyPopup(px, py, pz,
+      '좌판 구입! 포구 가는 길목에 폈어요\n당근을 들고 지키고 있으면 관광객이 옵니다');
   } else {
     furnitureOwned[good.key] = true;
     applyFurniture();
@@ -2708,20 +2818,20 @@ function hideFruit(i) {
   fruitMesh.instanceMatrix.needsUpdate = true;
 }
 
-// ---------- 8-3b. 당근밭 ----------
-// 땅에 심긴 당근은 잎만 보입니다. 밭고랑을 따라 줄지어 나 있고,
-// 다가가서 뽑으면 당근 한 개가 손에 들어옵니다 (상점에서 사지 않아도 됩니다).
-const carrotSpots = [];
-const carrotLeafMat = new THREE.MeshLambertMaterial({ color: 0x2f6b2a, flatShading: true });
-const carrotRootMat = new THREE.MeshLambertMaterial({ color: 0xe0721d, flatShading: true });
+// ---------- 8-3b. 농지 (이장님 땅) ----------
+// 처음엔 갈아엎어 놓은 맨흙뿐입니다. 밭 앞 팻말에 임대료가 적혀 있고,
+// 빌리고 나서 씨앗을 심어야 뭐라도 자랍니다.
+// 자리(spots)는 밭마다 미리 잡아 두고, 무엇을 심었는지에 따라 다른 그림을 그 자리에 세웁니다.
+const FARM_SOIL_MAT = new THREE.MeshLambertMaterial({ color: 0x7d6247 });
+const farmSpots = [];              // 모든 농지의 포기 자리를 한 줄로 모은 것
 {
-  for (const f of CARROT_FIELDS) {
+  for (const f of FARMS) {
     const c = Math.cos(f.rot), s = Math.sin(f.rot);
-    // 밭 하나에 고랑 7줄, 줄마다 12포기
-    for (let r = 0; r < 7; r++) {
-      for (let k = 0; k < 12; k++) {
-        const lx = (r - 3) * 3.4 + (Math.random() - 0.5) * 0.5;
-        const lz = (k - 5.5) * 1.9 + (Math.random() - 0.5) * 0.5;
+    // 밭 하나에 고랑 12줄, 줄마다 19포기 — 촘촘해야 들꽃밭이 아니라 밭으로 보입니다
+    for (let r = 0; r < 12; r++) {
+      for (let k = 0; k < 19; k++) {
+        const lx = (r - 5.5) * 2.1 + (Math.random() - 0.5) * 0.35;
+        const lz = (k - 9) * 1.28 + (Math.random() - 0.5) * 0.3;
         const x = f.x + lx * c - lz * s;
         const z = f.z + lx * s + lz * c;
         const y = groundHeight(x, z);
@@ -2731,27 +2841,140 @@ const carrotRootMat = new THREE.MeshLambertMaterial({ color: 0xe0721d, flatShadi
           if (Math.hypot(o.x - x, o.z - z) < o.r + 0.7) { blocked = true; break; }
         }
         if (blocked) continue;
-        carrotSpots.push({ x, y, z, rot: Math.random() * Math.PI, picked: false });
+        const spot = { x, y, z, rot: Math.random() * Math.PI, s: 0.9 + Math.random() * 0.3, farm: f };
+        spot.i = farmSpots.length;
+        farmSpots.push(spot);
+        f.spots.push(spot);
       }
     }
+    // 갈아엎은 맨흙 — 밭 넓이만큼 흙빛 바닥을 깝니다.
+    // 비탈에 걸친 밭도 있어서, 평평한 판을 얹으면 땅을 뚫고 나옵니다.
+    // 그래서 판을 잘게 나눠 꼭짓점마다 그 자리의 땅 높이를 넣어 지형을 따라 휘게 합니다.
+    const soilGeo = new THREE.PlaneGeometry(f.w - 1.5, f.h - 1.5, 14, 14);
+    soilGeo.rotateX(-Math.PI / 2);
+    {
+      const pos = soilGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const lx = pos.getX(i), lz = pos.getZ(i);
+        const wx = f.x + lx * c - lz * s;
+        const wz = f.z + lx * s + lz * c;
+        pos.setY(i, groundHeight(wx, wz) + 0.05);
+      }
+      soilGeo.computeVertexNormals();
+    }
+    const soil = new THREE.Mesh(soilGeo, FARM_SOIL_MAT);
+    soil.position.set(f.x, 0, f.z);
+    soil.rotation.y = f.rot;
+    soil.receiveShadow = true;
+    scene.add(soil);
+    f.soil = soil;
   }
 }
-// 잎 — 십자로 세운 판 두 장이면 어느 쪽에서 봐도 수북해 보입니다
-let carrotLeafMesh, carrotRootMesh;
+
+// 갈아엎었으니 밭 안에 있던 풀·꽃·바위는 걷어냅니다.
+// 심을 때 자리마다 걸러내긴 했지만, 풀과 유채는 한 자리에 여러 포기가 뭉쳐 자라서
+// 뭉텅이의 중심만 밭 밖이면 나머지가 밭 안으로 넘어와 있습니다.
 {
-  // 당근 잎은 밑동에서 여러 갈래가 부챗살처럼 뻗어 올라옵니다.
+  const m = new THREE.Matrix4(), v = new THREE.Vector3();
+  scene.traverse((o) => {
+    if (!o.isInstancedMesh) return;
+    let changed = false;
+    for (let i = 0; i < o.count; i++) {
+      o.getMatrixAt(i, m);
+      v.setFromMatrixPosition(m);
+      if (!inFarmPlot(v.x, v.z, -0.4)) continue;
+      m.makeScale(0, 0, 0);
+      o.setMatrixAt(i, m);
+      changed = true;
+    }
+    if (changed) o.instanceMatrix.needsUpdate = true;
+  });
+}
+
+// ----- 밭 앞 팻말 -----
+// 누구 땅인지, 무엇이 자라는지, 언제 거둘 수 있는지가 여기에 적힙니다.
+const SIGN_MAT_CACHE = [];
+function farmSignText(f) {
+  if (!f.rented && !f.owned) {
+    return ['이장님 땅', '100평', formatWon(rentPrice(rentedCount())) + ' 임대'];
+  }
+  const head = f.owned ? '루루의 땅' : '루루가 빌린 밭';
+  if (!f.crop) return [head, '100평', '씨앗을 심으세요'];
+  const sd = SEEDS[f.crop];
+  const left = sd.days - (dayCount - f.planted);
+  return [head, sd.name, left > 0 ? left + '일 뒤 수확' : '거둘 때가 됐어요'];
+}
+function drawFarmSign(f) {
+  if (!f.sign) return;
+  const lines = farmSignText(f);
+  const cv = f.sign.userData.canvas;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, 256, 168);
+  g.fillStyle = f.owned ? '#fdf3dd' : (f.rented ? '#f2ead6' : '#e6ddc8');
+  g.fillRect(0, 0, 256, 168);
+  g.strokeStyle = '#7a5636'; g.lineWidth = 8; g.strokeRect(4, 4, 248, 160);
+  g.textAlign = 'center';
+  g.fillStyle = '#4a3a26';
+  g.font = 'bold 38px "맑은 고딕", sans-serif';
+  g.fillText(lines[0], 128, 54);
+  g.font = 'bold 34px "맑은 고딕", sans-serif';
+  g.fillStyle = '#6b5a3e';
+  g.fillText(lines[1], 128, 100);
+  g.fillStyle = f.owned ? '#2f7a3a' : '#c2571d';
+  g.font = 'bold 30px "맑은 고딕", sans-serif';
+  g.fillText(lines[2], 128, 144);
+  f.sign.userData.tex.needsUpdate = true;
+}
+{
+  const postMat = new THREE.MeshLambertMaterial({ color: 0x7a5636, flatShading: true });
+  for (const f of FARMS) {
+    // 팻말은 밭의 남쪽 변 한가운데 — 길에서 다가오면 정면으로 보입니다
+    const c = Math.cos(f.rot), s = Math.sin(f.rot);
+    const lz = -(f.h / 2) - 1.2;
+    const sx = f.x - lz * s, sz = f.z + lz * c;
+    const y = groundHeight(sx, sz);
+    const g = new THREE.Group();
+    g.position.set(sx, y, sz);
+    g.rotation.y = f.rot + Math.PI;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.5, 0.12), postMat);
+    post.position.set(0, 0.75, 0.08);   // 글자를 가리지 않게 판 뒤로 물립니다
+    post.castShadow = true;
+    g.add(post);
+    const cv = document.createElement('canvas');
+    cv.width = 256; cv.height = 168;
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.85),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    board.position.y = 1.55;
+    g.add(board);
+    g.userData.canvas = cv;
+    g.userData.tex = tex;
+    scene.add(g);
+    f.sign = g;
+    f.signPos = { x: sx, z: sz };
+    obstacles.push({ x: sx, z: sz, r: 0.35, topY: y + 1.2 });
+    drawFarmSign(f);
+  }
+}
+
+// ----- 작물 그림 -----
+// 작물마다 본체(잎·줄기)와 열매를 따로 세웁니다.
+// 인스턴스는 모든 자리만큼 미리 만들어 두고, 심지 않은 자리는 크기를 0으로 눌러 감춥니다.
+function makeTuft(count, r, h, spread) {
+  // 밑동에서 여러 갈래가 부챗살처럼 뻗어 올라오는 잎 다발.
   // three에 지오메트리 합치기 도구가 없어서 손으로 엮습니다.
   const parts = [];
-  for (let k = 0; k < 6; k++) {
-    const blade = new THREE.ConeGeometry(0.045, 0.52 + Math.random() * 0.16, 4);
-    blade.translate(0, 0.26, 0);
-    blade.rotateZ((Math.random() - 0.5) * 0.7);          // 바깥으로 벌어지게
-    blade.rotateY((k / 6) * Math.PI * 2 + Math.random() * 0.4);
+  for (let k = 0; k < count; k++) {
+    const blade = new THREE.ConeGeometry(r, h * (0.85 + Math.random() * 0.3), 4);
+    blade.translate(0, h / 2, 0);
+    blade.rotateZ((Math.random() - 0.5) * spread);
+    blade.rotateY((k / count) * Math.PI * 2 + Math.random() * 0.4);
     parts.push(blade);
   }
-  const tuft = new THREE.BufferGeometry();
-  let pn = 0, inCount = 0;
-  parts.forEach((g) => { pn += g.attributes.position.count; inCount += g.index ? g.index.count : 0; });
+  const out = new THREE.BufferGeometry();
+  let pn = 0;
+  parts.forEach((g) => { pn += g.attributes.position.count; });
   const pos = new Float32Array(pn * 3);
   const nor = new Float32Array(pn * 3);
   const uv = new Float32Array(pn * 2);
@@ -2767,38 +2990,108 @@ let carrotLeafMesh, carrotRootMesh;
     po += g.attributes.position.array.length;
     uo += g.attributes.uv.array.length;
   });
-  tuft.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  tuft.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  tuft.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  tuft.setIndex(idx);
-  carrotLeafMesh = buildInstanced(tuft, carrotLeafMat, carrotSpots, (s) => {
-    dummy.position.set(s.x, s.y, s.z);
-    dummy.rotation.set(0, s.rot, 0);
-    dummy.scale.setScalar(0.9 + Math.random() * 0.3);
-  });
-  carrotLeafMesh.castShadow = true;
-  // 흙 위로 살짝 내민 주황 어깨
-  const root = new THREE.ConeGeometry(0.12, 0.3, 7);
-  root.rotateX(Math.PI);           // 뾰족한 쪽이 땅속으로
-  root.translate(0, 0.1, 0);
-  carrotRootMesh = buildInstanced(root, carrotRootMat, carrotSpots, (s) => {
-    dummy.position.set(s.x, s.y, s.z);
-    dummy.rotation.set(0, s.rot, 0);
-    dummy.scale.setScalar(1);
-  });
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  out.setIndex(idx);
+  return out;
 }
-function hideCarrotPlant(i) {
-  const s = carrotSpots[i];
-  s.picked = true;
-  dummy.position.set(s.x, s.y, s.z);
-  dummy.rotation.set(0, 0, 0);
-  dummy.scale.setScalar(0);
-  dummy.updateMatrix();
-  carrotLeafMesh.setMatrixAt(i, dummy.matrix);
-  carrotRootMesh.setMatrixAt(i, dummy.matrix);
-  carrotLeafMesh.instanceMatrix.needsUpdate = true;
-  carrotRootMesh.instanceMatrix.needsUpdate = true;
+// 열매(꽃·알)를 한 포기에 여러 개 흩어 놓은 덩어리
+function makeCluster(n, r, spreadX, spreadY) {
+  const parts = [];
+  for (let k = 0; k < n; k++) {
+    const b = new THREE.IcosahedronGeometry(r, 0);
+    b.translate((Math.random() - 0.5) * spreadX, spreadY + (Math.random() - 0.5) * 0.18,
+                (Math.random() - 0.5) * spreadX);
+    parts.push(b);
+  }
+  const out = new THREE.BufferGeometry();
+  let pn = 0;
+  parts.forEach((g) => { pn += g.attributes.position.count; });
+  const pos = new Float32Array(pn * 3);
+  const nor = new Float32Array(pn * 3);
+  const uv = new Float32Array(pn * 2);
+  let po = 0, uo = 0;
+  parts.forEach((g) => {
+    pos.set(g.attributes.position.array, po);
+    nor.set(g.attributes.normal.array, po);
+    uv.set(g.attributes.uv.array, uo);
+    po += g.attributes.position.array.length;
+    uo += g.attributes.uv.array.length;
+  });
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return out;
 }
+
+const cropMeshes = {};   // 작물키 → { body, fruit }
+{
+  const leafGreen = 0x3f7a35, teaGreen = 0x2d5f2c, radishLeaf = 0x4e8a3a;
+  const shapes = {
+    // 메밀 — 가는 줄기 다발에 하얀 꽃이 소복하게
+    buckwheat: {
+      body: [makeTuft(5, 0.028, 0.62, 0.5), new THREE.MeshLambertMaterial({ color: 0x6b8f4a, flatShading: true })],
+      fruit: [makeCluster(7, 0.055, 0.3, 0.62), new THREE.MeshLambertMaterial({ color: 0xf5f2e8, flatShading: true })],
+    },
+    // 감자 — 낮고 두툼한 초록 덤불. 캐기 전에는 알이 안 보입니다
+    potato: {
+      body: [makeTuft(7, 0.075, 0.4, 1.1), new THREE.MeshLambertMaterial({ color: leafGreen, flatShading: true })],
+      fruit: [makeCluster(3, 0.1, 0.26, 0.06), new THREE.MeshLambertMaterial({ color: 0xc9a165, flatShading: true })],
+    },
+    // 월동무 — 큼직한 잎에 흰 어깨가 흙 위로 쑥
+    radish: {
+      body: [makeTuft(6, 0.055, 0.84, 0.8), new THREE.MeshLambertMaterial({ color: radishLeaf, flatShading: true })],
+      fruit: [(() => { const g = new THREE.ConeGeometry(0.13, 0.34, 8); g.rotateX(Math.PI); g.translate(0, 0.1, 0); return g; })(),
+              new THREE.MeshLambertMaterial({ color: 0xf3f0e4, flatShading: true })],
+    },
+    // 차나무 — 둥글게 다듬은 낮은 덤불
+    tea: {
+      body: [(() => { const g = new THREE.IcosahedronGeometry(0.34, 0); g.scale(1.2, 0.72, 1.2); g.translate(0, 0.26, 0); return g; })(),
+             new THREE.MeshLambertMaterial({ color: teaGreen, flatShading: true })],
+      fruit: [makeCluster(4, 0.05, 0.4, 0.42), new THREE.MeshLambertMaterial({ color: 0x8fc16a, flatShading: true })],
+    },
+  };
+  const hidden = (s) => { dummy.position.set(s.x, s.y, s.z); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(0); };
+  for (const key of SEED_ORDER) {
+    const sh = shapes[key];
+    const body = buildInstanced(sh.body[0], sh.body[1], farmSpots, hidden);
+    body.castShadow = true;
+    const fruit = buildInstanced(sh.fruit[0], sh.fruit[1], farmSpots, hidden);
+    cropMeshes[key] = { body, fruit };
+  }
+}
+
+// 한 밭의 그림을 지금 상태에 맞춰 다시 세웁니다
+function refreshFarm(f) {
+  const sd = f.crop ? SEEDS[f.crop] : null;
+  const age = sd ? Math.min(1, (dayCount - f.planted) / sd.days) : 0;
+  const grown = sd && age >= 1;
+  // 자란 정도를 크기로 보여줍니다 — 심은 날은 겨우 싹입니다
+  const scale = sd ? 0.25 + age * 0.75 : 0;
+  for (const spot of f.spots) {
+    for (const key of SEED_ORDER) {
+      const mine = key === f.crop;
+      const m = cropMeshes[key];
+      dummy.position.set(spot.x, spot.y, spot.z);
+      dummy.rotation.set(0, spot.rot, 0);
+      dummy.scale.setScalar(mine ? scale * spot.s : 0);
+      dummy.updateMatrix();
+      m.body.setMatrixAt(spot.i, dummy.matrix);
+      // 열매는 다 자라야 보입니다 (심자마자 감자가 달려 있으면 이상하니까요)
+      dummy.scale.setScalar(mine && grown ? spot.s : 0);
+      dummy.updateMatrix();
+      m.fruit.setMatrixAt(spot.i, dummy.matrix);
+    }
+  }
+  for (const key of SEED_ORDER) {
+    cropMeshes[key].body.instanceMatrix.needsUpdate = true;
+    cropMeshes[key].fruit.instanceMatrix.needsUpdate = true;
+  }
+  // 흙은 늘 보입니다 — 고랑 사이로 흙이 비쳐야 들판이 아니라 밭으로 보입니다
+  drawFarmSign(f);
+}
+function refreshAllFarms() { for (const f of FARMS) refreshFarm(f); }
 
 // ---------- 8-3c. 올레길 — 일터로 이어지는 흙길 ----------
 // 제주 올레는 큰길에서 집으로 들어가는 좁은 골목입니다.
@@ -2834,6 +3127,117 @@ const OLLE_MAT = new THREE.MeshLambertMaterial({ color: 0xa8906a });
       scene.add(seg);
     }
   }
+}
+
+// ---------- 8-3d. 당근주스 노점 ----------
+// 천막을 친 나무 좌판입니다. 상판에 주스병과 유리컵을 늘어놓고,
+// 뒤쪽에는 아직 안 간 당근을 담은 나무 상자를 쌓아 뒀습니다.
+// 좌판은 사기 전까지 보이지 않습니다 (상점에서 사면 그때 나타납니다).
+{
+  const g = new THREE.Group();
+  const gy = groundHeight(STALL.x, STALL.z);
+  g.position.set(STALL.x, gy, STALL.z);
+  g.rotation.y = STALL.rot;
+
+  const woodMat = new THREE.MeshLambertMaterial({ color: 0xa97c4e, flatShading: true });
+  const postMat = new THREE.MeshLambertMaterial({ color: 0x7a5636, flatShading: true });
+  const awningMat = new THREE.MeshLambertMaterial({ color: 0xe0743a, flatShading: true });
+  const juiceMat = new THREE.MeshLambertMaterial({ color: 0xef8b2c });
+  const glassMat = new THREE.MeshLambertMaterial({
+    color: 0xffd9a8, transparent: true, opacity: 0.75,
+  });
+
+  const add = (mesh, px, py, pz) => {
+    mesh.position.set(px, py, pz);
+    mesh.castShadow = true;
+    g.add(mesh);
+    return mesh;
+  };
+
+  // 좌판 상판과 앞널
+  add(new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.14, 1.1), woodMat), 0, 1.0, 0);
+  add(new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.8, 0.1), woodMat), 0, 0.6, -0.5);
+  [[-1.55, -0.45], [1.55, -0.45], [-1.55, 0.45], [1.55, 0.45]].forEach(([px, pz]) => {
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.0, 0.14), postMat), px, 0.5, pz);
+  });
+  // 천막 — 기둥 넷에 얹은 맞배지붕
+  [[-1.55, -0.45], [1.55, -0.45], [-1.55, 0.45], [1.55, 0.45]].forEach(([px, pz]) => {
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.3, 0.1), postMat), px, 1.65, pz);
+  });
+  const roof = add(new THREE.Mesh(new THREE.ConeGeometry(2.5, 0.7, 4), awningMat), 0, 2.55, 0);
+  roof.rotation.y = Math.PI / 4;
+  roof.scale.set(1.05, 1, 0.62);
+
+  // 상판 위 — 주스병 하나와 유리컵 넷
+  const bottle = add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.44, 10), juiceMat), -1.1, 1.29, 0);
+  bottle.castShadow = false;
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 8), postMat), -1.1, 1.57, 0);
+  for (let i = 0; i < 4; i++) {
+    const cup = add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.2, 8), glassMat),
+      -0.3 + i * 0.42, 1.17, 0.05);
+    cup.castShadow = false;
+  }
+  // 좌판 뒤에 쌓아둔 당근 상자
+  const crate = add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.6), postMat), 1.3, 0.25, 0.8);
+  crate.rotation.y = 0.2;
+  for (let i = 0; i < 5; i++) {
+    const c = add(new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.32, 6), juiceMat),
+      1.05 + (i % 3) * 0.25, 0.62, 0.68 + ((i / 3) | 0) * 0.22);
+    c.rotation.x = Math.PI;
+    c.rotation.z = (Math.random() - 0.5) * 0.6;
+    c.castShadow = false;
+  }
+
+  // 차림표 — 손님이 오는 남쪽을 향해 세웁니다
+  const signCanvas = document.createElement('canvas');
+  signCanvas.width = 256; signCanvas.height = 160;
+  const sc = signCanvas.getContext('2d');
+  sc.fillStyle = '#fdf3dd'; sc.fillRect(0, 0, 256, 160);
+  sc.strokeStyle = '#7a5636'; sc.lineWidth = 8; sc.strokeRect(4, 4, 248, 152);
+  sc.fillStyle = '#4a3a26';
+  sc.textAlign = 'center';
+  sc.font = 'bold 44px "맑은 고딕", sans-serif';
+  sc.fillText('당근주스', 128, 66);
+  sc.fillStyle = '#c2571d';
+  sc.font = 'bold 38px "맑은 고딕", sans-serif';
+  sc.fillText('한 잔 ' + JUICE_PRICE.toLocaleString() + '원', 128, 120);
+  const signTex = new THREE.CanvasTexture(signCanvas);
+  signTex.colorSpace = THREE.SRGBColorSpace;
+  const sign = add(new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.94),
+    new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })), 0, 1.85, -0.56);
+
+  g.visible = false;        // 좌판을 사야 나타납니다
+  scene.add(g);
+  stallGroup = g;
+}
+
+// 손님 — 물질 구경하러 온 관광객입니다.
+// 올레길을 따라 남쪽에서 걸어와 좌판 앞에 줄을 서고, 주스를 받으면 포구 쪽으로 갑니다.
+const GUEST_COLORS = [0xe4694f, 0x4f86c6, 0x6fae62, 0xd9a441, 0x9a6bb5, 0x50b3ac];
+const juiceCupMat = new THREE.MeshLambertMaterial({ color: 0xef8b2c });
+const GUEST_START = { x: 16.5, z: 66 };    // 올레길에서 나타나는 자리
+const GUEST_EXIT = { x: 4, z: 90 };        // 다 마시고 떠나는 쪽 (포구)
+// 줄 서는 자리 — 좌판 앞(남쪽)에 한 줄로
+function guestSlot(i) {
+  return { x: STALL.x - 0.6, z: STALL.z - 2.0 - i * 1.3 };
+}
+function buildGuest(color) {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshLambertMaterial({ color, flatShading: true });
+  const skinMat = new THREE.MeshLambertMaterial({ color: 0xf0d0b0, flatShading: true });
+  const hatMat = new THREE.MeshLambertMaterial({ color: 0xf2e6c8, flatShading: true });
+  const put = (mesh, y, z) => { mesh.position.set(0, y, z || 0); mesh.castShadow = true; g.add(mesh); return mesh; };
+  put(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.34, 0.9, 8), bodyMat), 0.45);       // 몸통
+  put(new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), skinMat), 1.12);                // 머리
+  put(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.16, 10), hatMat), 1.3);       // 모자 통
+  put(new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.04, 12), hatMat), 1.24);      // 모자 챙
+  const bag = put(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.4, 0.2), bodyMat), 0.6, -0.3);  // 배낭
+  bag.material = new THREE.MeshLambertMaterial({ color: 0x5c5147, flatShading: true });
+  const cup = put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.18, 8), juiceCupMat), 0.78, 0.3);
+  cup.visible = false;      // 주스를 받으면 손에 들려줍니다
+  g.userData.cup = cup;
+  scene.add(g);
+  return g;
 }
 
 // 8-4. 팽나무 (바람에 한쪽으로 쏠린 제주 들판 나무)
@@ -2873,6 +3277,7 @@ scatter(16, ISLAND_R - 26, 2.5, (x, y, z) => {
   }
   if (plantBlocked(x, z)) return;   // 마구간·헌집 곁은 비워둡니다
   if (pointOnOlle(x, z, 2.5)) return;   // 올레길 위에는 나무를 심지 않습니다
+  if (inFarmPlot(x, z, 1.5)) return;    // 갈아엎은 농지 한복판에 나무가 서 있으면 안 됩니다
   buildTree(x, y, z);
 });
 
@@ -3838,10 +4243,38 @@ function updateRopeBadge() {
       : '이장님이 오고 계세요\n문 앞에서 잠깐 기다려주세요';
     return;
   }
-  // 당근밭 — 발밑에 뽑을 게 있으면 알려줍니다
-  if (typeof nearestCarrotPlant === 'function' && nearestCarrotPlant() >= 0) {
-    ropeBadge.textContent = `${KEY_ACTION_RO} 당근 뽑기 (지금 ${carrots}개)`;
+  // 당근주스 좌판
+  if (hasStall && Math.hypot(state.x - STALL.x, state.z - STALL.z) < STALL_RANGE) {
+    const g = guestWaiting();
+    ropeBadge.textContent = g
+      ? (carrots >= JUICE_CARROTS
+        ? `손님이 기다려요\n${KEY_ACTION_RO} 당근주스 팔기 (당근 ${JUICE_CARROTS}개 · ${formatWon(JUICE_PRICE)})`
+        : `손님이 기다리는데 당근이 모자라요 (${carrots}/${JUICE_CARROTS})`)
+      : (stallOpen()
+        ? `당근주스 좌판\n당근을 들고 지키고 있으면 관광객이 옵니다 (지금 ${carrots}개)`
+        : '당근주스 좌판\n손님은 낮에만 옵니다');
     return;
+  }
+  // 밭 팻말 앞 — 밭 상태에 따라 할 일을 알려줍니다
+  if (typeof nearestFarmSign === 'function') {
+    const f = nearestFarmSign();
+    if (f) {
+      if (!f.rented && !f.owned) {
+        ropeBadge.textContent =
+          `이장님 땅 100평\n${KEY_ACTION_RO} 빌리기 (${formatWon(rentPrice(rentedCount()))})`;
+      } else if (farmRipe(f)) {
+        ropeBadge.textContent = `${SEEDS[f.crop].name}를 거둘 때가 됐어요\n${KEY_ACTION_RO} 수확하기` +
+          (f.owned ? '' : '\n절반은 이장님 몫입니다');
+      } else if (f.crop) {
+        const left = SEEDS[f.crop].days - (dayCount - f.planted);
+        ropeBadge.textContent = `${SEEDS[f.crop].name}가 자라는 중\n${left}일 남았어요`;
+      } else {
+        ropeBadge.textContent = seedBagCount()
+          ? `${f.owned ? '루루의 땅' : '빌린 밭'}\n${KEY_ACTION_RO} 씨앗 심기`
+          : `${f.owned ? '루루의 땅' : '빌린 밭'}\n씨앗은 이장님 상점에서 삽니다`;
+      }
+      return;
+    }
   }
   // 마구간 안내 (당근·산소통은 상점 안에서 삽니다)
   if (typeof RACE_SPOT !== 'undefined' &&
@@ -4029,43 +4462,123 @@ targetRing.renderOrder = 999;
 targetRing.visible = false;
 scene.add(targetRing);
 
-// 발밑에 뽑을 수 있는 당근이 있는지 (귤보다 가까이 가야 손이 닿습니다)
-const CARROT_PULL_RANGE = 1.5;
-function nearestCarrotPlant() {
-  let best = -1, bestD = CARROT_PULL_RANGE;
-  for (let i = 0; i < carrotSpots.length; i++) {
-    const s = carrotSpots[i];
-    if (s.picked) continue;
-    const d = Math.hypot(s.x - state.x, s.z - state.z);
-    if (d < bestD) { bestD = d; best = i; }
+// ----- 밭 팻말 앞에서 하는 일 (임대 · 심기 · 수확 · 매입) -----
+const FARM_SIGN_RANGE = 2.6;
+function nearestFarmSign() {
+  let best = null, bestD = FARM_SIGN_RANGE;
+  for (const f of FARMS) {
+    if (!f.signPos) continue;
+    const d = Math.hypot(f.signPos.x - state.x, f.signPos.z - state.z);
+    if (d < bestD) { bestD = d; best = f; }
   }
   return best;
 }
-function tryPullCarrot() {
-  const i = nearestCarrotPlant();
-  if (i < 0) return false;
-  const s = carrotSpots[i];
-  state.facing = Math.atan2(s.x - state.x, s.z - state.z);
-  state.harvestT = 0;              // 귤 딸 때와 같은 동작을 씁니다
-  hideCarrotPlant(i);
-  carrots++;
-  updateCarrotBadge();
+// 이 밭이 지금 거둘 수 있는 상태인가
+function farmRipe(f) {
+  return !!f.crop && (dayCount - f.planted) >= SEEDS[f.crop].days;
+}
+function seedBagCount() {
+  return SEED_ORDER.reduce((n, k) => n + (seeds[k] || 0), 0);
+}
+// 밭 하나 빌리기
+function rentFarm(f) {
+  const price = rentPrice(rentedCount());
+  const py = groundHeight(f.signPos.x, f.signPos.z) + 2.2;
+  if (coins < price) {
+    spawnMoneyPopup(f.signPos.x, py, f.signPos.z, `${formatWon(price - coins)} 부족`);
+    return;
+  }
+  coins -= price;
+  f.rented = true;
+  stat.rented = (stat.rented || 0) + 1;
+  updateCoinBadge();
+  playShipSound();
+  refreshFarm(f);
+  spawnMoneyPopup(f.signPos.x, py, f.signPos.z,
+    '100평을 빌렸어요\n씨앗을 사다 심으면 됩니다\n수확할 때 절반은 이장님 몫입니다');
+}
+// 빌린 밭을 아예 사기
+function buyFarm(f) {
+  const py = groundHeight(f.signPos.x, f.signPos.z) + 2.2;
+  if (coins < FARM_BUY_PRICE) {
+    spawnMoneyPopup(f.signPos.x, py, f.signPos.z, `${formatWon(FARM_BUY_PRICE - coins)} 부족`);
+    return;
+  }
+  coins -= FARM_BUY_PRICE;
+  f.owned = true;
+  f.rented = true;
+  stat.owned = (stat.owned || 0) + 1;
+  updateCoinBadge();
+  playShipSound();
+  refreshFarm(f);
+  spawnMoneyPopup(f.signPos.x, py, f.signPos.z,
+    '내 땅이 생겼어요\n이제 이 밭에서 나는 건 전부 루루 몫입니다');
+}
+// 씨앗 심기
+function plantSeed(f, key) {
+  const py = groundHeight(f.signPos.x, f.signPos.z) + 2.2;
+  if (!seeds[key]) {
+    spawnMoneyPopup(f.signPos.x, py, f.signPos.z, `${SEEDS[key].name} 씨앗이 없어요`);
+    return;
+  }
+  seeds[key]--;
+  f.crop = key;
+  f.planted = dayCount;
+  refreshFarm(f);
   playPickSound();
-  spawnMoneyPopup(s.x, s.y + 1.0, s.z, `당근 +1 (${carrots}개)`);
-  state.idleTime = 0;
+  spawnMoneyPopup(f.signPos.x, py, f.signPos.z,
+    `${SEEDS[key].name}를 심었어요
+${SEEDS[key].days}일 뒤에 거둡니다`);
+}
+// 수확 — 임대한 밭이면 절반이 소작료로 나갑니다
+function harvestFarm(f) {
+  const sd = SEEDS[f.crop];
+  const py = groundHeight(f.signPos.x, f.signPos.z) + 2.4;
+  // 만원 단위로 떨어뜨립니다 (1,005,000원처럼 지저분한 숫자가 안 나오게)
+  const total = Math.round(sd.yield * (0.9 + Math.random() * 0.2) / 20000) * 20000;
+  const rent = f.owned ? 0 : total * TENANT_SHARE;
+  const mine = total - rent;
+  coins += mine;
+  stat.harvest = (stat.harvest || 0) + 1;
+  stat.rentPaid = (stat.rentPaid || 0) + rent;
+  updateCoinBadge();
+  playShipSound();
+  // 차나무는 베지 않고 잎만 땁니다 — 다시 자라기 시작합니다
+  if (sd.perennial) f.planted = dayCount;
+  else f.crop = null;
+  refreshFarm(f);
+  spawnMoneyPopup(f.signPos.x, py, f.signPos.z, f.owned
+    ? `${sd.name} 수확 ${formatWon(total)}
+전부 내 몫입니다`
+    : `${sd.name} 수확 ${formatWon(total)}
+이장님 몫 ${formatWon(rent)}
+내 몫 ${formatWon(mine)}`);
+}
+// 팻말 앞에서 F — 밭 상태에 따라 할 일이 갈립니다
+function tryFarmSign() {
+  const f = nearestFarmSign();
+  if (!f) return false;
+  if (!f.rented && !f.owned) {
+    const price = rentPrice(rentedCount());
+    openBuyDialog('🪧', `이장님 땅 100평 (${f.no + 1}번)`, price, () => rentFarm(f));
+    return true;
+  }
+  if (farmRipe(f)) { harvestFarm(f); return true; }
+  if (f.crop) {
+    const left = SEEDS[f.crop].days - (dayCount - f.planted);
+    spawnMoneyPopup(f.signPos.x, groundHeight(f.signPos.x, f.signPos.z) + 2.2, f.signPos.z,
+      `${SEEDS[f.crop].name}가 자라는 중이에요
+${left}일만 더 기다리세요`);
+    return true;
+  }
+  openFarmDialog(f);
   return true;
 }
 
 function updateHarvestTarget(dt, t) {
   if (state.harvestT >= 0) { targetRing.visible = false; return; }   // 따는 중엔 표식 끔
   const i = nearestFruit();
-  let s = null;
-  if (i >= 0) {
-    s = fruitSpots[i];
-  } else {
-    const ci = nearestCarrotPlant();                                 // 귤이 없으면 당근을 봅니다
-    if (ci >= 0) { const c = carrotSpots[ci]; s = { x: c.x, y: c.y + 0.5, z: c.z }; }
-  }
+  const s = i >= 0 ? fruitSpots[i] : null;
   if (!s) { targetRing.visible = false; return; }
   targetRing.visible = true;
   targetRing.position.set(s.x, s.y, s.z);
@@ -5056,6 +5569,114 @@ function updateMayor(dt, t) {
   mayorCard.scale.set(mirrorM ? -Wp : Wp, Hp, 1);
 }
 
+// ---------- 12-1f-2y. 당근주스 노점 손님 ----------
+// 손님은 루루가 좌판을 지키고 있을 때, 그리고 낮에만 옵니다.
+// 아무도 없는 좌판에 줄을 설 리도 없고, 캄캄한 밤에 주스를 사 마실 리도 없으니까요.
+const STALL_OPEN_FROM = 0.25, STALL_OPEN_TO = 0.78;   // 하루 중 장사가 되는 때 (아침 ~ 해질녘)
+function stallOpen() {
+  const f = (gameT % DAY_LEN) / DAY_LEN;
+  return f > STALL_OPEN_FROM && f < STALL_OPEN_TO;
+}
+function guestWaiting() {
+  return guests.find((g) => g.state === 'wait') || null;
+}
+function updateGuests(dt) {
+  if (!hasStall) return;
+  const luluNear = !state.inside && !state.inShop &&
+    Math.hypot(state.x - STALL.x, state.z - STALL.z) < 16;
+
+  // 새 손님 부르기
+  if (luluNear && stallOpen() && guestsToday < GUESTS_PER_DAY &&
+      guests.filter((g) => g.state !== 'leave').length < GUEST_QUEUE) {
+    guestTimer -= dt;
+    if (guestTimer <= 0) {
+      guestTimer = 14 + Math.random() * 16;
+      guestsToday++;
+      guests.push({
+        x: GUEST_START.x, z: GUEST_START.z,
+        state: 'come', wait: GUEST_MAX_WAIT, bob: Math.random() * 6,
+        group: buildGuest(GUEST_COLORS[(Math.random() * GUEST_COLORS.length) | 0]),
+      });
+    }
+  } else {
+    guestTimer = Math.min(guestTimer, 6);   // 자리를 비우면 다음 손님이 곧 오도록
+  }
+
+  const walk = (g, gx, gz, speed) => {
+    const dx = gx - g.x, dz = gz - g.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.15) return true;
+    g.x += (dx / d) * speed * dt;
+    g.z += (dz / d) * speed * dt;
+    g.group.rotation.y = Math.atan2(dx, dz);
+    return false;
+  };
+
+  for (let i = guests.length - 1; i >= 0; i--) {
+    const g = guests[i];
+    if (g.state === 'come') {
+      const slot = guestSlot(guests.filter((o) => o.state !== 'leave').indexOf(g));
+      if (walk(g, slot.x, slot.z, 2.0)) {
+        g.state = 'wait';
+        g.group.rotation.y = Math.PI;   // 좌판을 바라봅니다
+      }
+    } else if (g.state === 'wait') {
+      g.wait -= dt;
+      if (g.wait <= 0) {
+        g.state = 'leave';   // 기다리다 지쳐 그냥 갑니다
+        g.gaveUp = true;
+      }
+    } else {
+      if (walk(g, GUEST_EXIT.x, GUEST_EXIT.z, 2.4)) {
+        scene.remove(g.group);
+        guests.splice(i, 1);
+        continue;
+      }
+    }
+    // 제자리에서 살짝 몸을 흔듭니다 (기다리는 티)
+    g.bob += dt;
+    const y = groundHeight(g.x, g.z) + (g.state === 'wait' ? Math.abs(Math.sin(g.bob * 1.6)) * 0.04 : 0);
+    g.group.position.set(g.x, y, g.z);
+  }
+}
+// 한 잔 팔기 — 좌판 앞에서 F를 눌렀을 때
+function trySellJuice() {
+  const py = groundHeight(STALL.x, STALL.z) + 2.2;
+  if (!hasStall) return false;
+  if (Math.hypot(state.x - STALL.x, state.z - STALL.z) > STALL_RANGE) return false;
+  const g = guestWaiting();
+  if (!g) {
+    spawnMoneyPopup(STALL.x, py, STALL.z,
+      stallOpen() ? '아직 손님이 없어요\n좌판을 지키고 있으면 옵니다'
+                  : '지금은 손님이 다녔습니다\n낮에 나와야 장사가 됩니다');
+    return true;
+  }
+  if (carrots < JUICE_CARROTS) {
+    spawnMoneyPopup(STALL.x, py, STALL.z,
+      `당근이 ${JUICE_CARROTS}개는 있어야 한 잔이 나와요 (지금 ${carrots}개)`);
+    return true;
+  }
+  carrots -= JUICE_CARROTS;
+  coins += JUICE_PRICE;
+  juiceSold++;
+  stat.juice = (stat.juice || 0) + 1;
+  updateCarrotBadge();
+  updateCoinBadge();
+  playPickSound();
+  g.state = 'leave';
+  if (g.group.userData.cup) g.group.userData.cup.visible = true;
+  spawnMoneyPopup(STALL.x, py, STALL.z, `당근주스 한 잔! +${formatWon(JUICE_PRICE)}`);
+  return true;
+}
+// 좌판을 세웁니다 (상점에서 사거나, 저장을 불러올 때)
+function applyStall() {
+  if (stallGroup) stallGroup.visible = hasStall;
+  if (hasStall && !applyStall.blocked) {
+    applyStall.blocked = true;
+    obstacles.push({ x: STALL.x, z: STALL.z, r: 1.9, topY: NO_JUMP });
+  }
+}
+
 // ---------- 12-1f-2z. 무남이 (마을길의 백수 한량) ----------
 // 하는 일은 없는데 이상하게 품격이 있어 보이는 남자. 제주 촌구석에서도 매일 수트 차림입니다.
 // 루루가 집을 꾸며갈수록 한 단계씩 가까워지는데, 처음엔 젠틀하다가 갈수록
@@ -5566,6 +6187,8 @@ function updateDayNight(dt) {
     gameT -= DAY_LEN;
     dayCount++;
     rollDayEvent();
+    refreshAllFarms();     // 하룻밤 사이에 작물이 그만큼 자랐습니다
+    guestsToday = 0;       // 좌판 손님도 새로 옵니다
     // 엔딩이 나오는 아침에는 다른 알림을 쉬고 이야기에 집중합니다
     if (!checkEndingMorning()) {
       morningNotice();
@@ -5676,6 +6299,18 @@ function mayorTalkLines() {
     '물질을 해보고 싶으면 상점 안에서 망사리부터 사게.',
     '망사리 없이 바다에 드는 건 안 될 말이지.',
   ];
+  // 아직 밭을 한 칸도 안 빌렸으면 소작 이야기부터 꺼냅니다
+  if (rentedCount() === 0) return [
+    '섬에 놀리는 밭이 여럿 있네. 다 내 땅이지.',
+    '팻말 앞에서 말만 하면 100평씩 빌려줌세.',
+    '씨앗은 우리 상점에 있고,\n거둘 때 절반만 나한테 주면 되네.',
+    '…절반이 많다고? 땅값이 원래 그런 걸세.',
+  ];
+  // 거둘 밭이 있으면 그 이야기가 먼저입니다
+  if (FARMS.some((f) => farmRipe(f))) return [
+    '자네 밭에 거둘 때가 된 게 있던데.',
+    '팻말 앞에 서서 거두게.\n내 몫은 알아서 떼어가겠네.',
+  ];
   const idle = [
     ['혼저 옵서예~ 오늘도 부지런하구만.'],
     ['귤은 알이 굵을 때 따야 제값을 받네.'],
@@ -5684,6 +6319,8 @@ function mayorTalkLines() {
     ['자네 말, 요즘 눈빛이 다르던데? 경마에 한번 내보내 보게.'],
     ['바닥재랑 벽지도 들여놨네. 상점 왼쪽을 둘러보게.'],
     ['자네 집 말인가? …좋은 집이지. 아무렴, 좋은 집이고말고.', '(이장님은 왠지 눈을 피했다)'],
+    ['땅은 빌려 쓰는 것보다 사두는 게 낫지.', '뭐, 목돈이 있어야 하는 이야기지만 말이야.'],
+    ['소작료가 아깝거든 밭을 사버리게.', '그럼 거둔 게 다 자네 것이 되지 않는가.'],
   ];
   return idle[Math.floor(Math.random() * idle.length)];
 }
@@ -5752,6 +6389,9 @@ const TUTOR_LINES = [
   '안녕하세요! 저는 이 섬을 지키는 돌하르방입니다. 섬에서 사는 법을 알려드릴게요.',
   '귤나무 앞에서 (F)를 누르면 귤을 딸 수 있어요. 상자를 가득 채워 택배사에 가져가면 한 박스 1만원에 팔립니다.',
   '상점 문 앞에 서면 안으로 들어갑니다. 당근을 사서 말에게 매일 한 개씩 먹여주세요\n굶기면 위험해요!',
+  '섬에 놀리는 밭이 여럿 있어요. 전부 이장님 땅입니다.\n밭 앞 팻말에서 (F)를 누르면 100평씩 빌릴 수 있어요.',
+  '빌린 밭에는 상점에서 산 씨앗을 심습니다. 며칠 지나 다 자라면 팻말 앞에서 거두세요\n다만 절반은 이장님 몫으로 나갑니다.',
+  '소작료가 아까우면 밭을 아예 살 수도 있어요. 목돈이 들지만, 그 뒤로는 거둔 것이 전부 루루 몫이 됩니다.',
   '물질을 하려면 상점에서 망사리를 사고, 포구 끝까지 걸어가세요. 물속에서는 ↑ 떠오르기 · ↓ 잠수 · ←→ 헤엄이에요. 숨이 다하면 죽을 위험이 있어요!',
   '남쪽 언덕의 돌집이 루루의 집입니다. 문 앞에 서면 들어가지고, 가구를 사서 꾸밀 수도 있어요.',
   '말과 애정이 쌓이면 마구간 옆 팻말에서 경마에 나갈 수 있습니다. 좋은 하루 되세요!',
@@ -5765,7 +6405,8 @@ function tutorTalk() {
 // ---------- 12-1f-2a4. 도감(업적) — 섬 살이의 발자취 ----------
 // 게임 곳곳에서 한 일을 세어두고(stat), 조건을 채우면 업적이 달성됩니다.
 // 왼쪽 아래 📖 버튼으로 언제든 펼쳐볼 수 있습니다.
-const stat = { boxes: 0, dives: 0, drowns: 0, races: 0, raceWins: 0, abalone: 0, conch: 0, kelp: 0, octopus: 0, gold: 0 };
+const stat = { boxes: 0, dives: 0, drowns: 0, races: 0, raceWins: 0, abalone: 0, conch: 0, kelp: 0, octopus: 0, gold: 0,
+               rented: 0, owned: 0, harvest: 0, rentPaid: 0, juice: 0 };
 const ACHIEVEMENTS = [
   { id: 'box1',    name: '첫 출하',     desc: '귤 한 박스를 처음 팔았다' },
   { id: 'box10',   name: '귤 부자',     desc: '귤 박스 10개 판매' },
@@ -5782,6 +6423,11 @@ const ACHIEVEMENTS = [
   { id: 'gold1',   name: '황금향!',     desc: '황금향을 처음 발견했다' },
   { id: 'octo1',   name: '문어 한탕',   desc: '문어를 처음 잡았다 (한 마리 5만원!)' },
   { id: 'rich',    name: '백만장자',    desc: '돈 1,000,000원 모으기' },
+  { id: 'rent1',   name: '소작농',      desc: '이장님 땅을 처음 빌렸다' },
+  { id: 'crop1',   name: '첫 수확',     desc: '심은 것을 처음 거두었다' },
+  { id: 'crop20',  name: '농사꾼',      desc: '스무 번 수확했다' },
+  { id: 'land1',   name: '내 땅',       desc: '빌려 쓰던 밭을 사버렸다' },
+  { id: 'land5',   name: '제주 지주',   desc: '내 땅 다섯 칸' },
   { id: 'dream',   name: '제주 최고의 집', desc: '수리·가구·인테리어까지\n꿈을 이뤘다' },
 ];
 const ACH_TESTS = {
@@ -5801,6 +6447,11 @@ const ACH_TESTS = {
   octo1: () => stat.octopus >= 1,
   dream: () => endingState >= 1,
   rich: () => coins >= 1000000,
+  rent1: () => (stat.rented || 0) >= 1,
+  crop1: () => (stat.harvest || 0) >= 1,
+  crop20: () => (stat.harvest || 0) >= 20,
+  land1: () => (stat.owned || 0) >= 1,
+  land5: () => (stat.owned || 0) >= 5,
 };
 let achieved = {};
 // 업적 기능은 뺐습니다 (사용자 결정) — 그 자리는 🎒 아이템 보기가 대신합니다.
@@ -5843,9 +6494,24 @@ function openBag() {
   if (tools.paint) spent += PAINT_PRICE;      // 외벽 페인트
   if (houseFloorColor !== 0) spent += 4000000;
   if (houseWallColor !== 0) spent += 6000000;
+  // 밭 살림 — 빌린 땅, 산 땅, 지금까지 낸 소작료
+  const rentedN = FARMS.filter((f) => f.rented && !f.owned).length;
+  const ownedN = FARMS.filter((f) => f.owned).length;
+  const growing = FARMS.filter((f) => f.crop).length;
+  const ripe = FARMS.filter((f) => farmRipe(f)).length;
+  const farmLine = (rentedN || ownedN)
+    ? `🌱 빌린 밭 ${rentedN}칸 · 내 땅 ${ownedN}칸<br>` +
+      `자라는 중 ${growing}칸` + (ripe ? ` · 거둘 밭 ${ripe}칸` : '') +
+      (stat.rentPaid ? `<br>지금까지 낸 소작료 ${formatWon(stat.rentPaid)}` : '')
+    : '🌱 아직 빌린 밭이 없어요<br>밭 팻말 앞에서 이장님께 빌립니다';
+  // 씨앗 봉지
+  const seedLine = SEED_ORDER.filter((k) => seeds[k])
+    .map((k) => `${SEEDS[k].emoji} ${SEEDS[k].name} ${seeds[k]}봉지`).join(' · ');
   bookList.innerHTML =
     `<div class="bookHead">🎒 자산</div>` +
     `<div class="bagMoney">💵 ${formatWon(coins)}</div>` +
+    `<div class="bookTip" style="margin-bottom:10px">${farmLine}` +
+    (seedLine ? `<br>${seedLine}` : '') + `</div>` +
     `<div class="bookTip" style="margin-bottom:10px">🏠 집꾸미기 ${formatWon(spent)} / ${formatWon(100000000)}<br>` +
     (spent >= 100000000 ? '꿈을 이뤘어요!' : '1억을 채우면 꿈의 집 완성') + `</div>` +
     `<div class="bagGrid">` + items.map((it) =>
@@ -5932,6 +6598,119 @@ function openColorPicker(title, colors, onPick, price) {
   pickWrap.style.display = 'flex';
 }
 
+// 여러 갈래 중 하나를 고르는 창 (씨앗 고르기 · 밭 앞에서 할 일 고르기).
+// 색 고르기 창과 같은 모양인데, 색칠한 네모 대신 그림글자를 크게 보여줍니다.
+// items: [{ emoji, name, note, price, disabled, onPick }]
+function openChoiceDialog(title, items, tip) {
+  if (!pickWrap) return;
+  pickTitle.textContent = title;
+  pickGrid.innerHTML = '';
+  pickPrice.innerHTML = '';
+  if (pickTip) pickTip.textContent = tip || (IS_TOUCH
+    ? '관광지라 물가가 비싸구나 ㅠㅠ'
+    : '관광지라 물가가 비싸구나 ㅠㅠ (아래 단추를 누르면 결정 · ESC 나가기)');
+  let selected = null;
+  const swatches = [];
+  const okBtn = document.createElement('button');
+  okBtn.className = 'buyBtn';
+  const refreshBtn = () => {
+    okBtn.disabled = !selected;
+    okBtn.textContent = selected
+      ? (selected.price
+        ? `${selected.name} · ${formatWon(selected.price)}\n눌러서 결정`
+        : `${selected.name}\n눌러서 결정`)
+      : '먼저 하나 골라주세요';
+  };
+  for (const it of items) {
+    const item = document.createElement('div');
+    item.className = 'swItem';
+    const b = document.createElement('button');
+    b.className = 'swatch';
+    b.style.background = it.disabled ? '#6b6b6b' : '#f7edd8';
+    b.style.fontSize = '28px';
+    b.style.lineHeight = '1';
+    b.textContent = it.emoji;
+    if (it.disabled) b.style.opacity = '0.45';
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (it.disabled) return;
+      selected = it;
+      swatches.forEach((x) => x.classList.remove('sel'));
+      b.classList.add('sel');
+      refreshBtn();
+    });
+    swatches.push(b);
+    const nm = document.createElement('div');
+    nm.className = 'swName';
+    nm.textContent = it.note ? it.name + '\n' + it.note : it.name;
+    nm.style.whiteSpace = 'pre-line';
+    item.appendChild(b);
+    item.appendChild(nm);
+    pickGrid.appendChild(item);
+  }
+  okBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!selected) return;
+    pickWrap.style.display = 'none';
+    selected.onPick();
+  });
+  refreshBtn();
+  pickPrice.appendChild(okBtn);
+  pickWrap.style.display = 'flex';
+}
+
+// 상점 씨앗 진열대 — 벽지 고르듯 씨앗 종류를 고릅니다
+function openSeedShop() {
+  const items = SEED_ORDER.map((k) => {
+    const sd = SEEDS[k];
+    return {
+      emoji: sd.emoji, name: sd.name,
+      note: `${sd.days}일 · ${formatWon(sd.yield)}`,
+      price: shopPrice(sd.price),
+      onPick: () => {
+        const price = shopPrice(sd.price);
+        if (coins < price) {
+          spawnMoneyPopup(state.x, SHOP_ROOM.y + 1.6, state.z, `${formatWon(price - coins)} 부족`);
+          return;
+        }
+        coins -= price;
+        seeds[k] = (seeds[k] || 0) + 1;
+        updateCoinBadge();
+        playPickSound();
+        spawnMoneyPopup(state.x, SHOP_ROOM.y + 1.6, state.z,
+          `${sd.name} 씨앗 한 봉지 (${seeds[k]}봉지)\n밭 하나에 심을 수 있어요`);
+      },
+    };
+  });
+  openChoiceDialog('씨앗', items);
+}
+
+// 빌린 밭 앞에서 뜨는 창 — 심을 씨앗을 고르거나, 아예 사버립니다
+function openFarmDialog(f) {
+  const items = SEED_ORDER.map((k) => {
+    const sd = SEEDS[k];
+    const n = seeds[k] || 0;
+    return {
+      emoji: sd.emoji, name: sd.name,
+      note: n ? `${n}봉지 있음` : '없음',
+      disabled: !n,
+      onPick: () => plantSeed(f, k),
+    };
+  });
+  if (!f.owned) {
+    items.push({
+      emoji: '🏷', name: '이 밭 사기', note: formatWon(FARM_BUY_PRICE),
+      price: FARM_BUY_PRICE,
+      onPick: () => buyFarm(f),
+    });
+  }
+  openChoiceDialog(
+    (f.owned ? '루루의 땅' : '루루가 빌린 밭') + ' 100평',
+    items,
+    f.owned ? '내 땅입니다. 거둔 것은 전부 루루 몫입니다'
+            : '빌린 땅입니다. 거둘 때 절반이 이장님 몫으로 나갑니다');
+}
+
 // 물건 하나짜리 구입 확인 창 — 물건을 크게 미리 보여주고, 가격을 눌러야 사집니다
 function openBuyDialog(emoji, name, price, onBuy) {
   if (!pickWrap) return;
@@ -6006,6 +6785,8 @@ function saveGame(quiet) {
       floorC: houseFloorColor, wallC: houseWallColor, paintC: housePaintColor,
       stat, achieved,
       romanceStage, romanceSeen, lonelySeen, munamIgnored,
+      seeds, hasStall, juiceSold,
+      farms: FARMS.map((f) => ({ r: f.rented, o: f.owned, c: f.crop, p: f.planted })),
     }));
     if (!quiet) spawnMoneyPopup(state.x, lulu.position.y + 1.6, state.z, '저장했어요');
   } catch (e) { /* 시크릿 창 등에서는 저장이 막힐 수 있습니다 */ }
@@ -6037,6 +6818,23 @@ function loadGame() {
   // 가구 — 산 것들을 집 안에 다시 놓습니다
   furnitureOwned = Object.assign(emptyFurnOwned(), d.furn || {});
   applyFurniture();
+  // 농사 — 빌린 밭과 심어둔 작물
+  seeds = d.seeds || {};
+  if (Array.isArray(d.farms)) {
+    d.farms.forEach((sv, i) => {
+      const f = FARMS[i];
+      if (!f || !sv) return;
+      f.rented = !!sv.r;
+      f.owned = !!sv.o;
+      f.crop = SEEDS[sv.c] ? sv.c : null;
+      f.planted = sv.p || 0;
+    });
+  }
+  // (밭 그림은 아래에서 dayCount까지 되살린 뒤에 다시 그립니다 — 자란 정도가 날짜에 달렸으니까요)
+  // 당근주스 좌판
+  hasStall = !!d.hasStall;
+  juiceSold = d.juiceSold || 0;
+  applyStall();
   // 무남이와 어디까지 왔는지
   romanceStage = d.romanceStage || 0;
   romanceSeen = d.romanceSeen || {};
@@ -6068,6 +6866,7 @@ function loadGame() {
     lulu.position.set(state.x, groundHeight(state.x, state.z), state.z);
   }
   updateCoinBadge(); updateCarrotBadge(); updateBasketBadge();
+  refreshAllFarms();   // 날짜까지 되살린 뒤라야 작물이 얼마나 자랐는지 맞게 그려집니다
 }
 // (불러오기는 스크립트 맨 아래에서 합니다 — 여기서 부르면 아직 안 만들어진
 //  배지들을 건드려 게임 전체가 멈춥니다)
@@ -6453,8 +7252,10 @@ function handleActionKey() {
     tryHarvest();
     return;
   }
-  // 발밑에 당근이 있으면 뽑습니다 (상자가 없어도 됩니다 — 손에 들면 그만이니까)
-  if (tryPullCarrot()) return;
+  // 밭 팻말 앞이면 임대·심기·수확
+  if (tryFarmSign()) return;
+  // 좌판 앞이면 주스를 팝니다
+  if (trySellJuice()) return;
   // 상점 문 앞 — 이장님이 열어주면 들어갑니다 (문 앞에서는 입장이 대화보다 우선)
   if (Math.hypot(state.x - SHOP_DOOR.x, state.z - SHOP_DOOR.z) < SHOP_DOOR_RANGE) {
     tryEnterShop();
@@ -6972,6 +7773,7 @@ function animate() {
   updateMunam(dt, t); // 무남이 — 마을길을 느긋하게 왕복합니다
   updateHouse(dt);    // 집 고치는 동작이 끝나면 수리 단계를 올립니다
   updateMayor(dt, t); // 이장님이 상점과 택배사 사이를 오갑니다
+  updateGuests(dt);   // 당근주스 좌판에 관광객이 옵니다
   updateCarrotFx(dt); // 먹인 당근이 조랑말 입가에서 냠냠 사라집니다
   updateHarvestTarget(dt, t);
   updatePopups(dt);
