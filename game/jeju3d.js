@@ -4970,7 +4970,7 @@ const DIVE_ENTRY_RANGE = 2.6;
 //   "누르세요"라고 해놓고 눌러도 아무 일이 안 일어났습니다. 이제 둘을 같은 값으로 맞춥니다.
 const BULTEOK_RANGE = 6.0;
 const BREATH_MAX = 60;         // 한 번 잠수해서 버틸 수 있는 시간(초)
-const NET_CAP = 24;            // 망사리에 담을 수 있는 개수
+const NET_CAP = 10;            // 망사리에 담을 수 있는 개수 (가득 차면 뭍으로 나가 팔아야 합니다)
 const CATCH_RANGE = 1.7;       // 이 거리 안의 것만 딸 수 있음
 let breath = BREATH_MAX;
 let net = [];                  // 이번 물질에서 딴 것들의 종류 목록
@@ -5701,15 +5701,12 @@ function applyStall() {
 // 백수인데 집은 그럴듯하고, 심지어 오션뷰입니다. 마당이 바다를 마주 봅니다.
 // 무남이는 이 집 앞을 좀처럼 벗어나지 않습니다 (갈 데가 없으니까).
 const MUNAM_HOUSE = { x: 12.0, z: -64.0, rot: Math.PI };   // 정면(마당)이 남쪽 바다를 향합니다
-const MUNAM_PATH = [                 // 바다를 보고 있는 앞마당을 천천히 왕복합니다
-  { x: MUNAM_HOUSE.x - 3.0, z: MUNAM_HOUSE.z - 6.0 },
-  { x: MUNAM_HOUSE.x + 3.2, z: MUNAM_HOUSE.z - 6.4 },
-];
+// 무남이는 걸어다니지 않습니다. 마당 끝에 의자를 내놓고 앉아 바다만 봅니다.
+// 루루가 처음 그를 보는 것도 이 모습입니다 — 하는 일은 없는데 이상하게 품격이 있는 뒷모습.
+const MUNAM_SEAT = { x: MUNAM_HOUSE.x - 0.6, z: MUNAM_HOUSE.z - 7.2 };
 const munam = {
-  x: MUNAM_PATH[0].x, z: MUNAM_PATH[0].z,
-  target: 1,
-  facing: 0,
-  pause: 0,        // 가끔 멈춰 서서 하늘을 봅니다 (하는 일이 없으니까)
+  x: MUNAM_SEAT.x, z: MUNAM_SEAT.z,
+  facing: Math.PI,   // 남쪽 바다 쪽
   group: null,
 };
 // 무남이가 대꾸를 해주기 시작하는 돈 — 이만큼은 모아야 사람 취급을 해줍니다.
@@ -5815,7 +5812,7 @@ for (let i = 1; i <= 4; i++) clearTreesAround(MUNAM_HOUSE.x, MUNAM_HOUSE.z - i *
 // 빈터를 다 치운 뒤에야 집 자체를 막습니다 (먼저 세우면 위에서 같이 지워집니다).
 // 반경은 벽에 닿을 만큼만 — 마당의 무남이 곁까지는 걸어갈 수 있어야 합니다.
 obstacles.push({ x: MUNAM_HOUSE.x, z: MUNAM_HOUSE.z, r: 2.8, topY: NO_JUMP });
-const MUNAM_SPEED = 1.15;            // 서두를 일이 없는 걸음
+// (예전에는 무남이가 마당을 왕복했지만, 이제 의자에 앉아 바다만 봅니다)
 const MUNAM_RANGE = 3.0;   // 마당이 넓어 조금 멀리서도 말을 걸 수 있게
 let romanceStage = 0;                // 0 = 아직 못 만남, 6 = 프로포즈까지
 let romanceSeen = {};                // 단계별 이벤트를 봤는지
@@ -5885,25 +5882,52 @@ function buildMunam() {
 }
 munam.group = buildMunam();
 
+// 무남이가 내놓고 앉은 나무 의자.
+// 무남이 그림은 늘 카메라를 향해 도는 종이 인형이라, 의자도 같이 돌려야
+// 어느 각도에서 봐도 등받이가 그의 등 뒤에 옵니다.
+// 무남이 앞을 가로막는 낮은 밭담.
+// 그림이 허벅지에서 잘려 있어서, 담 뒤에 세우면 잘린 자리가 담에 가려집니다.
+// 담이 그림과 같이 카메라를 향해 돌기 때문에 어느 각도에서 봐도 가려집니다.
+let munamWall = null;
+{
+  const g = new THREE.Group();
+  const y = groundHeight(MUNAM_SEAT.x, MUNAM_SEAT.z);
+  g.position.set(MUNAM_SEAT.x, y, MUNAM_SEAT.z);
+  munamWall = g;
+  const dark = new THREE.MeshLambertMaterial({ color: 0x4a4f52, flatShading: true });
+  const light = new THREE.MeshLambertMaterial({ color: 0x5d6367, flatShading: true });
+  const rock = new THREE.DodecahedronGeometry(0.26, 0);
+  // 돌을 두 단으로 엇갈려 쌓습니다 (허벅지 높이까지만 — 얼굴이 묻히면 안 되니까요)
+  for (let row = 0; row < 2; row++) {
+    const n = row === 0 ? 8 : 7;
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(rock, (i + row) % 3 === 0 ? light : dark);
+      m.position.set((i - (n - 1) / 2) * 0.42 + (row ? 0.21 : 0), 0.2 + row * 0.32, 0.55);
+      m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+      m.scale.setScalar(0.85 + Math.random() * 0.3);
+      m.castShadow = true;
+      g.add(m);
+    }
+  }
+  scene.add(g);
+  obstacles.push({ x: MUNAM_SEAT.x, z: MUNAM_SEAT.z, r: 1.0, topY: y + 0.7 });
+}
+
 // 무남이 그림(스프라이트)이 준비되면 3D 대신 그 그림을 세웁니다.
-// assets/farmcat/munam_idle.webp 를 넣기만 하면 이 코드가 알아서 바꿔 답니다.
-const MUNAM_H = 1.85;
+// 담 너머로 바다를 보고 선 옆모습입니다. 칸을 넘기는 움직임은 없습니다.
+const MUNAM_H = 1.72;              // 담에 가려지는 아래를 뺀 키
 let munamCard = null;
 (function tryMunamSheet() {
   const img = new Image();
   img.onload = () => {
-    // 그림 한 장이면 그대로, 가로로 긴 시트면 8칸짜리 애니메이션으로 봅니다
-    // (다른 캐릭터 시트도 전부 8칸이라 규격을 맞췄습니다)
-    const frames = img.width / img.height >= 2.4 ? 8 : 1;
-    loadSheet('munamIdle', 'munam_idle.webp', frames, img.width / frames);
     const geo = new THREE.PlaneGeometry(1, 1);
-    geo.translate(0, 0.5, 0);
+    geo.translate(0, 0.5, 0);      // 발밑을 기준으로 세웁니다
     munamCard = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-      map: SHEETS.munamIdle.tex, transparent: true, alphaTest: 0.08,
-      side: THREE.DoubleSide,   // 어느 쪽에서 다가와도 보이게
+      map: loadTexture('../assets/farmcat/munam_stand.webp'),
+      transparent: true, alphaTest: 0.08,
+      side: THREE.DoubleSide,      // 어느 쪽에서 다가와도 보이게
     }));
-    munamCard.userData.planeH = MUNAM_H * CELL_H / (CELL_H - CELL_PAD * 2);
-    munamCard.position.y = -(CELL_PAD / CELL_H) * munamCard.userData.planeH;
+    munamCard.userData.ratio = img.width / img.height;
     munam.group.add(munamCard);
     // 그림이 붙었으니 3D 몸은 감춥니다 (그림자만 남깁니다)
     for (const c of munam.group.children) {
@@ -5912,7 +5936,7 @@ let munamCard = null;
     }
   };
   img.onerror = () => {};   // 그림이 아직 없으면 3D 무남이 그대로
-  img.src = '../assets/farmcat/munam_idle.webp';
+  img.src = '../assets/farmcat/munam_stand.webp';
 })();
 
 // 집이 어디까지 꾸며졌는지로 만남의 단계가 열립니다
@@ -6026,39 +6050,19 @@ function updateMunam(dt, t) {
   // 집 안이나 물속에 있으면 굳이 그리지 않습니다
   munam.group.visible = !state.inside && !state.inShop && !state.diving;
   if (!munam.group.visible) return;
-  const dest = MUNAM_PATH[munam.target];
-  const dx = dest.x - munam.x, dz = dest.z - munam.z;
-  const d = Math.hypot(dx, dz);
-  // 루루가 가까이 오면 멈춰 서서 마주 봅니다
-  const near = Math.hypot(state.x - munam.x, state.z - munam.z) < 4.5;
-  if (near) {
-    munam.facing = Math.atan2(state.x - munam.x, state.z - munam.z);
-  } else if (munam.pause > 0) {
-    munam.pause -= dt;                       // 하늘을 보는 중입니다
-  } else if (d < 0.6) {
-    munam.target = (munam.target + 1) % MUNAM_PATH.length;
-    munam.pause = 2.5 + Math.random() * 3.5;
-  } else {
-    munam.x += dx / d * MUNAM_SPEED * dt;
-    munam.z += dz / d * MUNAM_SPEED * dt;
-    munam.facing = Math.atan2(dx, dz);
-  }
+  // 무남이는 종일 여기 앉아 바다만 봅니다. 갈 데가 없으니까요.
   const gy = groundHeight(munam.x, munam.z);
-  munam.group.position.set(munam.x, gy, munam.z);
+  // 담 뒤에 서 있습니다 — 잘린 아래가 담에 가려지도록 조금 내려 세웁니다
+  munam.group.position.set(munam.x, gy - 0.12 + Math.sin(t * 1.4) * 0.008, munam.z);
   munam.group.rotation.y = munam.facing;
-  // 걸을 때 몸이 살짝 오르내리고, 서 있을 땐 숨 쉬듯 아주 조금 움직입니다
-  const moving = !near && munam.pause <= 0 && d >= 0.6;
-  munam.group.position.y = gy + (moving ? Math.abs(Math.sin(t * 4.4)) * 0.045 : Math.sin(t * 1.5) * 0.012);
   if (munam.group.userData.head) {
-    munam.group.userData.head.rotation.x = moving ? 0 : Math.sin(t * 0.5) * 0.12;   // 가끔 하늘을 봅니다
+    munam.group.userData.head.rotation.x = Math.sin(t * 0.5) * 0.1;   // 가끔 수평선을 훑습니다
   }
-  // 그림을 붙였으면 칸을 넘겨 움직이게 하고, 카메라를 향해 세워둡니다
+  // 그림을 붙였으면 카메라를 향해 세워둡니다
   if (munamCard) {
-    const sheet = SHEETS.munamIdle;
-    if (sheet.frames > 1) setCell(sheet, Math.floor(t * 6) % sheet.frames);
-    const Hp = munamCard.userData.planeH;
-    munamCard.scale.set(Hp * sheet.frameW / CELL_H, Hp, 1);
+    munamCard.scale.set(MUNAM_H * munamCard.userData.ratio, MUNAM_H, 1);
     munam.group.rotation.y = camYaw;   // 판이 늘 정면으로 보이게
+    if (munamWall) munamWall.rotation.y = camYaw;   // 담도 같이 돌아야 늘 그의 앞을 가립니다
   }
 }
 
