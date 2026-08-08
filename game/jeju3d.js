@@ -1470,10 +1470,7 @@ const PAINT_COLORS = [
 
 let carrots = 0;      // 들고 있는 당근
 let ponyLove = 0;     // 조랑말과 쌓은 애정 (당근 하나에 1씩)
-let hasTank = false;  // 해녀 산소통 — 사면 숨이 60초에서 3분으로 늘어납니다
 const CARROT_PRICE = 1000;
-const TANK_PRICE = 100000;
-const TANK_BREATH = 180;   // 산소통을 멘 뒤의 숨 — 3분
 
 // ----- 농사 -----
 // 이장님 땅을 100평씩 빌려 씨앗을 심습니다. 수확할 때마다 절반이 소작료로 나가고,
@@ -1520,7 +1517,7 @@ let guestTimer = 0;             // 다음 손님까지 남은 시간
 let guestsToday = 0;            // 오늘 온 손님 수
 let juiceSold = 0;              // 지금까지 판 잔 수
 
-// 가게 앞에 있던 당근 바구니와 산소통 판매대는 치웠습니다.
+// 가게 앞에 있던 당근 바구니는 치웠습니다 (상점 안에서 삽니다).
 // 둘 다 상점 안 진열대에서 사면 되니, 문 앞이 물건으로 어수선할 이유가 없습니다.
 
 // ---------- 8-2h. 실내 방들 (집 내부 · 상점 내부) ----------
@@ -2270,7 +2267,7 @@ function formatWon(n) {
 }
 
 // ---------- 8-2h-4. 상점 안 진열대 (가격표 달고, F로 구입) ----------
-// 상점 문으로 들어오면 당근·산소통·망사리·가구가 가격표와 함께 진열되어 있습니다.
+// 상점 문으로 들어오면 당근·씨앗·망사리·가구가 가격표와 함께 진열되어 있습니다.
 // 물건 앞에 서서 F(🐾)를 누르면 삽니다.
 function makePriceSign(name, price, suffix) {
   const c = document.createElement('canvas');
@@ -2294,8 +2291,6 @@ const SHOP_GOODS = [
   // 당근은 말먹이 소모품이라 구석에 둡니다 (왼쪽 벽 인테리어 견본 팻말과 겹치는 자리)
   { key: 'carrot', name: '당근',   emoji: '🥕', get price() { return CARROT_PRICE; },
     x: SHOP_ROOM.cx - 6.0, z: SHOP_ROOM.cz - 3.4 },
-  { key: 'tank',   name: '산소통', emoji: '🤿', get price() { return TANK_PRICE; },
-    x: SHOP_ROOM.cx - 3.0, z: SHOP_ROOM.cz - 3.4 },
   { key: 'net',    name: '망사리', emoji: '🧺', get price() { return NET_PRICE; },
     x: SHOP_ROOM.cx - 1.4, z: SHOP_ROOM.cz - 3.4 },
   // 씨앗은 종류가 여럿이라, 누르면 고르는 창이 뜹니다 (벽지·페인트와 같은 방식).
@@ -2548,7 +2543,6 @@ function buyShopGood(good) {
   const py = SHOP_ROOM.y + 1.6;
   if (good.seedShelf) { openSeedShop(); return; }   // 씨앗은 종류부터 고릅니다
   const already =
-    (good.key === 'tank' && hasTank) ||
     (good.key === 'net' && hasNet) ||
     (good.key === 'stall' && hasStall) ||
     (FURNITURE[good.key] && furnitureOwned[good.key]);
@@ -2576,11 +2570,6 @@ function doBuyShopGood(good, price, px, py, pz) {
     updateCarrotBadge();
     playPickSound();
     spawnMoneyPopup(px, py, pz, `당근 구입! (${carrots}개)`);
-  } else if (good.key === 'tank') {
-    hasTank = true;
-    BREATH_MAX = TANK_BREATH;
-    playShipSound();
-    spawnMoneyPopup(px, py, pz, '산소통 구입! 숨이 3분으로 늘었어요');
   } else if (good.key === 'net') {
     hasNet = true;
     netCarried = true;
@@ -4180,8 +4169,7 @@ function updateRopeBadge() {
     const good = nearestShopGood();
     if (good) {
       const owned =
-        (good.key === 'tank' && hasTank) ||
-        (good.key === 'net' && hasNet) ||
+            (good.key === 'net' && hasNet) ||
         (FURNITURE[good.key] && furnitureOwned[good.key]);
       ropeBadge.textContent = owned
         ? `${good.name}\n보유 중`
@@ -4303,7 +4291,7 @@ function updateRopeBadge() {
       return;
     }
   }
-  // 마구간 안내 (당근·산소통은 상점 안에서 삽니다)
+  // 마구간 안내 (당근은 상점 안에서 삽니다)
   if (typeof RACE_SPOT !== 'undefined' &&
       Math.hypot(state.x - RACE_SPOT.x, state.z - RACE_SPOT.z) < RACE_RANGE) {
     ropeBadge.textContent = ponyLove < RACE_LOVE
@@ -4604,6 +4592,7 @@ ${left}일만 더 기다리세요`);
 
 function updateHarvestTarget(dt, t) {
   if (state.harvestT >= 0) { targetRing.visible = false; return; }   // 따는 중엔 표식 끔
+  // 물속에는 표식을 두지 않습니다 — 어두운 바다를 더듬어 찾는 것이 물질입니다
   const i = nearestFruit();
   const s = i >= 0 ? fruitSpots[i] : null;
   if (!s) { targetRing.visible = false; return; }
@@ -4936,7 +4925,7 @@ function tryHarvest() {
 
 // (예전에는 상점에서 10만원짜리 끈을 팔았고, 사면 상자가 자동으로 따라왔습니다.
 //  상자는 E로 손잡고 끄는 것으로 충분해서 끈 아이템은 뺐습니다. 이제 상점 앞에서는
-//  당근(왼쪽 바구니)과 해녀 산소통(오른쪽 판매대)을 팝니다.)
+//  당근과 씨앗, 망사리, 가구를 팝니다.)
 
 // ---------- 12-1d. 택배사 — 이장님과 정산하고 육지로 부치기 ----------
 // 귤은 낱개로 값을 세지 않습니다. 상자를 가득 채워 가면 이장님이 한 박스 10,000원에 사 줍니다.
@@ -4980,7 +4969,7 @@ const DIVE_ENTRY_RANGE = 2.6;
 // ※ 예전에는 안내 문구가 5.2미터부터 뜨는데 실제 인식은 3.2미터라, 그 사이 2미터 구간에서
 //   "누르세요"라고 해놓고 눌러도 아무 일이 안 일어났습니다. 이제 둘을 같은 값으로 맞춥니다.
 const BULTEOK_RANGE = 6.0;
-let BREATH_MAX = 60;           // 한 번 잠수해서 버틸 수 있는 시간(초). 산소통을 사면 3분으로 늘어납니다
+const BREATH_MAX = 60;         // 한 번 잠수해서 버틸 수 있는 시간(초)
 const NET_CAP = 24;            // 망사리에 담을 수 있는 개수
 const CATCH_RANGE = 1.7;       // 이 거리 안의 것만 딸 수 있음
 let breath = BREATH_MAX;
@@ -6500,7 +6489,6 @@ function openBag() {
   add(basketCount > 0, '🍊', '귤', basketCount);
   add(carrots > 0, '🥕', '당근', carrots);
   add(hasNet, '🧺', hasNet && !netCarried ? '망사리(내려둠)' : '망사리');
-  add(hasTank, '🤿', '산소통');
   add(tools.paint, '🖌', '페인트');
   if (state.diving && net.length) {
     const em = { kelp: '🌿', conch: '🐚', abalone: '🦪', octopus: '🐙' };
@@ -6806,7 +6794,7 @@ function saveGame(quiet) {
     const outX = state.inside ? HOUSE.x : (state.inShop ? SHOP_DOOR.x : state.x);
     const outZ = state.inside ? HOUSE.z + 5.4 : (state.inShop ? SHOP_DOOR.z - 1.6 : state.z);
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      coins, carrots, ponyLove, hasTank, houseStage, fixSwings,
+      coins, carrots, ponyLove, houseStage, fixSwings,
       tools, basketCount, cap: BASKET_CAP, x: outX, z: outZ,
       hasNet, netCarried, netX: netObj.position.x, netZ: netObj.position.z,
       furn: furnitureOwned,
@@ -6828,8 +6816,6 @@ function loadGame() {
   coins = d.coins || 0;
   carrots = d.carrots || 0;
   ponyLove = d.ponyLove || 0;
-  hasTank = !!d.hasTank;
-  if (hasTank) BREATH_MAX = TANK_BREATH;
   houseStage = (d.houseStage === undefined) ? 0 : Math.max(0, d.houseStage);   // 집은 처음부터 루루의 것
   fixSwings = d.fixSwings || 0;
   if (d.tools) Object.assign(tools, d.tools);
@@ -7236,7 +7222,7 @@ function tryFeedPony() {
 
 // F키 하나로 "그 자리에서 할 수 있는 일"을 전부 합니다 — 상호작용 키는 이것 하나뿐입니다.
 // 물속: 채집 (수면에 떠 있으면 뭍으로 나가기)
-// 뭍:   귤 따기 → 당근·산소통 사기 → 택배 부치기 → 집 사기·고치기 → 말 먹이기 → 물질 들어가기
+// 뭍:   귤 따기 → 씨앗 사기 → 택배 부치기 → 집 사기·고치기 → 말 먹이기 → 물질 들어가기
 //       → 아무것도 없으면 상자 잡기/놓기
 function handleActionKey() {
   // 구입 창이 떠 있으면 F는 아무 일도 하지 않습니다.
@@ -7356,13 +7342,28 @@ function handleActionKey() {
 // (예전의 E키 전용 함수는 상호작용 통일로 handleActionKey에 합쳐졌습니다)
 addEventListener('keydown', (e) => { if (isKey(e, 'KeyF')) handleActionKey(); });
 
-// 시작 화면의 일거리 그림 — 바로 불러와서, 뜨는 순간 부드럽게 나타나게 합니다.
-// (예전에는 "파일이 있는지 먼저 재보고" 붙여서 두 번 기다렸고, 그 사이 이모지 화면이
-//  먼저 보였다가 그림이 뒤늦게 튀어나왔습니다. 이제 한 번에 불러옵니다)
-for (const img of document.querySelectorAll('#startJobs img[data-src]')) {
-  img.onload = () => img.classList.add('on');      // 다 받아지면 스르륵 나타남
-  img.onerror = () => img.remove();                // 파일이 없으면 이모지가 그대로 자리를 지킴
-  img.src = img.getAttribute('data-src');
+// 시작 화면의 그림 — 넉 장의 일거리 카드와 무남이.
+// 그림이 다 받아진 뒤에 시작 화면을 통째로 띄웁니다.
+// (예전에는 글자와 단추가 먼저 뜨고 그림이 하나씩 뒤늦게 튀어나와, 화면이 덜컹거렸습니다)
+{
+  const startEl = document.getElementById('start');
+  const imgs = [...document.querySelectorAll('#startJobs img[data-src], #munamHero[data-src]')];
+  let waiting = imgs.length;
+  let shown = false;
+  const showStart = () => {
+    if (shown) return;
+    shown = true;
+    if (startEl) startEl.classList.add('ready');
+  };
+  const oneDone = () => { if (--waiting <= 0) showStart(); };
+  for (const img of imgs) {
+    img.onload = () => { img.classList.add('on'); oneDone(); };
+    img.onerror = () => { img.remove(); oneDone(); };   // 파일이 없으면 이모지가 자리를 지킵니다
+    img.src = img.getAttribute('data-src');
+  }
+  if (!imgs.length) showStart();
+  // 그림이 늦거나 안 와도 게임은 시작할 수 있어야 합니다
+  setTimeout(showStart, 2500);
 }
 
 // 시작 화면: 누르면 사라지면서 소리와 배경음악이 깨어납니다.

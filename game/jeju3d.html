@@ -12,6 +12,14 @@
 <meta name="theme-color" content="#2f7fd0">
 <link rel="icon" href="../assets/icon-192.png">
 <link rel="apple-touch-icon" href="../assets/icon-192.png">
+<!-- 시작 화면 그림 — 여기서 미리 불러둡니다.
+     이 줄이 없으면 브라우저가 큰 스크립트를 다 읽은 뒤에야 그림을 받으러 가서,
+     시작 화면이 1초쯤 늦게 뜹니다. -->
+<link rel="preload" as="image" href="../assets/farmcat/scene_farm.webp">
+<link rel="preload" as="image" href="../assets/farmcat/scene_dive.webp">
+<link rel="preload" as="image" href="../assets/farmcat/scene_horse.webp">
+<link rel="preload" as="image" href="../assets/farmcat/scene_house.webp">
+<link rel="preload" as="image" href="../assets/farmcat/munam_hero.webp">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #a9d3ea; }
@@ -370,7 +378,11 @@
     text-align: center; cursor: pointer;
     transition: opacity .45s ease;
     overflow: hidden;
+    /* 그림이 다 받아지기 전에는 통째로 숨겨둡니다.
+       안 그러면 "시작하기"만 먼저 뜨고 카드 그림이 뒤늦게 하나씩 튀어나옵니다. */
+    opacity: 0;
   }
+  #start.ready { opacity: 1; }
   #start.gone { opacity: 0; pointer-events: none; }
 
   /* 제목 — 위쪽을 가로지르는 크림색 현판 */
@@ -396,10 +408,11 @@
   /* 일거리 카드 — 그림이 들어갈 자리를 미리 잡아둡니다.
      그림이 아직 없어도 자리가 무너지지 않도록 큼직한 이모지를 밑에 깔아둡니다. */
   #startJobs {
+    position: relative;   /* 한가운데 설 무남이의 기준점 */
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: clamp(6px, 1.2vw, 9px);
-    /* 예전의 절반 크기로, 가운데에 깔끔하게 (그림 파일도 절반 해상도로 줄여 로딩이 가볍습니다) */
-    width: min(280px, 88vw, 40vh);
+    /* 카드 사이를 넉넉히 벌려, 그 십자 자리에 무남이가 들어섭니다 */
+    gap: clamp(46px, 12.5vw, 62px);
+    width: min(316px, 92vw, 44vh);
     margin: 0 auto;
   }
   .job {
@@ -429,6 +442,26 @@
   .job .cap span {
     display: block; margin-top: 3px; color: var(--desc);
     font-size: clamp(10px, 2.4vw, 12.5px); line-height: 1.45;
+  }
+  /* 무남이 — 카드 넉 장이 만나는 한가운데에 섭니다 */
+  #munamHero {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    height: clamp(128px, 35vw, 178px);
+    z-index: 2; pointer-events: none;   /* 카드를 누르는 데 걸리지 않게 */
+    filter: drop-shadow(0 7px 16px rgba(0,0,0,.6));
+    opacity: 0; transition: opacity .25s ease;
+  }
+  #munamHero.on { opacity: 1; }
+  #munamHero:not([src]), #munamHero[src=""] { display: none; }
+  /* 글자는 카드 아래에 따로 놓습니다 */
+  #startRomance {
+    margin-top: 8px; text-align: center;
+  }
+  #startRomance b {
+    color: #ff9ec2; font-weight: 700;
+    font-size: clamp(12px, 2.9vw, 15.5px);
+    text-shadow: 0 2px 6px rgba(0,0,0,.7);
   }
   /* 아직 안 만든 일거리에는 "준비 중" 딱지를 붙입니다 */
   .job.soon .cap b::after {
@@ -599,7 +632,12 @@
         <div class="shot">🏚<img alt="" data-src="../assets/farmcat/scene_house.webp"></div>
         <div class="cap"><b>헌집 고치기</b></div>
       </div>
+      <!-- 무남이 — 일거리 카드 넉 장 한가운데 서 있습니다.
+           이 게임에서 돈을 모으는 진짜 이유라, 카드 사이를 벌려 그 자리를 냈습니다. -->
+      <img id="munamHero" alt="" data-src="../assets/farmcat/munam_hero.webp">
     </div>
+
+    <div id="startRomance"><b>그리고 설레는 사랑 💕</b></div>
 
     <div id="startKeys">
       <b class="pc">방향키</b><span class="pc">루루 이동</span>
@@ -615,7 +653,7 @@
       <b class="mob">🗺 배지</b><span class="mob">전체 지도</span>
       <b class="mob">🎵 배지</b><span class="mob">누르면 배경음악 꺼짐</span>
     </div>
-    <div id="startGo"><span class="paw">🐾</span>눌러서 시작<span class="paw">🐾</span></div>
+    <div id="startGo"><span class="paw">🐾</span>시작하기<span class="paw">🐾</span></div>
   </div>
 
   <!-- 폰용: 왼쪽 화면을 누르면 여기 조이스틱이 나타나고, 오른쪽 아래엔 행동 버튼이 있습니다 -->
@@ -643,6 +681,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 </script>
 <script src="lib/three.min.js"></script>
 <!-- ?v= 뒤 숫자는 "캐시 무시용" 표시입니다. jeju3d.js를 고쳤는데 화면이 그대로면 숫자를 1 올리세요. -->
-<script src="jeju3d.js?v=198"></script>
+<script src="jeju3d.js?v=207"></script>
 </body>
 </html>
